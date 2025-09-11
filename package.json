@@ -1,0 +1,33 @@
+{
+  "name": "arzesh-erp",
+  "private": true,
+  "workspaces": [
+    "apps/backend",
+    "apps/frontend"
+  ],
+  "scripts": {
+    "postinstall": "npm -w apps/backend run prisma:generate || exit 0",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "npm -w apps/backend run build",
+    "build:frontend": "npm -w apps/frontend run build:icons && npm -w apps/frontend run build",
+    "start:backend": "npm -w apps/backend run start",
+    "start:frontend": "npm -w apps/frontend run start",
+    "start:all": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "serve": "npm run build && npm run start:all",
+    "dev:backend": "npm -w apps/backend run start:dev",
+    "dev:frontend": "npm -w apps/frontend run dev",
+    "dev": "npm run dev:all",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
+  },
+  "devDependencies": {
+    "@next/swc-win32-x64-msvc": "^15.5.2",
+    "concurrently": "^9.2.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "dependencies": {},
+  "overrides": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  }
+}

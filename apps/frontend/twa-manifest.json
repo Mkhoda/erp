@@ -1,0 +1,32 @@
+{
+  "packageId": "com.arzesh.erp",
+  "host": "your-domain.com",
+  "name": "Arzesh ERP",
+  "themeColor": "#0B5ED7",
+  "navigationColor": "#000000",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://your-domain.com/icons/icon-512.png",
+  "maskableIconUrl": "https://your-domain.com/icons/maskable-512.png",
+  "shortcuts": [
+    {
+      "name": "داشبورد",
+      "short_name": "داشبورد", 
+      "url": "/dashboard",
+      "icon": "https://your-domain.com/icons/icon-192.png"
+    },
+    {
+      "name": "دارایی‌ها",
+      "short_name": "دارایی‌ها",
+      "url": "/dashboard/assets", 
+      "icon": "https://your-domain.com/icons/icon-192.png"
+    }
+  ],
+  "signing": {
+    "keystore": "./android-signing-key.keystore",
+    "alias": "android-signing-key",
+    "keystorePassword": "your-keystore-password",
+    "keyPassword": "your-key-password"
+  }
+}

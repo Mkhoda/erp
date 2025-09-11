@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: arzesh_erp_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ArzeshERP2025!
+      POSTGRES_DB: arzesh_erp
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./apps/backend/prisma/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - arzesh_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend API
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: arzesh_erp_backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=postgresql://postgres:ArzeshERP2025!@db:5432/arzesh_erp?schema=public
+      - DIRECT_URL=postgresql://postgres:ArzeshERP2025!@db:5432/arzesh_erp
+      - JWT_SECRET=ArzeshERP_JWT_Secret_2025_Production_Key
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./apps/backend/uploads:/app/uploads
+    networks:
+      - arzesh_network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    container_name: arzesh_erp_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://91.92.181.146:3001
+    depends_on:
+      - backend
+    networks:
+      - arzesh_network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: arzesh_erp_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - arzesh_network
+
+volumes:
+  db_data:
+
+networks:
+  arzesh_network:
+    driver: bridge

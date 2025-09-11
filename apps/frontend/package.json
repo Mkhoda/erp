@@ -1,0 +1,42 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Arzesh ERP",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "build:icons": "echo no-op icon build",
+    "build:apk": "scripts/build-apk.bat",
+    "build:apk:linux": "bash scripts/build-apk.sh",
+    "pwa:validate": "npx pwa-asset-generator --help",
+    "export": "next build && next export"
+  },
+  "dependencies": {
+    "next": "^14.2.4",
+    "next-pwa": "^5.6.0",
+    "framer-motion": "^11.11.17",
+    "lucide-react": "^0.460.0",
+  "react": "18.2.0",
+  "react-dom": "18.2.0",
+  "recharts": "^3.1.2",
+    "workbox-webpack-plugin": "^7.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^20.11.30",
+    "@types/react": "18.2.46",
+    "@types/react-dom": "18.2.18",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.4",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}

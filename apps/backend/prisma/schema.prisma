@@ -1,0 +1,261 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  firstName String
+  lastName  String
+  role      Role      @default(USER)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  // Many-to-many memberships in departments (additional to primary departmentId)
+  userDepartments UserDepartment[]
+  timesheets Timesheet[]
+  assetAssignments AssetAssignment[]        @relation("AssetAssignmentUser")
+  assignedByAssignments AssetAssignment[]   @relation("AssetAssignmentAssignedBy")
+  assetCostsCreated AssetCost[] @relation("AssetCostCreatedBy")
+  assetsCreated Asset[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  USER
+  EXPERT
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  users     User[]
+  userDepartments UserDepartment[]
+  assetAssignments AssetAssignment[]
+  pagePermissions PagePermission[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Timesheet {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  date      DateTime
+  hours     Float
+  project   String?
+  note      String?
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Asset Management
+
+enum AssetCondition {
+  NEW
+  USED_GOOD
+  DEFECTIVE
+}
+
+enum AssetAvailability {
+  AVAILABLE
+  IN_USE
+  CONSUMED
+  MAINTENANCE
+  RETIRED
+  LOST
+}
+
+enum BarcodeType {
+  QR
+  CODE128
+}
+
+enum AssetCostType {
+  PURCHASE
+  REPAIR
+  MAINTENANCE
+  OTHER
+}
+
+model AssetType {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  assets      Asset[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AssetCategory {
+  id          String          @id @default(cuid())
+  name        String          @unique
+  description String?
+  codePrefix  String?
+  parentId    String?
+  parent      AssetCategory?  @relation("AssetCategoryToAssetCategory", fields: [parentId], references: [id])
+  children    AssetCategory[] @relation("AssetCategoryToAssetCategory")
+  assets      Asset[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Asset {
+  id             String            @id @default(cuid())
+  name           String
+  barcode        String            @unique
+  oldBarcode     String?
+  description    String?
+  typeId         String
+  type           AssetType        @relation(fields: [typeId], references: [id])
+  condition      AssetCondition
+  categoryId     String
+  category       AssetCategory     @relation(fields: [categoryId], references: [id])
+  availability   AssetAvailability @default(AVAILABLE)
+  barcodeType    BarcodeType       @default(QR)
+  serialNumber   String?
+  location       String?
+  purchaseDate   DateTime?
+  cost           Float?
+  consumedAt     DateTime?
+  images         AssetImage[]
+  assignments    AssetAssignment[]
+  maintenances   AssetMaintenance[]
+  costs          AssetCost[]
+  createdById    String?
+  createdBy      User?             @relation(fields: [createdById], references: [id])
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model AssetImage {
+  id        String  @id @default(cuid())
+  assetId   String
+  asset     Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  url       String
+  caption   String?
+  createdAt DateTime @default(now())
+}
+
+model AssetAssignment {
+  id            String     @id @default(cuid())
+  assetId       String
+  asset         Asset      @relation(fields: [assetId], references: [id])
+  userId        String?
+  user          User?      @relation("AssetAssignmentUser", fields: [userId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  buildingId    String?
+  building      Building?  @relation(fields: [buildingId], references: [id])
+  floorId       String?
+  floor         Floor?     @relation(fields: [floorId], references: [id])
+  roomId        String?
+  room          Room?      @relation(fields: [roomId], references: [id])
+  assignedAt    DateTime   @default(now())
+  returnedAt    DateTime?
+  purpose       String?    @default("استفاده")
+  note          String?
+  assignedById  String?
+  assignedBy    User?      @relation("AssetAssignmentAssignedBy", fields: [assignedById], references: [id])
+}
+
+model AssetMaintenance {
+  id          String   @id @default(cuid())
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id])
+  startDate   DateTime
+  endDate     DateTime?
+  cost        Float?
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AssetCost {
+  id          String        @id @default(cuid())
+  assetId     String
+  asset       Asset         @relation(fields: [assetId], references: [id])
+  type        AssetCostType
+  amount      Float
+  date        DateTime      @default(now())
+  note        String?
+  createdById String?
+  createdBy   User?         @relation("AssetCostCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([assetId, date])
+}
+
+model Building {
+  id               String            @id @default(cuid())
+  name             String            @unique
+  floors           Floor[]
+  rooms            Room[]
+  assetAssignments AssetAssignment[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model Floor {
+  id               String            @id @default(cuid())
+  name             String
+  buildingId       String
+  building         Building          @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  rooms            Room[]
+  assetAssignments AssetAssignment[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([buildingId, name])
+}
+
+model Room {
+  id               String            @id @default(cuid())
+  name             String
+  buildingId       String
+  floorId          String?
+  building         Building          @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  floor            Floor?            @relation(fields: [floorId], references: [id])
+  assetAssignments AssetAssignment[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([buildingId, floorId, name])
+}
+
+// Many-to-many relation between User and Department (memberships)
+model UserDepartment {
+  userId       String
+  departmentId String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@id([userId, departmentId])
+}
+
+// Department-based page access control
+model PagePermission {
+  id            String      @id @default(cuid())
+  departmentId  String
+  department    Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  page          String
+  canRead       Boolean     @default(true)
+  canWrite      Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([departmentId, page])
+  @@index([page])
+}

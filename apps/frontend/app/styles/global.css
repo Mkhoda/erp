@@ -1,0 +1,189 @@
+
+@import "tailwindcss";
+
+/* Import the public styles via correct paths */
+@import url("/css/fontiran.css");
+@import url("/css/style.css");
+
+html, body { 
+  min-height: 100%; 
+  scroll-behavior: smooth;
+}
+
+/* Enhanced smooth theme transitions */
+html {
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced float animation for background blobs */
+@keyframes float {
+	0% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+	25% { transform: translate3d(15px, -8px, 0) scale(1.08) rotate(1deg); }
+	50% { transform: translate3d(-12px, 12px, 0) scale(0.95) rotate(-1deg); }
+	75% { transform: translate3d(8px, -6px, 0) scale(1.02) rotate(0.5deg); }
+	100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+}
+
+@keyframes fadeFloat {
+	0%, 100% { opacity: 0.3; transform: translateY(0); }
+	50% { opacity: 0.6; transform: translateY(-10px); }
+}
+
+@keyframes pulse-subtle {
+	0%, 100% { opacity: 0.4; }
+	50% { opacity: 0.7; }
+}
+
+body { 
+  font-feature-settings: "liga" 1, "kern" 1;
+}
+
+/* Enhanced Dark theme improvements */
+.dark {
+  color-scheme: dark;
+}
+
+/* Force proper color inheritance in dark mode */
+.dark * {
+  border-color: inherit;
+}
+
+/* Enhanced text contrast for better readability */
+.dark .text-gray-900 { color: rgb(243 244 246) !important; }
+.dark .text-gray-800 { color: rgb(229 231 235) !important; }
+.dark .text-gray-700 { color: rgb(209 213 219) !important; }
+.dark .text-gray-600 { color: rgb(156 163 175) !important; }
+.dark .text-gray-500 { color: rgb(107 114 128) !important; }
+
+/* Enhanced background patterns for better visual hierarchy */
+.bg-pattern-dots {
+  background-image: radial-gradient(circle at 2px 2px, rgba(99, 102, 241, 0.15) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.dark .bg-pattern-dots {
+  background-image: radial-gradient(circle at 2px 2px, rgba(147, 197, 253, 0.08) 1px, transparent 0);
+}
+
+.bg-pattern-grid {
+  background-image: 
+    linear-gradient(rgba(99, 102, 241, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.1) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.dark .bg-pattern-grid {
+  background-image: 
+    linear-gradient(rgba(147, 197, 253, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(147, 197, 253, 0.05) 1px, transparent 1px);
+}
+
+/* Enhanced scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: rgb(248 250 252);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background-color: rgb(17 24 39);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgb(203 213 225);
+  border-radius: 4px;
+  border: 1px solid rgb(241 245 249);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgb(55 65 81);
+  border: 1px solid rgb(31 41 55);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(148 163 184);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(75 85 99);
+}
+
+/* Enhanced Selection styling with better contrast */
+::selection {
+  background-color: rgb(191 219 254);
+  color: rgb(30 58 138);
+}
+
+.dark ::selection {
+  background-color: rgb(37 99 235);
+  color: rgb(219 234 254);
+}
+
+/* Custom utilities for better theme support */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-card {
+  background: rgba(17, 24, 39, 0.7);
+  border: 1px solid rgba(55, 65, 81, 0.3);
+}
+
+.text-adaptive {
+  color: rgb(17 24 39);
+}
+
+.dark .text-adaptive {
+  color: rgb(243 244 246);
+}
+
+.bg-adaptive {
+  background-color: rgb(255 255 255);
+}
+
+.dark .bg-adaptive {
+  background-color: rgb(17 24 39);
+}
+
+.border-adaptive {
+  border-color: rgb(229 231 235);
+}
+
+.dark .border-adaptive {
+  border-color: rgb(55 65 81);
+}
+
+/* Enhanced button states */
+.btn-primary {
+  background: linear-gradient(135deg, rgb(59 130 246), rgb(37 99 235));
+  color: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(29 78 216));
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+}
+
+.dark .btn-primary {
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(29 78 216));
+}
+
+.dark .btn-primary:hover {
+  background: linear-gradient(135deg, rgb(59 130 246), rgb(37 99 235));
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.4);
+}

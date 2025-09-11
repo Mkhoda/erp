@@ -1,0 +1,1 @@
+This file exists to keep the `public` directory non-empty when next-pwa generates its service worker at build time. Safe to delete if not using next-pwa.
