@@ -6,7 +6,9 @@ import Link from 'next/link';
 
 export default function SignUpPage() {
   const router = useRouter();
-  const [name, setName] = React.useState('');
+  const [firstName, setFirstName] = React.useState('');
+  const [lastName, setLastName] = React.useState('');
+  const [phone, setPhone] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
@@ -43,6 +45,11 @@ export default function SignUpPage() {
     setError(null);
 
     // Validation
+    if (!/^98\d{10}$/.test(phone)) {
+      setError('شماره موبایل باید با 98 شروع شود و 12 رقم باشد. مثال: 98912XXXXXXX');
+      setLoading(false);
+      return;
+    }
     if (password !== confirmPassword) {
       setError('رمزهای عبور مطابقت ندارند');
       setLoading(false);
@@ -65,12 +72,12 @@ export default function SignUpPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ firstName, lastName, email, password, phone })
       });
       
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || 'ثبت نام ناموفق بود');
+        throw new Error(data.message || 'ثبت نام ناموفق بود (ایمیل یا شماره تکراری است)');
       }
       
       router.push('/signin?message=registration-success');
@@ -110,24 +117,53 @@ export default function SignUpPage() {
           className="bg-white/80 dark:bg-gray-800/80 shadow-xl backdrop-blur-sm p-8 border border-gray-200 dark:border-gray-700 rounded-2xl"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="gap-4 grid grid-cols-1 sm:grid-cols-2">
+              <div>
+                <label htmlFor="firstName" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">نام</label>
+                <div className="relative">
+                  <input
+                    id="firstName"
+                    type="text"
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    required
+                    className="bg-white dark:bg-gray-700 px-4 py-3 border border-gray-200 dark:border-gray-600 focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-white transition-all"
+                    placeholder="نام"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="lastName" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">نام خانوادگی</label>
+                <div className="relative">
+                  <input
+                    id="lastName"
+                    type="text"
+                    value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    required
+                    className="bg-white dark:bg-gray-700 px-4 py-3 border border-gray-200 dark:border-gray-600 focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-white transition-all"
+                    placeholder="نام خانوادگی"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div>
-              <label htmlFor="name" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                نام کامل
-              </label>
+              <label htmlFor="phone" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">شماره موبایل (فرمت: 98XXXXXXXXXX)</label>
               <div className="relative">
                 <input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value.replace(/\s+/g,''))}
                   required
-                  className="bg-white dark:bg-gray-700 px-4 py-3 border border-gray-200 dark:border-gray-600 focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-white transition-all"
-                  placeholder="نام و نام خانوادگی خود را وارد کنید"
+                  pattern="98\\d{10}"
+                  className={`bg-white dark:bg-gray-700 px-4 py-3 border ${/^98\d{10}$/.test(phone)||!phone? 'border-gray-200 dark:border-gray-600':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^98\d{10}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-gray-900 dark:text-white transition-all`}
+                  placeholder="مثال: 98912XXXXXXX"
                 />
-                <svg className="top-3 left-3 absolute w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+                <span className="top-3 left-3 absolute text-gray-400 text-xs">IR</span>
               </div>
+              <p className="mt-1 text-gray-500 dark:text-gray-400 text-xs">شماره باید با 98 شروع شود و 12 رقم باشد.</p>
             </div>
 
             <div>

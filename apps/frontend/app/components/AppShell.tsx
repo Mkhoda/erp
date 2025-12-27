@@ -11,7 +11,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ClientProviders>
       <GlassyBackground />
-      <div className="relative flex flex-col min-h-screen text-gray-900 dark:text-gray-100">
+      <div className="relative flex flex-col min-h-screen text-theme-primary">
         <Navbar />
         <motion.main 
           className="flex-1"

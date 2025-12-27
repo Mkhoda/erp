@@ -15,7 +15,7 @@ export default function GlassyBackground() {
   return (
     <div className="-z-10 fixed inset-0 overflow-hidden pointer-events-none">
       {/* Base clean gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-50 dark:from-gray-900 via-white dark:via-gray-800 to-blue-50 dark:to-gray-900" />
+      <div className="absolute inset-0 bg-gradient-theme-light" />
       
       {/* Glass bullet patterns with advanced blur and fade */}
       <div className="absolute inset-0 opacity-30 dark:opacity-15" 

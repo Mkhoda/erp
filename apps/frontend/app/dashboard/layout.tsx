@@ -84,53 +84,53 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [sidebarOpen]);
   return (
-    <div className="flex bg-gray-50 dark:bg-gray-900 min-h-dvh">
+    <div className="flex bg-theme-secondary min-h-dvh">
       {sidebarOpen && (<div className="md:hidden z-40 fixed inset-0 bg-black/30 dark:bg-black/50" onClick={()=>setSidebarOpen(false)} />)}
       {/* Sidebar */}
       <aside 
-        className={`${sidebarOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 fixed md:static inset-y-0 right-0 z-50 w-72 md:w-64 transition-transform flex flex-col bg-white/95 dark:bg-gray-900/95 supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-gray-900/80 backdrop-blur-xl border-r border-gray-200/60 dark:border-gray-700/60 shadow-2xl md:shadow-lg`}
+        className={`${sidebarOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 fixed md:static inset-y-0 right-0 z-50 w-72 md:w-64 transition-transform flex flex-col bg-theme-card backdrop-blur-xl border-r border-theme shadow-2xl md:shadow-lg`}
         aria-label="ناوبری اصلی"
         role="navigation"
         aria-hidden={!sidebarOpen ? "true" : "false"}
       >
-        <div className="px-4 py-4 border-gray-200/60 dark:border-gray-700/60 border-b">
+        <div className="px-4 py-4 border-theme border-b">
           <div className="flex justify-between items-center">
             <div>
-              <div className="font-bold text-gray-900 dark:text-gray-100">Arzesh ERP</div>
-              <div className="text-gray-500 dark:text-gray-400 text-xs">داشبورد مدیریت</div>
+              <div className="font-bold text-theme-primary">Arzesh ERP</div>
+              <div className="text-theme-muted text-xs">داشبورد مدیریت</div>
             </div>
-            <button className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded-lg transition-colors" onClick={() => setSidebarOpen(false)} aria-label="بستن"><X className="w-5 h-5 text-gray-700 dark:text-gray-300"/></button>
+            <button className="md:hidden hover:bg-theme-secondary p-2 rounded-lg transition-colors" onClick={() => setSidebarOpen(false)} aria-label="بستن"><X className="w-5 h-5 text-theme-secondary"/></button>
           </div>
         </div>
         <nav className="flex-1 space-y-1 p-2">
           {links.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
             return (
-              <Link key={href} href={href} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${active? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}>
+              <Link key={href} href={href} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${active? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}>
                 <Icon className="w-4 h-4" />
                 <span>{label}</span>
               </Link>
             );
           })}
-          <Link href="/dashboard/profile" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/profile'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}><UserCog className="w-4 h-4"/> پروفایل</Link>
-          <div className="mt-6 px-3 font-semibold text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest">مدیریت دارایی</div>
-          <Link href="/dashboard/assets" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}><Boxes className="w-4 h-4"/> دارایی‌ها</Link>
-          <Link href="/dashboard/assets/types" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets/types'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}><Layers className="w-4 h-4"/> انواع دارایی</Link>
-          <Link href="/dashboard/assets/categories" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets/categories'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}><Tag className="w-4 h-4"/> دسته‌بندی‌ها</Link>
-          <Link href="/dashboard/assets/assignments" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets/assignments'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}><Handshake className="w-4 h-4"/> واگذاری‌ها</Link>
+          <Link href="/dashboard/profile" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/profile'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><UserCog className="w-4 h-4"/> پروفایل</Link>
+          <div className="mt-6 px-3 font-semibold text-[10px] text-theme-muted uppercase tracking-widest">مدیریت دارایی</div>
+          <Link href="/dashboard/assets" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Boxes className="w-4 h-4"/> دارایی‌ها</Link>
+          <Link href="/dashboard/assets/types" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets/types'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Layers className="w-4 h-4"/> انواع دارایی</Link>
+          <Link href="/dashboard/assets/categories" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets/categories'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Tag className="w-4 h-4"/> دسته‌بندی‌ها</Link>
+          <Link href="/dashboard/assets/assignments" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets/assignments'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Handshake className="w-4 h-4"/> واگذاری‌ها</Link>
           {(role==='EXPERT'||role==='ADMIN'||role==='MANAGER') && (
-            <Link href="/dashboard/accounting" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/accounting'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}>
+            <Link href="/dashboard/accounting" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/accounting'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}>
               <CircleDollarSign className="w-4 h-4"/>
               <span>حسابداری دارایی</span>
               <span className="inline-block bg-amber-100 dark:bg-amber-900/50 ms-auto px-1.5 py-0.5 rounded-md font-medium text-[10px] text-amber-700 dark:text-amber-300">EXPERT</span>
             </Link>
           )}
           
-          <div className="mt-6 px-3 font-semibold text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest">مدیریت سازمان</div>
-          <Link href="/dashboard/departments" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/departments'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}><MapPin className="w-4 h-4"/> دپارتمان‌ها</Link>
-          <Link href="/dashboard/buildings" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/buildings'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}><Building className="w-4 h-4"/> ساختمان‌ها</Link>
-          <Link href="/dashboard/floors" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/floors'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}><Layers className="w-4 h-4"/> طبقات</Link>
-          <Link href="/dashboard/rooms" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/rooms'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-700 dark:hover:text-blue-300 text-gray-700 dark:text-gray-300'}`}><Home className="w-4 h-4"/> اتاق‌ها</Link>
+          <div className="mt-6 px-3 font-semibold text-[10px] text-theme-muted uppercase tracking-widest">مدیریت سازمان</div>
+          <Link href="/dashboard/departments" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/departments'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><MapPin className="w-4 h-4"/> دپارتمان‌ها</Link>
+          <Link href="/dashboard/buildings" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/buildings'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Building className="w-4 h-4"/> ساختمان‌ها</Link>
+          <Link href="/dashboard/floors" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/floors'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Layers className="w-4 h-4"/> طبقات</Link>
+          <Link href="/dashboard/rooms" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/rooms'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Home className="w-4 h-4"/> اتاق‌ها</Link>
         </nav>
       </aside>
       {/* Main */}
@@ -138,13 +138,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Header */}
         <header className="top-0 z-10 sticky">
           <div className="mx-auto px-4 max-w-7xl">
-            <div className="flex items-center gap-3 bg-white/60 supports-[backdrop-filter]:bg-white/40 dark:bg-gray-900/60 dark:supports-[backdrop-filter]:bg-gray-900/40 shadow-sm backdrop-blur-xl mt-4 px-4 py-3 border border-white/70 dark:border-gray-700/50 rounded-2xl transition-all duration-300">
-              <button className="md:hidden bg-white/80 hover:bg-white dark:bg-gray-900/80 dark:hover:bg-gray-800 backdrop-blur-sm p-2 border border-gray-200/50 dark:border-gray-700/50 rounded-xl transition-all" onClick={() => setSidebarOpen(true)} aria-label="باز کردن منو"><Menu className="w-5 h-5 text-gray-700 dark:text-gray-300"/></button>
-              <nav aria-label="breadcrumb" className="flex items-center gap-1 text-gray-600 dark:text-gray-300 text-xs sm:text-sm truncate">
+            <div className="flex items-center gap-3 bg-theme-card shadow-sm backdrop-blur-xl mt-4 px-4 py-3 border border-theme rounded-2xl transition-all duration-300">
+              <button className="md:hidden bg-theme-primary hover:bg-theme-secondary backdrop-blur-sm p-2 border border-theme rounded-xl transition-all" onClick={() => setSidebarOpen(true)} aria-label="باز کردن منو"><Menu className="w-5 h-5 text-theme-primary"/></button>
+              <nav aria-label="breadcrumb" className="flex items-center gap-1 text-theme-secondary text-xs sm:text-sm truncate">
                 {breadcrumbs.map((c, idx) => (
                   <React.Fragment key={c.href}>
                     {idx>0 && <ChevronLeft className="opacity-60 w-4 h-4"/>}
-                    <Link href={c.href} className={`inline-flex items-center gap-1 hover:text-blue-700 dark:hover:text-blue-300 transition-colors rounded-lg px-2 py-1 ${idx===breadcrumbs.length-1?'font-semibold text-gray-900 dark:text-gray-100':''}`} onClick={()=> setSidebarOpen(false)}>
+                    <Link href={c.href} className={`inline-flex items-center gap-1 hover:text-blue-700 dark:hover:text-blue-300 transition-colors rounded-lg px-2 py-1 ${idx===breadcrumbs.length-1?'font-semibold text-theme-primary':''}`} onClick={()=> setSidebarOpen(false)}>
                       <c.Icon className="w-4 h-4"/>
                       <span className="max-w-[10ch] sm:max-w-none truncate">{c.label}</span>
                     </Link>
@@ -160,7 +160,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
-  <main className="supports-[backdrop-filter]:bg-transparent bg-gradient-to-b from-gray-50/80 dark:from-gray-900/80 to-white/60 dark:to-gray-800/60 mx-auto px-4 py-6 w-full max-w-7xl text-gray-900 dark:text-gray-100 transition-colors duration-300">{children}</main>
+  <main className="supports-[backdrop-filter]:bg-transparent bg-gradient-theme mx-auto px-4 py-6 w-full max-w-7xl text-theme-primary transition-colors duration-300">{children}</main>
       </div>
     </div>
   );
@@ -178,8 +178,8 @@ function UserMenu({ onLogout, theme, onToggleTheme }: { onLogout: () => void, th
   }, []);
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(v=>!v)} className="inline-flex items-center gap-2 hover:bg-white/60 dark:hover:bg-gray-800/60 backdrop-blur-sm px-3 py-2 border border-transparent rounded-xl transition-all duration-200">
-        <UserRound className="w-5 h-5 text-gray-700 dark:text-gray-300"/>
+      <button onClick={() => setOpen(v=>!v)} className="inline-flex items-center gap-2 hover:bg-theme-secondary backdrop-blur-sm px-3 py-2 border border-transparent rounded-xl transition-all duration-200">
+        <UserRound className="w-5 h-5 text-theme-primary"/>
         <span className="hidden sm:inline font-medium text-gray-800 dark:text-gray-200 text-sm">حساب</span>
       </button>
       {open && (

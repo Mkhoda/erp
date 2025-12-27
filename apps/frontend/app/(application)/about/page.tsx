@@ -53,10 +53,10 @@ export default function AboutPage() {
             animate={{ opacity: 1, y: 0 }} 
             className="mb-12 text-center"
           >
-            <h1 className="mb-6 font-bold text-gray-900 dark:text-gray-100 text-4xl md:text-5xl">
+            <h1 className="mb-6 font-bold text-theme-primary text-4xl md:text-5xl">
               درباره <span className="bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 text-transparent">ارزش ERP</span>
             </h1>
-            <p className="mx-auto max-w-3xl text-gray-600 dark:text-gray-400 text-xl leading-relaxed">
+            <p className="mx-auto max-w-3xl text-theme-secondary text-xl leading-relaxed">
               ما با تمرکز بر سادگی، کارایی و زیبایی، راهکارهای یکپارچه مدیریت منابع سازمانی ارائه می‌دهیم
               که به رشد و موفقیت کسب‌وکار شما کمک می‌کند.
             </p>
@@ -89,10 +89,10 @@ export default function AboutPage() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="space-y-6"
           >
-            <h2 className="font-bold text-gray-900 dark:text-gray-100 text-3xl">
+            <h2 className="font-bold text-theme-primary text-3xl">
               تیمی متعهد به <span className="text-blue-600 dark:text-blue-400">تعالی</span>
             </h2>
-            <div className="space-y-4 text-gray-700 dark:text-gray-300 leading-relaxed">
+            <div className="space-y-4 text-theme-secondary leading-relaxed">
               <p>
                 تیم ما از متخصصان مجرب حوزه نرم‌افزار، مدیریت و کسب‌وکار تشکیل شده است که با تجربه 
                 سال‌ها کار در صنایع مختلف، درک عمیقی از چالش‌های سازمان‌ها دارند.
@@ -116,10 +116,10 @@ export default function AboutPage() {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="mb-12 text-center"
         >
-          <h2 className="mb-4 font-bold text-gray-900 dark:text-gray-100 text-3xl">
+          <h2 className="mb-4 font-bold text-theme-primary text-3xl">
             ارزش‌های <span className="text-purple-600 dark:text-purple-400">ما</span>
           </h2>
-          <p className="mx-auto max-w-2xl text-gray-600 dark:text-gray-400">
+          <p className="mx-auto max-w-2xl text-theme-secondary">
             اصول و باورهایی که ما را در مسیر ارائه بهترین خدمات راهنمایی می‌کند
           </p>
         </motion.div>
@@ -131,16 +131,16 @@ export default function AboutPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 * index }}
-              className="group bg-white/70 dark:bg-gray-900/70 shadow-sm hover:shadow-lg backdrop-blur-sm p-6 border border-gray-200/50 dark:border-gray-700/50 rounded-xl hover:scale-[1.02] transition-all duration-300"
+              className="group bg-theme-card shadow-sm hover:shadow-lg backdrop-blur-sm p-6 border border-theme rounded-xl hover:scale-[1.02] transition-all duration-300"
             >
               <div className="text-center">
                 <div className="inline-flex justify-center items-center bg-gradient-to-br from-blue-500 to-purple-500 mb-4 rounded-xl w-16 h-16 group-hover:scale-110 transition-transform">
                   <value.icon className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="mb-3 font-bold text-gray-900 dark:text-gray-100 text-xl">
+                <h3 className="mb-3 font-bold text-theme-primary text-xl">
                   {value.title}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                <p className="text-theme-secondary leading-relaxed">
                   {value.description}
                 </p>
               </div>
@@ -157,10 +157,10 @@ export default function AboutPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <h2 className="mb-6 font-bold text-gray-900 dark:text-gray-100 text-3xl">
+            <h2 className="mb-6 font-bold text-theme-primary text-3xl">
               مأموریت <span className="text-blue-600 dark:text-blue-400">ما</span>
             </h2>
-            <p className="mb-8 text-gray-700 dark:text-gray-300 text-lg leading-relaxed">
+            <p className="mb-8 text-theme-secondary text-lg leading-relaxed">
               هدف ما ایجاد پلی میان تکنولوژی پیشرفته و نیازهای واقعی کسب‌وکارها است. 
               ما می‌خواهیم با ارائه راهکارهای هوشمند و کاربرپسند، به سازمان‌ها کمک کنیم 
               تا منابع خود را بهینه مدیریت کرده و بر روی آنچه که واقعاً اهمیت دارد متمرکز شوند.

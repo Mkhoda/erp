@@ -68,8 +68,9 @@ export default function RootLayout({
               (function(){
                 try {
                   var theme = localStorage.getItem('theme');
+                  // Prefer light by default for application pages; user can still switch to dark elsewhere
                   if (!theme) {
-                    theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                    theme = 'light';
                     localStorage.setItem('theme', theme);
                   }
                   if (theme === 'dark') {
@@ -102,7 +103,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${montserrat.variable} ${poppins.variable} font-montserrat antialiased bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
+      <body className={`${montserrat.variable} ${poppins.variable} font-montserrat antialiased bg-theme-secondary text-theme-primary`}>
         <GlassyBackground />
         {children}
       </body>

@@ -67,7 +67,7 @@ export default function ServicesPage() {
             <h1 className="bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-6 font-bold text-transparent text-5xl md:text-6xl">
               خدمات ما
             </h1>
-            <p className="mx-auto max-w-3xl text-gray-600 dark:text-gray-300 text-xl leading-relaxed">
+            <p className="mx-auto max-w-3xl text-theme-secondary text-xl leading-relaxed">
               ما مجموعه کاملی از خدمات ERP را ارائه می‌دهیم تا کسب‌وکار شما را به سطح جدیدی از کارایی و موفقیت برسانیم
             </p>
           </motion.div>
@@ -84,7 +84,7 @@ export default function ServicesPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1, duration: 0.6 }}
-                className="group bg-white/80 dark:bg-gray-800/80 shadow-lg hover:shadow-2xl backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden transition-all duration-300"
+                className="group bg-theme-card shadow-lg hover:shadow-2xl backdrop-blur-sm border border-theme rounded-2xl overflow-hidden transition-all duration-300"
               >
                 <div className="relative h-48 overflow-hidden">
                   <Image 
@@ -95,24 +95,24 @@ export default function ServicesPage() {
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                  <div className="top-4 right-4 absolute flex justify-center items-center bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-full w-12 h-12 text-3xl">
+                  <div className="top-4 right-4 absolute flex justify-center items-center bg-theme-card backdrop-blur-sm rounded-full w-12 h-12 text-3xl">
                     {service.icon}
                   </div>
                 </div>
                 
                 <div className="p-6">
-                  <h3 className="mb-3 font-bold text-gray-900 dark:group-hover:text-blue-400 dark:text-white group-hover:text-blue-600 text-xl transition-colors">
+                  <h3 className="mb-3 font-bold text-theme-primary dark:group-hover:text-blue-400 group-hover:text-blue-600 text-xl transition-colors">
                     {service.title}
                   </h3>
-                  <p className="mb-4 text-gray-600 dark:text-gray-300 leading-relaxed">
+                  <p className="mb-4 text-theme-secondary leading-relaxed">
                     {service.description}
                   </p>
                   
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm">ویژگی‌های کلیدی:</h4>
+                    <h4 className="font-semibold text-theme-primary text-sm">ویژگی‌های کلیدی:</h4>
                     <ul className="space-y-1">
                       {service.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-center text-gray-600 dark:text-gray-300 text-sm">
+                        <li key={idx} className="flex items-center text-theme-secondary text-sm">
                           <svg className="flex-shrink-0 ml-2 w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
@@ -143,7 +143,7 @@ export default function ServicesPage() {
               با تیم متخصص ما تماس بگیرید و رایگان مشاوره دریافت کنید
             </p>
             <div className="flex sm:flex-row flex-col justify-center gap-4">
-              <button className="bg-white hover:bg-gray-50 shadow-lg px-8 py-3 rounded-xl font-semibold text-blue-600 transition-colors">
+              <button className="bg-theme-card hover:bg-theme-hover shadow-lg px-8 py-3 rounded-xl font-semibold text-blue-600 transition-colors">
                 مشاوره رایگان
               </button>
               <button className="hover:bg-white/10 px-8 py-3 border-2 border-white rounded-xl font-semibold text-white transition-colors">

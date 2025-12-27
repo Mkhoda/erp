@@ -23,7 +23,7 @@ export default function Stats(){
               className="text-center"
             >
               <div className="font-extrabold text-blue-700 text-2xl">{s.kpi}</div>
-              <div className="mt-1 text-gray-600 text-xs">{s.label}</div>
+              <div className="mt-1 text-theme-muted text-xs">{s.label}</div>
             </motion.div>
           ))}
         </div>

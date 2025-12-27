@@ -4,7 +4,7 @@ import { User, Mail, Shield, Edit, Save, Camera, Key, Bell } from 'lucide-react'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-type Me = { id:string; email:string; firstName?:string; lastName?:string; role?:string };
+type Me = { id:string; email:string; phone?:string; hasPassword?:boolean; firstName?:string; lastName?:string; role?:string };
 
 export default function ProfilePage(){
   React.useEffect(() => {
@@ -15,6 +15,13 @@ export default function ProfilePage(){
   const [edit,setEdit]=React.useState<Partial<Me>>({});
   const [saving,setSaving]=React.useState(false);
   const [activeTab, setActiveTab] = React.useState('profile');
+  const [sendingOtp, setSendingOtp] = React.useState(false);
+  const [otpSent, setOtpSent] = React.useState(false);
+  const [otp, setOtp] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [otpExpiresAt, setOtpExpiresAt] = React.useState<string | null>(null);
+  // no mock otp exposure
+  const [mockOtp, setMockOtp] = React.useState<string | null>(null);
   const token = typeof window!=='undefined'? localStorage.getItem('token'):null;
 
   React.useEffect(()=>{ (async ()=>{
@@ -212,16 +219,86 @@ export default function ProfilePage(){
         {activeTab === 'security' && (
           <div className="space-y-6">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">تنظیمات امنیتی</h2>
-            
-            <div className="bg-amber-50/50 dark:bg-amber-950/50 p-4 border border-amber-200/50 dark:border-amber-800/50 rounded-lg">
-              <h3 className="mb-2 font-semibold text-amber-800 dark:text-amber-200">تغییر رمز عبور</h3>
-              <p className="mb-4 text-amber-700 dark:text-amber-300 text-sm">
-                برای تغییر رمز عبور با مدیر سیستم تماس بگیرید.
-              </p>
-              <button className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg text-white text-sm transition-colors">
-                درخواست تغییر رمز
-              </button>
-            </div>
+            {me?.phone ? (
+              <div className="space-y-3 bg-blue-50/50 dark:bg-blue-950/50 p-4 border border-blue-200/50 dark:border-blue-800/50 rounded-lg">
+                <h3 className="font-semibold text-blue-800 dark:text-blue-200">تغییر رمز عبور با تایید پیام‌رسان بله</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">شماره ثبت‌شده: <span className="font-mono">{me.phone}</span></p>
+                <div className="flex gap-2">
+                  <button
+                    disabled={sendingOtp}
+                    onClick={async ()=>{
+                      try{
+                        setSendingOtp(true);
+                        const res = await fetch(`${API}/auth/send-otp`, {
+                          method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
+                          body: JSON.stringify({ phone: me.phone, purpose: 'change' })
+                        });
+                        const data = await res.json().catch(()=>({}));
+                        if(!res.ok) {
+                          if (res.status === 404) throw new Error('کاربری با این شماره یافت نشد');
+                          throw new Error(data.message || 'ارسال کد ناموفق بود');
+                        }
+                        setOtpSent(true);
+                        setOtpExpiresAt(data.expiresAt || null);
+                        setMockOtp(null);
+                      }catch(err:any){ alert(err.message); }
+                      finally{ setSendingOtp(false); }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded-lg text-white text-sm"
+                  >
+                    {otpSent? 'ارسال مجدد کد' : 'ارسال کد تایید'}
+                  </button>
+                  {otpExpiresAt && <span className="self-center text-gray-500 text-xs">انقضا: {new Date(otpExpiresAt).toLocaleTimeString()}</span>}
+                  {/* no mock otp display */}
+                </div>
+                {otpSent && (
+                  <div className="gap-3 grid md:grid-cols-2">
+                    <input
+                      placeholder="کد تایید"
+                      value={otp}
+                      onChange={(e)=>setOtp(e.target.value.replace(/[^0-9]/g,''))}
+                      className="bg-white dark:bg-gray-800 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg"
+                    />
+                    <input
+                      placeholder="رمز عبور جدید"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e)=>setNewPassword(e.target.value)}
+                      className="bg-white dark:bg-gray-800 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg"
+                    />
+                    <div className="flex justify-end md:col-span-2">
+                      <button
+                        onClick={async()=>{
+                          try{
+                            if(!/^\d{4,6}$/.test(otp)) throw new Error('کد تایید نامعتبر است');
+                            if(newPassword.length<6) throw new Error('رمز عبور باید حداقل ۶ کاراکتر باشد');
+                            const res = await fetch(`${API}/auth/change-password`, {
+                              method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
+                              body: JSON.stringify({ otp, newPassword })
+                            });
+                            const data = await res.json().catch(()=>({}));
+                            if(!res.ok) throw new Error(data.message || 'تغییر رمز ناموفق بود');
+                            alert('رمز عبور با موفقیت تغییر کرد');
+                            setOtp(''); setNewPassword(''); setOtpSent(false); setOtpExpiresAt(null); setMockOtp(null);
+                          }catch(err:any){ alert(err.message); }
+                        }}
+                        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white text-sm"
+                      >
+                        تایید و تغییر رمز
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {!me?.hasPassword && (
+                  <p className="text-amber-700 dark:text-amber-300 text-sm">پیشنهاد می‌شود برای افزایش امنیت، رمز عبور تنظیم کنید.</p>
+                )}
+              </div>
+            ) : (
+              <div className="bg-amber-50/50 dark:bg-amber-950/50 p-4 border border-amber-200/50 dark:border-amber-800/50 rounded-lg">
+                <h3 className="mb-2 font-semibold text-amber-800 dark:text-amber-200">شماره موبایل ثبت نشده است</h3>
+                <p className="text-amber-700 dark:text-amber-300 text-sm">برای استفاده از تغییر رمز با بله، لطفاً با مدیر سیستم تماس بگیرید تا شماره موبایل شما ثبت شود.</p>
+              </div>
+            )}
 
             <div className="gap-4 grid">
               <div className="flex justify-between items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">

@@ -19,6 +19,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.0.0",
     "@nestjs/core": "^10.0.0",
@@ -27,6 +28,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@prisma/client": "^6.14.0",
     "@types/multer": "^2.0.0",
+    "axios": "^1.11.0",
     "bcryptjs": "^2.4.3",
     "bwip-js": "^4.7.0",
     "class-transformer": "^0.5.1",

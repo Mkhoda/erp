@@ -89,7 +89,7 @@ export default function PWAInstaller() {
         </button>
         <button
           onClick={handleInstallClick}
-          className="bg-white hover:bg-gray-100 px-3 py-1 rounded font-medium text-blue-600 text-xs"
+          className="bg-theme-card hover:bg-theme-hover px-3 py-1 rounded font-medium text-blue-600 text-xs"
         >
           نصب
         </button>

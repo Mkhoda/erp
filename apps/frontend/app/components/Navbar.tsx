@@ -43,16 +43,16 @@ export default function Navbar() {
 
   return (
     <motion.header 
-      className="top-0 z-40 sticky"
+      className="top-0 z-40 sticky h-0"
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
     >
       <div className="mx-auto px-4 max-w-5xl">
-        <div className="relative flex items-center gap-4 bg-white/50 supports-[backdrop-filter]:bg-white/30 dark:bg-gray-900/50 dark:supports-[backdrop-filter]:bg-gray-900/30 shadow-sm backdrop-blur-md mt-4 px-4 py-2 border border-white/60 dark:border-gray-700/60 rounded-2xl">
+        <div className="relative flex items-center gap-4 bg-theme-navbar shadow-sm backdrop-blur-md mt-4 px-4 py-2 border border-theme rounded-2xl">
           {/* Mobile menu toggle */}
           <button 
-            className="sm:hidden hover:bg-blue-50 dark:hover:bg-blue-950 p-2 rounded-lg text-gray-700 dark:text-gray-200" 
+            className="sm:hidden hover:bg-theme-hover p-2 rounded-lg text-theme-secondary" 
             aria-label="منو" 
             onClick={() => setMobileOpen(v => !v)}
           >
@@ -60,7 +60,7 @@ export default function Navbar() {
           </button>
           
           {/* Logo */}
-          <Link href="/" className="font-semibold text-gray-800 dark:text-gray-100 tracking-tight shrink-0">
+          <Link href="/" className="font-semibold text-theme-primary tracking-tight shrink-0">
             ارزش ERP
           </Link>
           
@@ -81,7 +81,7 @@ export default function Navbar() {
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all duration-200 ${
                       active 
                         ? 'bg-blue-600 text-white' 
-                        : 'text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-950 hover:text-blue-700 dark:hover:text-blue-400'
+                        : 'text-theme-secondary hover:bg-theme-hover hover:text-blue-700 dark:hover:text-blue-400'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -100,7 +100,7 @@ export default function Navbar() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3, delay: 0.2 }}
               onClick={toggleTheme}
-              className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 p-2 rounded-lg text-gray-700 dark:text-gray-200 transition-all duration-200"
+              className="bg-theme-card hover:bg-theme-hover p-2 rounded-lg text-theme-secondary transition-all duration-200"
               aria-label="تغییر تم"
             >
               {theme === 'dark' ? (
@@ -123,7 +123,7 @@ export default function Navbar() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="bg-white/95 dark:bg-gray-900/95 shadow-lg p-2 border border-gray-200 dark:border-gray-700 rounded-2xl">
+                <div className="bg-theme-card shadow-lg p-2 border border-theme rounded-2xl">
                   <nav className="flex flex-col gap-1 text-sm">
                     {links.map(({ href, label, icon: Icon }) => {
                       const active = pathname === href;
@@ -135,7 +135,7 @@ export default function Navbar() {
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                             active 
                               ? 'bg-blue-600 text-white' 
-                              : 'text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-950 hover:text-blue-700 dark:hover:text-blue-400'
+                              : 'text-theme-secondary hover:bg-theme-hover hover:text-blue-700 dark:hover:text-blue-400'
                           }`}
                         >
                           <Icon className="w-4 h-4" />
@@ -144,7 +144,7 @@ export default function Navbar() {
                       );
                     })}
                   </nav>
-                  <div className="my-2 border-gray-200 dark:border-gray-700 border-t" />
+                  <div className="my-2 border-t border-theme" />
                   <div className="px-1"><AuthCorner onAction={() => setMobileOpen(false)} /></div>
                 </div>
               </motion.div>

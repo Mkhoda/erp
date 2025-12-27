@@ -8,7 +8,7 @@ export default function Footer() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg mt-auto border-gray-200/50 dark:border-gray-700/50 border-t"
+      className="bg-theme-card backdrop-blur-lg mt-auto border-t border-theme"
     >
       <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div className="py-8">
@@ -20,10 +20,10 @@ export default function Footer() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
             >
-              <h3 className="mb-4 font-bold text-gray-900 dark:text-white text-xl">
+              <h3 className="mb-4 font-bold text-theme-primary text-xl">
                 ارزش ERP
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+              <p className="text-theme-secondary leading-relaxed">
                 سامانه جامع مدیریت منابع سازمانی با رویکرد مدرن و کاربرپسند
                 برای بهبود فرآیندهای کسب‌وکار شما
               </p>

@@ -11,7 +11,10 @@ datasource db {
 model User {
   id        String    @id @default(cuid())
   email     String    @unique
-  password  String
+  // Phone number used for OTP-based auth. Optional for legacy users; unique when present.
+  phone     String?   @unique
+  // Password is optional when users sign up via OTP and haven't set a password yet.
+  password  String?
   firstName String
   lastName  String
   role      Role      @default(USER)
@@ -258,4 +261,15 @@ model PagePermission {
 
   @@unique([departmentId, page])
   @@index([page])
+}
+
+// OTP codes used for phone-based authentication and password reset
+model Otp {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
 }

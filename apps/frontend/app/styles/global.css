@@ -51,9 +51,9 @@ body {
 }
 
 /* Force proper color inheritance in dark mode */
-.dark * {
+/* .dark * {
   border-color: inherit;
-}
+} */
 
 /* Enhanced text contrast for better readability */
 .dark .text-gray-900 { color: rgb(243 244 246) !important; }
@@ -61,6 +61,86 @@ body {
 .dark .text-gray-700 { color: rgb(209 213 219) !important; }
 .dark .text-gray-600 { color: rgb(156 163 175) !important; }
 .dark .text-gray-500 { color: rgb(107 114 128) !important; }
+
+/* Light theme base styles */
+html:not(.dark) {
+  background-color: rgb(248 250 252);
+  color: rgb(15 23 42);
+}
+
+html:not(.dark) body {
+  background-color: #f8fafc63;
+  color: rgb(15 23 42);
+}
+
+/* Enhanced theme-aware backgrounds */
+.bg-theme-primary {
+  background-color: rgb(255 255 255);
+}
+
+.dark .bg-theme-primary {
+  background-color: rgb(17 24 39);
+}
+
+.bg-theme-secondary {
+  background-color: rgb(248 250 252);
+}
+
+.dark .bg-theme-secondary {
+  background-color: rgb(31 41 55);
+}
+
+.bg-theme-card {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+.dark .bg-theme-card {
+  background-color: rgba(17, 24, 39, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+/* Enhanced theme-aware text colors */
+.text-theme-primary {
+  color: rgb(15 23 42);
+}
+
+.dark .text-theme-primary {
+  color: rgb(248 250 252);
+}
+
+.text-theme-secondary {
+  color: rgb(71 85 105);
+}
+
+.dark .text-theme-secondary {
+  color: rgb(148 163 184);
+}
+
+.text-theme-muted {
+  color: rgb(100 116 139);
+}
+
+.dark .text-theme-muted {
+  color: rgb(148 163 184);
+}
+
+/* Enhanced theme-aware borders */
+.border-theme {
+  border-color: rgb(226 232 240);
+}
+
+.dark .border-theme {
+  border-color: rgb(51 65 85);
+}
+
+.border-theme-light {
+  border-color: rgb(241 245 249);
+}
+
+.dark .border-theme-light {
+  border-color: rgb(30 41 59);
+}
 
 /* Enhanced background patterns for better visual hierarchy */
 .bg-pattern-dots {
@@ -83,6 +163,23 @@ body {
   background-image: 
     linear-gradient(rgba(147, 197, 253, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(147, 197, 253, 0.05) 1px, transparent 1px);
+}
+
+/* Theme-aware gradient backgrounds */
+.bg-gradient-theme {
+  background: linear-gradient(135deg, rgb(248 250 252) 0%, rgb(241 245 249) 50%, rgb(226 232 240) 100%);
+}
+
+.dark .bg-gradient-theme {
+  background: linear-gradient(135deg, rgb(15 23 42) 0%, rgb(30 41 59) 50%, rgb(51 65 85) 100%);
+}
+
+.bg-gradient-theme-light {
+  background: linear-gradient(to bottom right, rgb(239 246 255), rgb(219 234 254), rgb(191 219 254));
+}
+
+.dark .bg-gradient-theme-light {
+  background: linear-gradient(to bottom right, rgb(15 23 42), rgb(30 41 59), rgb(51 65 85));
 }
 
 /* Enhanced scrollbar styling for dark theme */
