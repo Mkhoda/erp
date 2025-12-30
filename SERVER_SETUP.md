@@ -1,10 +1,12 @@
-# Server Setup and Deployment Guide
+# Server Setup and Deployment Guide (Native Deployment - No Docker)
 
 ## Server Information
-- IP: 91.92.181.146
-- Port: 45
-- User: mahdi
-- Password: Mahdi5614
+- **Internal IP**: 172.17.100.13
+- **Public IP**: 91.92.181.146
+- **Port**: 45 (SSH)
+- **User**: mahdi
+- **Password**: Mahdi5614
+- **PostgreSQL**: 172.17.100.12:5432
 
 ## Step 1: Connect to Your Server
 
@@ -102,12 +104,12 @@ sudo mv arzesh-erp-main arzesh-erp  # if extracted with -main suffix
 sudo chown -R $USER:$USER /opt/arzesh-erp
 ```
 
-## Step 6: Deploy the Application
+## Step 6: Deploy the Application (Native)
 
 ```bash
 cd /opt/arzesh-erp
-chmod +x deploy.sh
-./deploy.sh
+chmod +x deploy-native.sh
+./deploy-native.sh
 ```
 
 ## Step 7: Verify Deployment
@@ -130,19 +132,16 @@ curl http://localhost:3001/api/health  # Backend (if health endpoint exists)
 
 ## Step 8: Access Your Application
 
-- **Frontend**: http://91.92.181.146:3000
-- **Backend API**: http://91.92.181.146:3001
-- **Full Application**: http://91.92.181.146 (through Nginx)
+- **Main App**: http://172.17.100.13
+- **Frontend**: http://172.17.100.13:3000
+- **Backend API**: http://172.17.100.13:3001
 
 ## Database Access
 
 ### Connect to PostgreSQL
 ```bash
-# From within the server
-docker-compose -f docker-compose.prod.yml exec db psql -U postgres -d arzesh_erp
-
-# From external tools (if you opened port 5432)
-# Host: 91.92.181.146
+# From external tools (PostgreSQL is on separate server)
+# Host: 172.17.100.12
 # Port: 5432
 # Database: arzesh_erp
 # Username: postgres
