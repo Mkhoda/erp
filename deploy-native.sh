@@ -40,9 +40,13 @@ print_status "📦 Installing Node.js and npm..."
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# Install PM2 for process management
-print_status "📦 Installing PM2..."
-sudo npm install -g pm2
+# Install dos2unix to fix line endings
+print_status "📦 Installing dos2unix..."
+sudo apt install -y dos2unix
+
+# Fix line endings in .env files
+print_status "🔧 Fixing line endings in .env files..."
+find . -name "*.env" -type f -exec dos2unix {} \;
 
 # Install Nginx
 print_status "📦 Installing Nginx..."
