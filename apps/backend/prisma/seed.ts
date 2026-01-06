@@ -4,6 +4,18 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+  // Check if database is already seeded
+  const existingDepartments = await prisma.department.count();
+  const existingUsers = await prisma.user.count();
+  
+  if (existingDepartments > 0 && existingUsers > 0) {
+    console.log('Database is already seeded. Skipping seed process.');
+    console.log(`Found ${existingDepartments} departments and ${existingUsers} users.`);
+    return;
+  }
+
+  console.log('Starting database seed...');
+
   // Create departments
   const departments = await Promise.all([
     prisma.department.upsert({
@@ -246,21 +258,33 @@ async function main() {
 
   console.log('Assets created:', assets.length);
 
-  // Create asset assignments
-  const assignments = await Promise.all([
-    prisma.assetAssignment.create({
-      data: {
-        assetId: assets[1].id, // Monitor assigned to user
-        userId: users[0].id,
-        departmentId: departments[1].id,
-        buildingId: buildings[0].id,
-        floorId: floors[0].id,
-        roomId: rooms[0].id,
-        purpose: 'استفاده روزمره',
-        assignedById: adminUser.id,
-      },
-    }),
-  ]);
+  // Create asset assignments (only if they don't exist)
+  const existingAssignment = await prisma.assetAssignment.findFirst({
+    where: {
+      assetId: assets[1].id,
+      userId: users[0].id,
+    },
+  });
+
+  let assignments = [];
+  if (!existingAssignment) {
+    assignments = await Promise.all([
+      prisma.assetAssignment.create({
+        data: {
+          assetId: assets[1].id, // Monitor assigned to user
+          userId: users[0].id,
+          departmentId: departments[1].id,
+          buildingId: buildings[0].id,
+          floorId: floors[0].id,
+          roomId: rooms[0].id,
+          purpose: 'استفاده روزمره',
+          assignedById: adminUser.id,
+        },
+      }),
+    ]);
+  } else {
+    console.log('Asset assignments already exist, skipping...');
+  }
 
   console.log('Asset assignments created:', assignments.length);
 
