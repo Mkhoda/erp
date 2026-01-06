@@ -228,7 +228,7 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
     sudo tee /etc/nginx/sites-available/arzesh-erp > /dev/null <<'EOF'
 server {
     listen 80;
-    server_name 172.17.100.13;
+    server_name erp.arzesh.net 172.17.100.13;
 
     # Frontend
     location / {
