@@ -177,8 +177,14 @@ const nextConfig = {
   
   // No custom headers needed for sw.js/manifest in dev; next-pwa serves them when enabled
   
-  // Enable standalone output for Docker
+  // Enable standalone output for optimized production builds
+  // Note: When using standalone, public/ folder needs to be copied manually
   output: 'standalone',
+  
+  // Ensure public files are accessible
+  async rewrites() {
+    return []
+  },
 }
 
 module.exports = withPWA(nextConfig)
