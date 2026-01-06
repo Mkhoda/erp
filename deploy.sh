@@ -171,6 +171,12 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
         fi
     done
 
+    # Copy production env file BEFORE building so Next.js bakes correct API URL
+    if [ -f ".env.production" ]; then
+        cp .env.production .env
+        print_success "Frontend production environment loaded"
+    fi
+
     # Build frontend
     print_status "🏗️  Building frontend..."
     npm run build
@@ -201,12 +207,6 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
     # Start frontend with PM2
     print_status "🚀 Starting frontend service..."
     cd ../frontend
-
-    # Copy production env file if exists
-    if [ -f ".env.production" ]; then
-        cp .env.production .env
-        print_success "Frontend production environment loaded"
-    fi
 
     pm2 delete arzesh-frontend 2>/dev/null || true
 
