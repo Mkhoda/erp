@@ -237,31 +237,40 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
     }
 
     # Backend API
     location /api {
+        rewrite ^/api/(.*) /$1 break;
         proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
     }
 }
 EOF
 
-    # Enable site
+    # Enable site and remove default if exists
     sudo ln -sf /etc/nginx/sites-available/arzesh-erp /etc/nginx/sites-enabled/
-    sudo nginx -t
-    sudo systemctl reload nginx
+    sudo rm -f /etc/nginx/sites-enabled/default
+    
+    # Test and restart Nginx
+    print_status "🔍 Testing Nginx configuration..."
+    if sudo nginx -t; then
+        print_success "Nginx configuration is valid"
+        print_status "🔄 Restarting Nginx..."
+        sudo systemctl restart nginx
+        print_success "Nginx restarted successfully"
+    else
+        print_error "Nginx configuration test failed!"
+        exit 1
+    fi
 
     # Set up PM2 to start on boot
     print_status "📅 Setting up PM2 startup..."
@@ -273,9 +282,13 @@ EOF
     (crontab -l 2>/dev/null; echo "*/5 * * * * /opt/arzesh-erp/healthcheck.sh") | crontab -
 
     print_success "🎉 Native deployment completed!"
-    print_success "🌐 Your application should be available at: http://172.17.100.13"
-    print_success "📊 Frontend: http://172.17.100.13:3000"
-    print_success "🔌 Backend API: http://172.17.100.13:3001"
+    print_success "🌐 Your application is available at:"
+    print_success "   - http://erp.arzesh.net (without port - through Nginx)"
+    print_success "   - http://172.17.100.13 (through Nginx)"
+    echo ""
+    print_status "📊 Direct access (for debugging):"
+    print_status "   - Frontend: http://localhost:3000"
+    print_status "   - Backend API: http://localhost:3001"
     echo ""
     print_status "📋 Useful commands:"
     echo "   View PM2 processes: pm2 list"
