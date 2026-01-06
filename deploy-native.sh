@@ -36,8 +36,8 @@ print_status "📦 Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
 # Install Node.js and npm
-print_status "📦 Installing Node.js and npm..."
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+print_status "📦 Installing Node.js 20 LTS and npm..."
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Install dos2unix to fix line endings
