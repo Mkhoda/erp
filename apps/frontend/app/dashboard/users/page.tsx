@@ -107,7 +107,7 @@ export default function UsersPage() {
               placeholder="جستجو در کاربران..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+              className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
             />
           </div>
           <div className="flex items-center text-gray-600 dark:text-gray-400 text-sm">
@@ -117,11 +117,11 @@ export default function UsersPage() {
       </div>
 
       {/* Users Content */}
-      <div className="bg-white/70 dark:bg-gray-900/70 shadow-sm backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-xl overflow-hidden">
+      <div className="table-theme-container">
         {view==='list' ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50/50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300">
+            <table className="table-theme">
+              <thead>
                 <tr>
                   <th className="px-6 py-4 font-medium text-right">نام</th>
                   <th className="px-6 py-4 font-medium text-right">ایمیل</th>
@@ -130,9 +130,9 @@ export default function UsersPage() {
                   <th className="px-6 py-4 font-medium text-right">اقدامات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody>
                 {filtered.map(u => (
-                  <tr key={u.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                  <tr key={u.id}>
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                       {u.firstName} {u.lastName}
                     </td>
@@ -260,7 +260,7 @@ export default function UsersPage() {
                   <input 
                     value={editing?.firstName || ''} 
                     onChange={e=>setEditing(s=>s?{...s, firstName:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
+                    className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
                   />
                 </div>
                 <div>
@@ -268,7 +268,7 @@ export default function UsersPage() {
                   <input 
                     value={editing?.lastName || ''} 
                     onChange={e=>setEditing(s=>s?{...s, lastName:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
+                    className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
                   />
                 </div>
               </div>
@@ -278,7 +278,7 @@ export default function UsersPage() {
                   type="email"
                   value={editing?.email || ''} 
                   onChange={e=>setEditing(s=>s?{...s, email:e.target.value}:s)} 
-                  className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
+                  className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
                 />
               </div>
               {!editing?.id && (
@@ -288,7 +288,7 @@ export default function UsersPage() {
                     type="password" 
                     value={(editing as any)?.password || ''} 
                     onChange={e=>setEditing(s=>s?{...s, password:e.target.value} as any:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
+                    className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
                   />
                 </div>
               )}
@@ -297,7 +297,7 @@ export default function UsersPage() {
                 <select 
                   value={editing?.role||'USER'} 
                   onChange={e=>setEditing(s=>s?{...s, role: e.target.value as User['role']}:s)} 
-                  className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
+                  className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 w-full text-gray-900 dark:text-gray-100 text-sm"
                 >
                   <option value="USER">USER</option>
                   <option value="MANAGER">MANAGER</option>

@@ -79,9 +79,9 @@ export default function AccessPage(){
           <button disabled={!selectedDept || loading} onClick={save} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-2 rounded text-white text-sm">{loading?'...':'ذخیره'}</button>
         </div>
       </div>
-      <div className="shadow-sm border border-gray-200 dark:border-gray-800 rounded overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300">
+      <div className="table-theme-container">
+        <table className="table-theme">
+          <thead>
             <tr>
               <th className="px-3 py-2 text-right">صفحه</th>
               <th className="px-3 py-2 text-right">خواندن</th>

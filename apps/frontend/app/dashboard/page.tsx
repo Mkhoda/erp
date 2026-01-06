@@ -138,13 +138,13 @@ export default function DashboardPage() {
       {/* Header Section */}
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 dark:from-blue-500/20 to-purple-600/10 dark:to-purple-500/20 rounded-2xl"></div>
-        <div className="relative bg-white/70 dark:bg-gray-900/70 shadow-lg backdrop-blur-sm p-8 border border-gray-200/50 dark:border-gray-700/50 rounded-2xl">
+        <div className="relative bg-theme-card shadow-theme-lg backdrop-blur-sm p-8 rounded-2xl">
           <div className="flex lg:flex-row flex-col justify-between lg:items-center gap-6">
             <div>
-              <h1 className="mb-2 font-bold text-gray-900 dark:text-gray-100 text-3xl">
+              <h1 className="mb-2 font-bold text-theme-primary text-3xl">
                 خوش آمدید به سیستم مدیریت ارزش 🎯
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 text-lg">
+              <p className="text-theme-secondary text-lg">
                 آمار کلی و دسترسی سریع به ابزارهای مدیریتی
               </p>
             </div>
@@ -179,8 +179,8 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div>
-                <h3 className="mb-1 font-medium text-gray-600 dark:text-gray-400 text-sm">{stat.title}</h3>
-                <p className="font-bold text-gray-900 dark:text-gray-100 text-2xl">{stat.value}</p>
+                <h3 className="mb-1 font-medium text-theme-secondary text-sm">{stat.title}</h3>
+                <p className="font-bold text-theme-primary text-2xl">{stat.value}</p>
               </div>
             </div>
           </div>
@@ -191,12 +191,12 @@ export default function DashboardPage() {
       <div className="gap-8 grid lg:grid-cols-3">
         {/* Quick Actions */}
         <div className="lg:col-span-2">
-          <div className="bg-white/70 dark:bg-gray-900/70 shadow-sm backdrop-blur-sm p-6 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+          <div className="shadow-theme backdrop-blur-sm p-6 card-theme">
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-lg">
                 <Zap className="w-5 h-5 text-white" />
               </div>
-              <h2 className="font-bold text-gray-900 dark:text-gray-100 text-xl">دسترسی سریع</h2>
+              <h2 className="font-bold text-theme-primary text-xl">دسترسی سریع</h2>
             </div>
             <div className="gap-4 grid grid-cols-1 md:grid-cols-2">
               {quickActions.map((action, index) => (
@@ -207,8 +207,8 @@ export default function DashboardPage() {
                         <action.icon className="w-5 h-5 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="mb-1 font-semibold text-gray-900 dark:text-gray-100">{action.title}</h3>
-                        <p className="mb-2 text-gray-600 dark:text-gray-400 text-sm">{action.description}</p>
+                        <h3 className="mb-1 font-semibold text-theme-primary">{action.title}</h3>
+                        <p className="mb-2 text-theme-secondary text-sm">{action.description}</p>
                         <div className="flex items-center group-hover:gap-2 text-blue-600 dark:text-blue-400 text-sm transition-all">
                           شروع کنید
                           <ArrowRight className="mr-1 group-hover:mr-0 w-4 h-4 transition-all" />
@@ -224,12 +224,12 @@ export default function DashboardPage() {
 
         {/* Recent Activity */}
         <div className="lg:col-span-1">
-          <div className="bg-white/70 dark:bg-gray-900/70 shadow-sm backdrop-blur-sm p-6 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+          <div className="shadow-theme backdrop-blur-sm p-6 card-theme">
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-gradient-to-r from-green-500 to-blue-500 p-2 rounded-lg">
                 <Activity className="w-5 h-5 text-white" />
               </div>
-              <h2 className="font-bold text-gray-900 dark:text-gray-100 text-xl">فعالیت‌های اخیر</h2>
+              <h2 className="font-bold text-theme-primary text-xl">فعالیت‌های اخیر</h2>
             </div>
             <div className="space-y-4">
               {recentActivities.map((activity) => (
@@ -246,14 +246,14 @@ export default function DashboardPage() {
                      <Target className="w-3 h-3 text-orange-600 dark:text-orange-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">{activity.action}</p>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm truncate">{activity.item}</p>
-                    <p className="mt-1 text-gray-500 dark:text-gray-500 text-xs">{activity.time}</p>
+                    <p className="font-medium text-theme-primary text-sm">{activity.action}</p>
+                    <p className="text-theme-secondary text-sm truncate">{activity.item}</p>
+                    <p className="mt-1 text-theme-muted text-xs">{activity.time}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-4 pt-4 border-gray-200 dark:border-gray-700 border-t">
+            <div className="mt-4 pt-4 border-theme border-t">
               <Link href="/dashboard/activity" className="flex items-center gap-1 text-blue-600 dark:text-blue-400 text-sm hover:underline">
                 مشاهده همه فعالیت‌ها
                 <ArrowRight className="w-3 h-3" />
@@ -264,13 +264,13 @@ export default function DashboardPage() {
       </div>
 
       {/* Performance Overview */}
-      <div className="bg-white/70 dark:bg-gray-900/70 shadow-sm backdrop-blur-sm p-6 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
+      <div className="shadow-theme backdrop-blur-sm p-6 card-theme">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-2 rounded-lg">
               <BarChart3 className="w-5 h-5 text-white" />
             </div>
-            <h2 className="font-bold text-gray-900 dark:text-gray-100 text-xl">نمای کلی عملکرد</h2>
+            <h2 className="font-bold text-theme-primary text-xl">نمای کلی عملکرد</h2>
           </div>
           <Link href="/dashboard/reports" className="text-blue-600 dark:text-blue-400 text-sm hover:underline">
             گزارش‌های تفصیلی
@@ -279,15 +279,15 @@ export default function DashboardPage() {
         <div className="gap-6 grid grid-cols-1 md:grid-cols-3">
           <div className="bg-gradient-to-br from-blue-50 dark:from-blue-950 to-indigo-50 dark:to-indigo-950 p-4 rounded-lg text-center">
             <div className="mb-2 font-bold text-blue-600 dark:text-blue-400 text-2xl">۹۲%</div>
-            <div className="text-gray-600 dark:text-gray-400 text-sm">بهره‌وری سیستم</div>
+            <div className="text-theme-secondary text-sm">بهره‌وری سیستم</div>
           </div>
           <div className="bg-gradient-to-br from-green-50 dark:from-green-950 to-emerald-50 dark:to-emerald-950 p-4 rounded-lg text-center">
-            <div className="mb-2 font-bold text-green-600 dark:text-green-400 text-2xl">۸۷%</div>
-            <div className="text-gray-600 dark:text-gray-400 text-sm">رضایت کاربران</div>
+            <div className="mb-2 font-bold text-green-600 dark:text-green-400 text-2xl">۹۷%</div>
+            <div className="text-theme-secondary text-sm">رضایت کاربران</div>
           </div>
           <div className="bg-gradient-to-br from-purple-50 dark:from-purple-950 to-pink-50 dark:to-pink-950 p-4 rounded-lg text-center">
             <div className="mb-2 font-bold text-purple-600 dark:text-purple-400 text-2xl">۹۵%</div>
-            <div className="text-gray-600 dark:text-gray-400 text-sm">دقت داده‌ها</div>
+            <div className="text-theme-secondary text-sm">دقت داده‌ها</div>
           </div>
         </div>
       </div>

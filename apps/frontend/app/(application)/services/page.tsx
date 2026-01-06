@@ -54,7 +54,7 @@ export default function ServicesPage() {
   ];
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 dark:from-gray-900 via-white dark:via-gray-800 to-indigo-50 dark:to-gray-900 min-h-screen">
+    <div className="bg-gradient-theme-light min-h-screen">
       {/* Hero Section */}
       <section className="relative py-20 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 dark:from-blue-800/30 to-purple-600/20 dark:to-purple-800/30"></div>

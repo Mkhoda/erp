@@ -181,16 +181,6 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
     print_status "🏗️  Building frontend..."
     npm run build
 
-    # Copy public and static files to standalone output
-    print_status "📋 Copying static assets for standalone build..."
-    if [ -d ".next/standalone" ]; then
-        mkdir -p .next/standalone/public
-        mkdir -p .next/standalone/.next/static
-        cp -r public/* .next/standalone/public/ 2>/dev/null || true
-        cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
-        print_success "Static assets copied successfully"
-    fi
-
     # Start backend with PM2
     print_status "🚀 Starting backend service..."
     cd ../backend
@@ -210,14 +200,9 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
 
     pm2 delete arzesh-frontend 2>/dev/null || true
 
-    # Use standalone server if available, otherwise use npm start
-    if [ -f ".next/standalone/server.js" ]; then
-        print_status "Using Next.js standalone server..."
-        pm2 start .next/standalone/server.js --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096"
-    else
-        print_status "Using npm start..."
-        pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start
-    fi
+    # Use npm start (standard Next.js production mode)
+    print_status "Using npm start..."
+    pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start
 
     # Install Nginx
     print_status "📦 Installing Nginx..."

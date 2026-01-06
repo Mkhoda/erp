@@ -59,8 +59,8 @@ export default function SignInPage() {
       } else {
         // OTP flow: verify entered code
         const phoneDigits = phone.replace(/\s/g, '');
-        if (!/^98\d{10}$/.test(phoneDigits)) {
-          throw new Error('شماره موبایل باید با 98 شروع شود و 12 رقم باشد. مثال: 98912XXXXXXX');
+        if (!/^0\d{10}$/.test(phoneDigits)) {
+          throw new Error('شماره موبایل باید با 0 شروع شود و 11 رقم باشد. مثال: 09121234567');
         }
         if (!otpSent) {
           // if user didn't click send code, do it now
@@ -107,8 +107,8 @@ export default function SignInPage() {
       setLoading(true);
       const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const phoneDigits = phone.replace(/\s/g, '');
-      if (!/^98\d{10}$/.test(phoneDigits)) {
-        throw new Error('شماره موبایل باید با 98 شروع شود و 12 رقم باشد. مثال: 98912XXXXXXX');
+      if (!/^0\d{10}$/.test(phoneDigits)) {
+        throw new Error('شماره موبایل باید با 0 شروع شود و 11 رقم باشد. مثال: 09121234567');
       }
       const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST',
@@ -169,8 +169,8 @@ export default function SignInPage() {
           className="bg-theme-card shadow-xl backdrop-blur-sm p-8 border border-theme rounded-2xl"
         >
           <div className="flex gap-2 mb-6">
-            <button type="button" onClick={()=>setMode('otp')} className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${mode==='otp'?'bg-blue-600 text-white':'bg-theme-secondary text-theme-secondary'}`}>ورود با شماره موبایل</button>
-            <button type="button" onClick={()=>setMode('email')} className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${mode==='email'?'bg-blue-600 text-white':'bg-theme-secondary text-theme-secondary'}`}>ورود با ایمیل</button>
+            <button type="button" onClick={()=>setMode('otp')} className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${mode==='otp'?'bg-blue-600 text-white':'bg-theme-secondary text-theme-muted'}`}>ورود با شماره موبایل</button>
+            <button type="button" onClick={()=>setMode('email')} className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${mode==='email'?'bg-blue-600 text-white':'bg-theme-secondary text-theme-muted'}`}>ورود با ایمیل</button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -188,40 +188,29 @@ export default function SignInPage() {
                       onChange={e => {
                         const digits = e.target.value.replace(/\D/g, '');
                         let formatted = '';
-                        if (digits.startsWith('98')) {
-                          formatted = digits.slice(0, 12);
-                          formatted = formatted.replace(/^(98)(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3, p4) => {
+                        if (digits.startsWith('0') && digits.length <= 11) {
+                          formatted = digits.replace(/^(0)(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3, p4) => {
                             let result = p1;
                             if (p2) result += ' ' + p2;
                             if (p3) result += ' ' + p3;
                             if (p4) result += ' ' + p4;
-                            return result;
+                            return result.trim();
                           });
-                        } else if (digits.startsWith('0')) {
-                          const withoutZero = digits.slice(1);
-                          if (withoutZero.length <= 10) {
-                            formatted = '98 ' + withoutZero.replace(/(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3) => {
-                              let result = p1;
-                              if (p2) result += ' ' + p2;
-                              if (p3) result += ' ' + p3;
-                              return result;
-                            });
-                          }
-                        } else if (digits.length <= 10) {
-                          formatted = '98 ' + digits.replace(/(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3) => {
+                        } else if (digits.length > 0 && digits.length <= 10) {
+                          formatted = '0 ' + digits.replace(/(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3) => {
                             let result = p1;
                             if (p2) result += ' ' + p2;
                             if (p3) result += ' ' + p3;
-                            return result;
+                            return result.trim();
                           });
                         }
                         setPhone(formatted);
                       }}
                       required
                       inputMode="tel"
-                      className={`bg-theme-primary px-12 py-3 border ${/^98\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^98\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary transition-all ${otpSent && !canResend ? 'opacity-60 cursor-not-allowed':''}`}
+                      className={`bg-theme-primary px-12 py-3 border ${/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary transition-all ${otpSent && !canResend ? 'opacity-60 cursor-not-allowed':''}`}
                       disabled={otpSent && !canResend}
-                      placeholder="98 912 345 6789"
+                      placeholder="0912 345 6789"
                     />
                     <div className="top-3 right-3 absolute flex items-center gap-1 text-theme-muted text-sm">
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -231,7 +220,7 @@ export default function SignInPage() {
                     </div>
                   </div>
                   <div className="flex justify-between items-center mt-1">
-                    <p className="text-theme-muted text-xs">فرمت: 98 XXX XXX XXXX</p>
+                    <p className="text-theme-muted text-xs">فرمت: 0XXX XXX XXXX</p>
                     {otpSent && otpExpiresAt && (
                       <p className="text-theme-muted text-xs">انقضا: {Math.floor(remainingSec/60)}:{String(remainingSec%60).padStart(2,'0')}</p>
                     )}
@@ -285,12 +274,12 @@ export default function SignInPage() {
                   </div>
                 )}
 
-                {!otpSent && (
+                {!otpSent ? (
                   <button 
                     type="button" 
                     onClick={sendOtp} 
-                    disabled={loading || !phone || !/^98\s\d{3}\s\d{3}\s\d{4}$/.test(phone)} 
-                    className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${phone && /^98\s\d{3}\s\d{3}\s\d{4}$/.test(phone) && !loading ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-theme-secondary text-theme-muted cursor-not-allowed'}`}
+                    disabled={loading || !phone || !/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)} 
+                    className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${phone && /^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone) && !loading ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-theme-secondary text-theme-muted cursor-not-allowed'}`}
                   >
                     {loading ? (
                       <div className="flex justify-center items-center gap-2">
@@ -301,19 +290,15 @@ export default function SignInPage() {
                       'ارسال کد تایید'
                     )}
                   </button>
-                )}
-
-                {otpSent && canResend && (
-                  <div className="flex justify-center">
-                    <button 
-                      type="button" 
-                      onClick={resendOtp} 
-                      disabled={loading}
-                      className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl font-medium text-white text-sm transition-all"
-                    >
-                      ارسال مجدد کد
-                    </button>
-                  </div>
+                ) : canResend && (
+                  <button 
+                    type="button" 
+                    onClick={resendOtp} 
+                    disabled={loading}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-3 rounded-xl w-full font-medium text-white text-sm transition-all"
+                  >
+                    ارسال مجدد کد
+                  </button>
                 )}
 
                 <div className="text-sm text-center">
@@ -431,7 +416,7 @@ export default function SignInPage() {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="border-t border-theme w-full" />
+                <div className="border-theme border-t w-full" />
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="bg-theme-primary px-2 text-theme-muted">یا</span>

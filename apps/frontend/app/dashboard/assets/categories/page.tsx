@@ -15,9 +15,9 @@ export default function AssetCategoriesPage(){
   return (
     <div className="space-y-4">
       <div className="flex justify-between"><h2 className="font-semibold">دسته‌بندی دارایی</h2><button onClick={()=>{setEditing({id:'', name:''}); setOpen(true);}} className="inline-flex items-center gap-1.5 bg-blue-600 px-3 py-2 rounded text-white text-sm"><Plus className="w-4 h-4"/> افزودن</button></div>
-      <div className="shadow-sm border border-gray-200 dark:border-gray-800 rounded overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300"><tr><th className="px-3 py-2 text-right">نام</th><th className="px-3 py-2 text-right">پیشوند کد</th><th className="px-3 py-2 text-right">اقدامات</th></tr></thead>
+      <div className="table-theme-container">
+        <table className="table-theme">
+          <thead><tr><th className="px-3 py-2 text-right">نام</th><th className="px-3 py-2 text-right">پیشوند کد</th><th className="px-3 py-2 text-right">اقدامات</th></tr></thead>
           <tbody>
             {items.map(it=> (
               <tr key={it.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 border-gray-200 dark:border-gray-800 border-t">

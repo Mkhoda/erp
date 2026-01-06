@@ -45,8 +45,8 @@ export default function SignUpPage() {
     setError(null);
 
     // Validation
-    if (!/^98\d{10}$/.test(phone)) {
-      setError('شماره موبایل باید با 98 شروع شود و 12 رقم باشد. مثال: 98912XXXXXXX');
+    if (!/^0\d{10}$/.test(phone)) {
+      setError('شماره موبایل باید با 0 شروع شود و 11 رقم باشد. مثال: 09121234567');
       setLoading(false);
       return;
     }
@@ -89,7 +89,7 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="flex justify-center items-center bg-gradient-to-br from-blue-50 dark:from-gray-900 via-white dark:via-gray-800 to-indigo-50 dark:to-gray-900 px-4 py-12 min-h-screen">
+    <div className="flex justify-center items-center bg-gradient-theme-light px-4 py-12 min-h-screen">
       <div className="space-y-8 w-full max-w-md">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -105,7 +105,7 @@ export default function SignUpPage() {
           <h2 className="bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-bold text-transparent text-3xl">
             ثبت نام
           </h2>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
+          <p className="mt-2 text-theme-muted">
             حساب کاربری جدید ایجاد کنید
           </p>
         </motion.div>
@@ -114,12 +114,12 @@ export default function SignUpPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.6 }}
-          className="bg-white/80 dark:bg-gray-800/80 shadow-xl backdrop-blur-sm p-8 border border-gray-200 dark:border-gray-700 rounded-2xl"
+          className="bg-theme-card shadow-xl backdrop-blur-sm p-8 border border-theme rounded-2xl"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="gap-4 grid grid-cols-1 sm:grid-cols-2">
               <div>
-                <label htmlFor="firstName" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">نام</label>
+                <label htmlFor="firstName" className="block mb-2 font-medium text-theme-primary text-sm">نام</label>
                 <div className="relative">
                   <input
                     id="firstName"
@@ -127,13 +127,13 @@ export default function SignUpPage() {
                     value={firstName}
                     onChange={e => setFirstName(e.target.value)}
                     required
-                    className="bg-white dark:bg-gray-700 px-4 py-3 border border-gray-200 dark:border-gray-600 focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-white transition-all"
+                    className="bg-theme-primary px-4 py-3 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
                     placeholder="نام"
                   />
                 </div>
               </div>
               <div>
-                <label htmlFor="lastName" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">نام خانوادگی</label>
+                <label htmlFor="lastName" className="block mb-2 font-medium text-theme-primary text-sm">نام خانوادگی</label>
                 <div className="relative">
                   <input
                     id="lastName"
@@ -141,7 +141,7 @@ export default function SignUpPage() {
                     value={lastName}
                     onChange={e => setLastName(e.target.value)}
                     required
-                    className="bg-white dark:bg-gray-700 px-4 py-3 border border-gray-200 dark:border-gray-600 focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-white transition-all"
+                    className="bg-theme-primary px-4 py-3 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
                     placeholder="نام خانوادگی"
                   />
                 </div>
@@ -149,7 +149,7 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label htmlFor="phone" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">شماره موبایل (فرمت: 98XXXXXXXXXX)</label>
+              <label htmlFor="phone" className="block mb-2 font-medium text-theme-primary text-sm">شماره موبایل (فرمت: 0XXXXXXXXXX)</label>
               <div className="relative">
                 <input
                   id="phone"
@@ -157,17 +157,17 @@ export default function SignUpPage() {
                   value={phone}
                   onChange={e => setPhone(e.target.value.replace(/\s+/g,''))}
                   required
-                  pattern="98\\d{10}"
-                  className={`bg-white dark:bg-gray-700 px-4 py-3 border ${/^98\d{10}$/.test(phone)||!phone? 'border-gray-200 dark:border-gray-600':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^98\d{10}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-gray-900 dark:text-white transition-all`}
-                  placeholder="مثال: 98912XXXXXXX"
+                  pattern="0\\d{10}"
+                  className={`bg-theme-primary px-4 py-3 border ${/^0\d{10}$/.test(phone)||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^0\d{10}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary transition-all`}
+                  placeholder="مثال: 09121234567"
                 />
-                <span className="top-3 left-3 absolute text-gray-400 text-xs">IR</span>
+                <span className="top-3 left-3 absolute text-theme-muted text-xs">IR</span>
               </div>
-              <p className="mt-1 text-gray-500 dark:text-gray-400 text-xs">شماره باید با 98 شروع شود و 12 رقم باشد.</p>
+              <p className="mt-1 text-theme-muted text-xs">شماره باید با 0 شروع شود و 11 رقم باشد.</p>
             </div>
 
             <div>
-              <label htmlFor="email" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
+              <label htmlFor="email" className="block mb-2 font-medium text-theme-primary text-sm">
                 آدرس ایمیل
               </label>
               <div className="relative">
@@ -177,17 +177,17 @@ export default function SignUpPage() {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
-                  className="bg-white dark:bg-gray-700 px-4 py-3 border border-gray-200 dark:border-gray-600 focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-white transition-all"
+                  className="bg-theme-primary px-4 py-3 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
                   placeholder="your@email.com"
                 />
-                <svg className="top-3 left-3 absolute w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="top-3 left-3 absolute w-5 h-5 text-theme-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                 </svg>
               </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
+              <label htmlFor="password" className="block mb-2 font-medium text-theme-primary text-sm">
                 رمز عبور
               </label>
               <div className="relative">
@@ -197,13 +197,13 @@ export default function SignUpPage() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
-                  className="bg-white dark:bg-gray-700 px-4 py-3 pl-12 border border-gray-200 dark:border-gray-600 focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-white transition-all"
+                  className="bg-theme-primary px-4 py-3 pl-12 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
                   placeholder="رمز عبور قوی انتخاب کنید"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="top-3 left-3 absolute text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="top-3 left-3 absolute text-theme-muted hover:text-theme-secondary"
                 >
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -220,7 +220,7 @@ export default function SignUpPage() {
               {password && (
                 <div className="mt-2">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-600 dark:text-gray-400">قدرت رمز عبور:</span>
+                    <span className="text-theme-secondary">قدرت رمز عبور:</span>
                     <span className={`font-medium text-${strengthColors[passwordStrength - 1]}-600`}>
                       {strengthLabels[passwordStrength - 1] || 'خیلی ضعیف'}
                     </span>
@@ -232,7 +232,7 @@ export default function SignUpPage() {
                         className={`h-1 flex-1 rounded ${
                           level <= passwordStrength
                             ? `bg-${strengthColors[passwordStrength - 1]}-500`
-                            : 'bg-gray-200 dark:bg-gray-700'
+                            : 'bg-theme-secondary'
                         }`}
                       />
                     ))}
@@ -242,7 +242,7 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
+              <label htmlFor="confirmPassword" className="block mb-2 font-medium text-theme-primary text-sm">
                 تکرار رمز عبور
               </label>
               <div className="relative">
@@ -252,13 +252,13 @@ export default function SignUpPage() {
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   required
-                  className="bg-white dark:bg-gray-700 px-4 py-3 pl-12 border border-gray-200 dark:border-gray-600 focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-white transition-all"
+                  className="bg-theme-primary px-4 py-3 pl-12 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
                   placeholder="رمز عبور را مجدداً وارد کنید"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="top-3 left-3 absolute text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="top-3 left-3 absolute text-theme-muted hover:text-theme-secondary"
                 >
                   {showConfirmPassword ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,13 +285,13 @@ export default function SignUpPage() {
                 onChange={(e) => setAcceptTerms(e.target.checked)}
                 className="border-gray-300 rounded focus:ring-blue-500 w-4 h-4 text-blue-600"
               />
-              <label htmlFor="accept-terms" className="block mr-2 text-gray-700 dark:text-gray-300 text-sm">
+              <label htmlFor="accept-terms" className="block mr-2 text-theme-primary text-sm">
                 من با{' '}
-                <Link href="/terms" className="text-blue-600 hover:text-blue-500 dark:text-blue-400">
+                <Link href="/terms" className="text-blue-600 hover:text-blue-500 dark:hover:text-blue-300 dark:text-blue-400">
                   شرایط و قوانین
                 </Link>{' '}
                 و{' '}
-                <Link href="/privacy" className="text-blue-600 hover:text-blue-500 dark:text-blue-400">
+                <Link href="/privacy" className="text-blue-600 hover:text-blue-500 dark:hover:text-blue-300 dark:text-blue-400">
                   حریم خصوصی
                 </Link>{' '}
                 موافقم
@@ -330,15 +330,15 @@ export default function SignUpPage() {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="border-gray-300 dark:border-gray-600 border-t w-full" />
+                <div className="border-theme border-t w-full" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="bg-white dark:bg-gray-800 px-2 text-gray-500 dark:text-gray-400">یا</span>
+                <span className="bg-theme-card px-2 text-theme-muted">یا</span>
               </div>
             </div>
 
             <div className="mt-6 text-center">
-              <p className="text-gray-600 dark:text-gray-400 text-sm">
+              <p className="text-theme-secondary text-sm">
                 قبلاً حساب کاربری دارید؟{' '}
                 <Link href="/signin" className="font-medium text-blue-600 hover:text-blue-500 dark:hover:text-blue-300 dark:text-blue-400">
                   وارد شوید

@@ -11,7 +11,7 @@ const STATS = [
 export default function Stats(){
   return (
     <section className="mx-auto px-4 py-12 max-w-6xl">
-      <div className="bg-gradient-to-tr from-blue-50 to-indigo-50 p-6 border rounded-2xl">
+      <div className="bg-theme-card p-6 border border-theme rounded-2xl">
         <div className="gap-4 grid grid-cols-2 md:grid-cols-4">
           {STATS.map((s,i)=> (
             <motion.div

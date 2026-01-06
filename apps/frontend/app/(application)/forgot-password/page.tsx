@@ -32,8 +32,8 @@ export default function ForgotPasswordPage() {
     setError(null); setInfo(null); setLoading(true);
     try {
       const phoneNorm = phone.replace(/\s/g, '');
-      if (!/^98\d{10}$/.test(phoneNorm)) {
-        throw new Error('شماره موبایل باید با 98 شروع شود و 12 رقم باشد. مثال: 98912XXXXXXX');
+      if (!/^0\d{10}$/.test(phoneNorm)) {
+        throw new Error('شماره موبایل باید با 0 شروع شود و 11 رقم باشد. مثال: 09121234567');
       }
       const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -112,39 +112,29 @@ export default function ForgotPasswordPage() {
                     onChange={(e) => {
                       const digits = e.target.value.replace(/\D/g, '');
                       let formatted = '';
-                      if (digits.startsWith('98')) {
-                        formatted = digits.slice(0, 12);
-                        formatted = formatted.replace(/^(98)(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3, p4) => {
+                      if (digits.startsWith('0') && digits.length <= 11) {
+                        formatted = digits.replace(/^(0)(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3, p4) => {
                           let result = p1;
                           if (p2) result += ' ' + p2;
                           if (p3) result += ' ' + p3;
                           if (p4) result += ' ' + p4;
-                          return result;
+                          return result.trim();
                         });
-                      } else if (digits.startsWith('0')) {
-                        const withoutZero = digits.slice(1);
-                        if (withoutZero.length <= 10) {
-                          formatted = '98 ' + withoutZero.replace(/(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3) => {
-                            let result = p1;
-                            if (p2) result += ' ' + p2;
-                            if (p3) result += ' ' + p3;
-                            return result;
-                          });
-                        }
-                      } else if (digits.length <= 10) {
-                        formatted = '98 ' + digits.replace(/(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3) => {
+                      } else if (digits.length > 0 && digits.length <= 10) {
+                        formatted = '0 ' + digits.replace(/(\d{0,3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3) => {
                           let result = p1;
                           if (p2) result += ' ' + p2;
                           if (p3) result += ' ' + p3;
-                          return result;
+                          return result.trim();
                         });
                       }
                       setPhone(formatted);
                     }}
                     inputMode="tel"
                     disabled={otpSent && !canResend}
-                    className={`bg-theme-primary px-12 py-3 border ${/^98\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^98\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary transition-all ${otpSent && !canResend ? 'opacity-60 cursor-not-allowed':''}`}
-                    placeholder="98 912 345 6789"
+                    dir="ltr"
+                    className={`bg-theme-primary px-12 py-3 border ${/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary text-right transition-all ${otpSent && !canResend ? 'opacity-60 cursor-not-allowed':''}`}
+                    placeholder="0912 345 6789"
                   />
                   <div className="top-3 right-3 absolute flex items-center gap-1 text-theme-muted text-sm">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -154,7 +144,7 @@ export default function ForgotPasswordPage() {
                   </div>
                 </div>
                 <div className="flex justify-between items-center mt-1">
-                  <p className="text-theme-muted text-xs">فرمت: 98 XXX XXX XXXX</p>
+                  <p className="text-theme-muted text-xs">فرمت: 0XXX XXX XXXX</p>
                   {otpExpiresAt && (
                     <p className="text-theme-muted text-xs">انقضا: {Math.floor(remainingSec/60)}:{String(remainingSec%60).padStart(2,'0')}</p>
                   )}
@@ -162,8 +152,8 @@ export default function ForgotPasswordPage() {
               </div>
               <button 
                 onClick={sendOtp} 
-                disabled={loading || !phone || !/^98\s\d{3}\s\d{3}\s\d{4}$/.test(phone)} 
-                className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${phone && /^98\s\d{3}\s\d{3}\s\d{4}$/.test(phone) && !loading ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-theme-secondary text-theme-muted cursor-not-allowed'}`}
+                disabled={loading || !phone || !/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)} 
+                className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${phone && /^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone) && !loading ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-theme-secondary text-theme-muted cursor-not-allowed'}`}
               >
                 {loading ? (
                   <div className="flex justify-center items-center gap-2">

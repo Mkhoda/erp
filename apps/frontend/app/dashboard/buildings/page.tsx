@@ -113,10 +113,10 @@ export default function BuildingsPage() {
         </button>
       </div>
 
-      <div className="bg-white/80 dark:bg-gray-800/80 shadow-xl backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden glass-card">
+      <div className="table-theme-container">
         <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <table className="table-theme">
+            <thead>
               <tr>
                 <th className="px-6 py-4 font-semibold text-gray-700 dark:text-gray-300 text-xs text-right uppercase tracking-wider">
                   نام ساختمان
@@ -135,9 +135,9 @@ export default function BuildingsPage() {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody>
               {buildings.map((building) => (
-                <tr key={building.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                <tr key={building.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <Building className="ml-3 w-5 h-5 text-gray-400" />

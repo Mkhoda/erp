@@ -134,7 +134,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </aside>
       {/* Main */}
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-col flex-1 bg-gradient-theme">
         {/* Header */}
         <header className="top-0 z-10 sticky">
           <div className="mx-auto px-4 max-w-7xl">
@@ -160,7 +160,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
-  <main className="supports-[backdrop-filter]:bg-transparent bg-gradient-theme mx-auto px-4 py-6 w-full max-w-7xl text-theme-primary transition-colors duration-300">{children}</main>
+  <main className="mx-auto px-4 py-6 w-full max-w-7xl text-theme-primary transition-colors duration-300">{children}</main>
       </div>
     </div>
   );
@@ -183,15 +183,15 @@ function UserMenu({ onLogout, theme, onToggleTheme }: { onLogout: () => void, th
         <span className="hidden sm:inline font-medium text-gray-800 dark:text-gray-200 text-sm">حساب</span>
       </button>
       {open && (
-        <div className="left-0 absolute bg-white/95 dark:bg-gray-900/95 shadow-2xl backdrop-blur-xl mt-2 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl w-48 overflow-hidden">
-          <Link href="/" onClick={()=>setOpen(false)} className="block hover:bg-blue-50 dark:hover:bg-blue-950/50 px-4 py-3 font-medium text-gray-800 dark:text-gray-200 text-sm transition-colors">صفحه اصلی</Link>
-          <Link href="/dashboard/profile" onClick={()=>setOpen(false)} className="block hover:bg-blue-50 dark:hover:bg-blue-950/50 px-4 py-3 font-medium text-gray-800 dark:text-gray-200 text-sm transition-colors">پروفایل</Link>
-          <Link href="/about" onClick={()=>setOpen(false)} className="block hover:bg-blue-50 dark:hover:bg-blue-950/50 px-4 py-3 font-medium text-gray-800 dark:text-gray-200 text-sm transition-colors">درباره</Link>
-          <button onClick={()=>{ onToggleTheme?.(); }} className="flex items-center gap-2 hover:bg-blue-50 dark:hover:bg-blue-950/50 px-4 py-3 w-full font-medium text-gray-800 dark:text-gray-200 text-sm text-left transition-colors">
-            {theme==='dark'? <Sun className="w-4 h-4 text-yellow-500"/> : <Moon className="w-4 h-4 text-gray-600 dark:text-gray-400"/>}
+        <div className="left-0 absolute bg-theme-card shadow-2xl backdrop-blur-xl mt-2 border border-theme rounded-2xl w-48 overflow-hidden">
+          <Link href="/" onClick={()=>setOpen(false)} className="block hover:bg-theme-hover px-4 py-3 font-medium text-theme-secondary text-sm transition-colors">صفحه اصلی</Link>
+          <Link href="/dashboard/profile" onClick={()=>setOpen(false)} className="block hover:bg-theme-hover px-4 py-3 font-medium text-theme-secondary text-sm transition-colors">پروفایل</Link>
+          <Link href="/about" onClick={()=>setOpen(false)} className="block hover:bg-theme-hover px-4 py-3 font-medium text-theme-secondary text-sm transition-colors">درباره</Link>
+          <button onClick={()=>{ onToggleTheme?.(); }} className="flex items-center gap-2 hover:bg-theme-hover px-4 py-3 w-full font-medium text-theme-secondary text-sm text-left transition-colors">
+            {theme==='dark'? <Sun className="w-4 h-4 text-yellow-500"/> : <Moon className="w-4 h-4 text-theme-secondary"/>}
             تغییر تم
           </button>
-          <div className="border-gray-200/60 dark:border-gray-700/60 border-t" />
+          <div className="border-theme border-t" />
           <button onClick={()=>{ setOpen(false); onLogout(); }} className="flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-950/50 px-4 py-3 w-full font-medium text-red-600 dark:text-red-400 text-sm transition-colors"><LogOut className="w-4 h-4"/> خروج</button>
         </div>
       )}

@@ -112,10 +112,10 @@ export default function DepartmentsPage() {
         </button>
       </div>
 
-      <div className="bg-white/80 dark:bg-gray-800/80 shadow-xl backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-2xl overflow-hidden glass-card">
+      <div className="table-theme-container">
         <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <table className="table-theme">
+            <thead>
               <tr>
                 <th className="px-6 py-4 font-semibold text-gray-700 dark:text-gray-300 text-xs text-right uppercase tracking-wider">
                   نام دپارتمان

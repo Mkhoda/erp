@@ -22,7 +22,7 @@ export default function Hero() {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
             viewport={{ once: true }}
-            className="text-gray-600 dark:text-gray-300 md:text-lg leading-relaxed"
+            className="text-theme-secondary md:text-lg leading-relaxed"
           >
             از مدیریت دارایی‌ها و واگذاری‌ها تا منابع انسانی و مجوزهای صفحه‌ای. وب‌اپلیکیشن مدرن، نصب‌پذیر (PWA) و قابل تبدیل به APK.
           </motion.p>
@@ -41,13 +41,13 @@ export default function Hero() {
             </Link>
             <Link 
               href="/signin" 
-              className="hover:bg-gray-50 dark:hover:bg-gray-800 px-5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-700 dark:text-gray-200 text-sm transition-all duration-200"
+              className="hover:bg-theme-hover px-5 py-2.5 border border-theme rounded-lg font-medium text-theme-primary text-sm transition-all duration-200"
             >
               ورود
             </Link>
             <Link 
               href="/signup" 
-              className="hover:bg-gray-50 dark:hover:bg-gray-800 px-5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-700 dark:text-gray-200 text-sm transition-all duration-200"
+              className="hover:bg-theme-hover px-5 py-2.5 border border-theme rounded-lg font-medium text-theme-primary text-sm transition-all duration-200"
             >
               ثبت‌نام
             </Link>
@@ -57,13 +57,13 @@ export default function Hero() {
             whileInView="show"
             viewport={{ once: true }}
             variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
-            className="flex flex-wrap gap-3 text-gray-600 dark:text-gray-300 text-xs"
+            className="flex flex-wrap gap-3 text-theme-secondary text-xs"
           >
             {["PWA/TWA نصب‌پذیر","گزارش‌گیری PDF/Excel","تقویم جلالی","دسترسی نقش‌محور"].map((t,i)=> (
               <motion.li 
                 key={i} 
                 variants={{ hidden:{opacity:0,y:10}, show:{opacity:1,y:0}}} 
-                className="bg-white/70 hover:bg-white/90 dark:bg-gray-800/70 dark:hover:bg-gray-800/90 backdrop-blur px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-full transition-all duration-200"
+                className="bg-theme-card hover:bg-theme-hover backdrop-blur px-3 py-1.5 border border-theme rounded-full transition-all duration-200"
               >
                 {t}
               </motion.li>
@@ -77,11 +77,11 @@ export default function Hero() {
           viewport={{ once: true }}
           className="md:justify-self-end"
         >
-          <div className="bg-white/80 dark:bg-gray-800/80 shadow-xl dark:shadow-gray-900/20 backdrop-blur p-6 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-md">
+          <div className="bg-theme-card shadow-xl dark:shadow-gray-900/20 backdrop-blur p-6 border border-theme rounded-2xl w-full max-w-md">
             <div className="relative bg-gradient-to-tr from-blue-100 dark:from-blue-900/30 to-indigo-100 dark:to-indigo-900/30 rounded-xl h-48 overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-transparent to-blue-200/30 dark:to-blue-800/30" />
             </div>
-            <div className="gap-3 grid grid-cols-3 mt-4 text-gray-700 dark:text-gray-200 text-xs text-center">
+            <div className="gap-3 grid grid-cols-3 mt-4 text-theme-primary text-xs text-center">
               {['دارایی‌ها','کاربران','دسترسی‌ها'].map((t,i)=>(
                 <motion.div 
                   key={i} 
@@ -89,7 +89,7 @@ export default function Hero() {
                   whileInView={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: 0.4 + i * 0.1 }}
                   viewport={{ once: true }}
-                  className="bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 p-3 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors duration-200"
+                  className="bg-theme-secondary hover:bg-theme-hover p-3 border border-theme rounded-lg transition-colors duration-200"
                 >
                   {t}
                 </motion.div>

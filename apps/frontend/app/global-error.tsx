@@ -8,15 +8,23 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <html>
-      <body>
-        <div className="flex justify-center items-center min-h-screen">
-          <div className="text-center">
-            <h1 className="font-bold text-gray-900 text-6xl">خطا!</h1>
-            <p className="mt-4 text-gray-600 text-xl">مشکلی در سرور رخ داده است</p>
+    <html lang="fa" dir="rtl">
+      <body style={{ margin: 0, fontFamily: 'sans-serif' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f3f4f6' }}>
+          <div style={{ textAlign: 'center' }}>
+            <h1 style={{ fontSize: '3rem', fontWeight: 'bold', color: '#111827' }}>خطا!</h1>
+            <p style={{ marginTop: '1rem', fontSize: '1.25rem', color: '#4b5563' }}>مشکلی در سرور رخ داده است</p>
             <button 
               onClick={reset}
-              className="inline-block bg-blue-600 hover:bg-blue-700 mt-6 px-6 py-3 rounded-lg text-white"
+              style={{ 
+                marginTop: '1.5rem', 
+                padding: '0.75rem 1.5rem', 
+                backgroundColor: '#2563eb', 
+                color: 'white', 
+                borderRadius: '0.5rem', 
+                border: 'none', 
+                cursor: 'pointer' 
+              }}
             >
               تلاش مجدد
             </button>

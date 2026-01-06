@@ -144,7 +144,7 @@ export default function Navbar() {
                       );
                     })}
                   </nav>
-                  <div className="my-2 border-t border-theme" />
+                  <div className="my-2 border-theme border-t" />
                   <div className="px-1"><AuthCorner onAction={() => setMobileOpen(false)} /></div>
                 </div>
               </motion.div>
@@ -193,10 +193,10 @@ function AuthCorner({ onAction }: { onAction?: () => void } = {}) {
     <Link 
       href="/signin" 
       onClick={onAction} 
-      className="inline-flex items-center gap-1 hover:bg-blue-50 dark:hover:bg-blue-950 px-3 py-1.5 rounded-full text-blue-700 dark:text-blue-400"
+      className="inline-flex items-center gap-1.5 hover:bg-theme-hover px-3 py-1.5 rounded-full font-medium text-blue-600 dark:text-blue-400 transition-colors"
     >
       <LogIn className="w-4 h-4" />
-      <span className="hidden sm:inline">ورود</span>
+      <span className="hidden sm:inline text-sm">ورود</span>
     </Link>
   );
 
@@ -204,10 +204,10 @@ function AuthCorner({ onAction }: { onAction?: () => void } = {}) {
     <div className="relative" ref={ref}>
       <button 
         onClick={() => setOpen(v => !v)} 
-        className="inline-flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-1.5 rounded-full transition-colors"
+        className="inline-flex items-center gap-2 hover:bg-theme-hover backdrop-blur-sm px-3 py-2 border border-transparent rounded-xl transition-all duration-200"
       >
-        <UserRound className="w-5 h-5 text-gray-700 dark:text-gray-200" />
-        <span className="hidden sm:inline text-gray-700 dark:text-gray-200 text-sm">
+        <UserRound className="w-5 h-5 text-theme-primary" />
+        <span className="hidden sm:inline font-medium text-theme-primary text-sm">
           {me?.firstName ? `${me.firstName} ${me?.lastName || ''}` : 'حساب کاربری'}
         </span>
       </button>
@@ -215,46 +215,46 @@ function AuthCorner({ onAction }: { onAction?: () => void } = {}) {
       <AnimatePresence>
         {open && (
           <motion.div 
-            className="sm:right-0 left-0 sm:left-auto z-50 absolute bg-white/95 dark:bg-gray-900/95 shadow-xl mt-2 border border-gray-200 dark:border-gray-800 rounded-xl w-56 overflow-hidden"
+            className="sm:right-0 left-0 sm:left-auto z-50 absolute bg-theme-card shadow-theme-lg backdrop-blur-md mt-2 border border-theme rounded-xl w-56 overflow-hidden"
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
           >
             <div className="px-3 py-2 text-sm">
-              <div className="font-medium text-gray-900 dark:text-gray-100">
+              <div className="font-medium text-theme-primary">
                 {me?.firstName ? `${me.firstName} ${me?.lastName || ''}` : me?.email || 'کاربر'}
               </div>
-              {me?.role && <div className="text-[11px] text-gray-500 dark:text-gray-400">نقش: {me.role}</div>}
+              {me?.role && <div className="text-[11px] text-theme-muted">نقش: {me.role}</div>}
             </div>
-            <div className="border-gray-200 dark:border-gray-800 border-t" />
+            <div className="border-theme border-t" />
             <div className="p-1">
               <Link 
                 href="/dashboard" 
                 onClick={() => { setOpen(false); onAction?.(); }} 
-                className="flex items-center gap-2 hover:bg-blue-50 dark:hover:bg-blue-950 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 text-sm"
+                className="flex items-center gap-2 hover:bg-theme-hover px-3 py-2 rounded-lg text-theme-secondary text-sm transition-colors"
               >
                 <LayoutDashboard className="w-4 h-4"/> داشبورد
               </Link>
               <Link 
                 href="/services" 
                 onClick={() => { setOpen(false); onAction?.(); }} 
-                className="flex items-center gap-2 hover:bg-blue-50 dark:hover:bg-blue-950 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 text-sm"
+                className="flex items-center gap-2 hover:bg-theme-hover px-3 py-2 rounded-lg text-theme-secondary text-sm transition-colors"
               >
                 <Sparkles className="w-4 h-4"/> خدمات
               </Link>
               <Link 
                 href="/about" 
                 onClick={() => { setOpen(false); onAction?.(); }} 
-                className="flex items-center gap-2 hover:bg-blue-50 dark:hover:bg-blue-950 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 text-sm"
+                className="flex items-center gap-2 hover:bg-theme-hover px-3 py-2 rounded-lg text-theme-secondary text-sm transition-colors"
               >
                 <Info className="w-4 h-4"/> درباره ما
               </Link>
             </div>
-            <div className="border-gray-200 dark:border-gray-800 border-t" />
+            <div className="border-theme border-t" />
             <button 
               onClick={logout} 
-              className="flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-950 px-3 py-2 w-full text-red-600 dark:text-red-400 text-sm"
+              className="flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-950 px-3 py-2 w-full text-red-600 dark:text-red-400 text-sm transition-colors"
             >
               <LogOut className="w-4 h-4"/> خروج
             </button>

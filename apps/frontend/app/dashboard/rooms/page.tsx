@@ -168,10 +168,10 @@ export default function RoomsPage() {
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <div className="table-theme-container">
         <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800/60">
+          <table className="table-theme">
+            <thead>
               <tr>
                 <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs text-right uppercase tracking-wider">
                   نام اتاق

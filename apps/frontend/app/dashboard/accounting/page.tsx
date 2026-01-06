@@ -143,15 +143,15 @@ export default function AccountingPage(){
         </div>
 
         {/* Assets Table */}
-        <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-gray-200 dark:border-gray-700 border-b">
-            <h3 className="font-semibold text-gray-900 dark:text-white text-lg">اطلاعات مالی دارایی‌ها</h3>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">ویرایش قیمت و تاریخ خرید دارایی‌ها</p>
+        <div className="card-theme">
+          <div className="px-6 py-4 border-theme border-b">
+            <h3 className="font-semibold text-theme-primary text-lg">اطلاعات مالی دارایی‌ها</h3>
+            <p className="text-theme-secondary text-sm">ویرایش قیمت و تاریخ خرید دارایی‌ها</p>
           </div>
           
           <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-gray-50 dark:bg-gray-800/60">
+            <table className="table-theme">
+              <thead>
                 <tr>
                   <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs text-right uppercase tracking-wider">نام دارایی</th>
                   <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs text-right uppercase tracking-wider">بارکد</th>

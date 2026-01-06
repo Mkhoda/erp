@@ -17,7 +17,7 @@ export default function Features(){
         initial={{ opacity: 0, y: 10 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="mb-6 font-bold text-xl"
+        className="mb-6 font-bold text-theme-primary text-xl"
       >
         امکانات کلیدی
       </motion.h2>
@@ -29,10 +29,10 @@ export default function Features(){
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: i*0.05 }}
             viewport={{ once: true }}
-            className="bg-white/70 backdrop-blur p-4 border rounded-xl"
+            className="bg-theme-card backdrop-blur p-4 border border-theme rounded-xl"
           >
-            <div className="mb-1 font-medium">{f.t}</div>
-            <div className="text-gray-600 text-sm leading-relaxed">{f.d}</div>
+            <div className="mb-1 font-medium text-theme-primary">{f.t}</div>
+            <div className="text-theme-secondary text-sm leading-relaxed">{f.d}</div>
           </motion.div>
         ))}
       </div>

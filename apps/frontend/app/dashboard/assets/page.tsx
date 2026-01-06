@@ -269,7 +269,7 @@ export default function AssetsPage() {
               placeholder="جستجو در دارایی‌ها..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+              className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
             />
           </div>
           <div className="flex items-center text-gray-600 dark:text-gray-400 text-sm">
@@ -279,11 +279,11 @@ export default function AssetsPage() {
       </div>
 
       {/* Assets Content */}
-      <div className="bg-white/70 dark:bg-gray-900/70 shadow-sm backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-xl overflow-hidden">
+      <div className="table-theme-container">
         {view === 'list' ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50/50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300">
+            <table className="table-theme">
+              <thead>
                 <tr>
                   <th className="px-6 py-4 font-medium text-right">بارکد</th>
                   <th className="px-6 py-4 font-medium text-right">نام</th>
@@ -294,9 +294,9 @@ export default function AssetsPage() {
                   <th className="px-6 py-4 font-medium text-right">اقدامات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody>
                 {filtered.map(a => (
-                  <tr key={a.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                  <tr key={a.id}>
                     <td className="px-6 py-4 font-mono text-blue-600 dark:text-blue-400">
                       <Link href={`/dashboard/assets/${a.id}`} className="hover:underline">
                         {a.barcode}
@@ -437,7 +437,7 @@ export default function AssetsPage() {
                     required
                     value={editing?.name || ''} 
                     onChange={e=>setEditing(s=>s?{...s, name:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                     placeholder="نام دارایی را وارد کنید"
                   />
                 </div>
@@ -448,7 +448,7 @@ export default function AssetsPage() {
                     required
                     value={editing?.barcode || ''} 
                     onChange={e=>setEditing(s=>s?{...s, barcode:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                     placeholder="بارکد جدید را وارد کنید"
                   />
                 </div>
@@ -458,7 +458,7 @@ export default function AssetsPage() {
                   <input 
                     value={editing?.oldBarcode || ''} 
                     onChange={e=>setEditing(s=>s?{...s, oldBarcode:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                     placeholder="بارکد قدیم (در صورت وجود)"
                   />
                 </div>
@@ -468,7 +468,7 @@ export default function AssetsPage() {
                   <input 
                     value={editing?.serialNumber || ''} 
                     onChange={e=>setEditing(s=>s?{...s, serialNumber:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                     placeholder="شماره سریال دارایی"
                   />
                 </div>
@@ -481,7 +481,7 @@ export default function AssetsPage() {
                   <select 
                     value={editing?.typeId || ''} 
                     onChange={e=>setEditing(s=>s?{...s, typeId:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                   >
                     <option value="">انتخاب نوع دارایی</option>
                     {assetTypes.map(type => (
@@ -495,7 +495,7 @@ export default function AssetsPage() {
                   <select 
                     value={editing?.categoryId || ''} 
                     onChange={e=>setEditing(s=>s?{...s, categoryId:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                   >
                     <option value="">انتخاب دسته‌بندی</option>
                     {assetCategories.map(category => (
@@ -512,7 +512,7 @@ export default function AssetsPage() {
                   <select 
                     value={editing?.condition || 'NEW'} 
                     onChange={e=>setEditing(s=>s?{...s, condition:e.target.value as any}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                   >
                     <option value="NEW">جدید</option>
                     <option value="USED_GOOD">استفاده شده - سالم</option>
@@ -525,7 +525,7 @@ export default function AssetsPage() {
                   <select 
                     value={editing?.availability || 'AVAILABLE'} 
                     onChange={e=>setEditing(s=>s?{...s, availability:e.target.value as any}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                   >
                     <option value="AVAILABLE">موجود</option>
                     <option value="IN_USE">در حال استفاده</option>
@@ -541,7 +541,7 @@ export default function AssetsPage() {
                   <select 
                     value={editing?.barcodeType || 'QR'} 
                     onChange={e=>setEditing(s=>s?{...s, barcodeType:e.target.value as any}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                   >
                     <option value="QR">QR Code</option>
                     <option value="CODE128">Code 128</option>
@@ -556,7 +556,7 @@ export default function AssetsPage() {
                   <input 
                     value={editing?.location || ''} 
                     onChange={e=>setEditing(s=>s?{...s, location:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                     placeholder="مکان فعلی دارایی"
                   />
                 </div>
@@ -567,7 +567,7 @@ export default function AssetsPage() {
                     type="date"
                     value={editing?.purchaseDate || ''} 
                     onChange={e=>setEditing(s=>s?{...s, purchaseDate:e.target.value}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                   />
                 </div>
 
@@ -579,7 +579,7 @@ export default function AssetsPage() {
                     step="1000"
                     value={editing?.cost || ''} 
                     onChange={e=>setEditing(s=>s?{...s, cost:e.target.value ? parseFloat(e.target.value) : undefined}:s)} 
-                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                    className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                     placeholder="0"
                   />
                 </div>
@@ -592,7 +592,7 @@ export default function AssetsPage() {
                   rows={3}
                   value={editing?.description || ''} 
                   onChange={e=>setEditing(s=>s?{...s, description:e.target.value}:s)} 
-                  className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
+                  className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border border-gray-200 focus:border-transparent dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100"
                   placeholder="توضیحات تکمیلی دارایی"
                 />
               </div>
