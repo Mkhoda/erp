@@ -5,6 +5,9 @@
     "apps/backend",
     "apps/frontend"
   ],
+  "overrides": {
+    "minimatch": "^10.2.1"
+  },
   "scripts": {
     "postinstall": "npm -w apps/backend run prisma:generate || exit 0",
     "build": "npm run build:backend && npm run build:frontend",
