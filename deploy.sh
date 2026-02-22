@@ -181,6 +181,14 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
     print_status "🏗️  Building frontend..."
     npm run build
 
+    # Grant nginx (www-data) read access to static assets served via alias
+    print_status "🔐 Setting static asset permissions for nginx..."
+    sudo chmod -R o+rX /opt/arzesh-erp/apps/frontend/.next/static/ 2>/dev/null || true
+    sudo chmod o+rx /opt/arzesh-erp/apps/frontend/.next/ 2>/dev/null || true
+    sudo chmod o+rx /opt/arzesh-erp/apps/frontend/ 2>/dev/null || true
+    sudo chmod o+rx /opt/arzesh-erp/apps/ 2>/dev/null || true
+    sudo chmod o+rx /opt/arzesh-erp/ 2>/dev/null || true
+
     # Start backend with PM2
     print_status "🚀 Starting backend service..."
     cd ../backend
@@ -217,7 +225,9 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
             --node-args="--max-old-space-size=4096"
     else
         print_status "Using npm start (no standalone output found)..."
-        pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start
+        # Pass --hostname 0.0.0.0 so Next.js 16 accepts requests from nginx proxy
+        # regardless of the Host header value
+        PORT=3000 pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start -- --hostname 0.0.0.0
     fi
 
     # Install Nginx
