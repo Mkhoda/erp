@@ -34,8 +34,36 @@ done
 info "Pulling latest from Git..."
 git fetch --all --prune
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-git pull --rebase origin "$BRANCH"
-success "Updated to latest $BRANCH"
+
+# If there are local changes, stash them so pull/rebase succeeds
+STASHED=0
+if [ -n "$(git status --porcelain)" ]; then
+  info "Local changes detected — stashing before update..."
+  git add -A
+  git stash push -u -m "auto-update-$(date +%s)" || true
+  STASHED=1
+fi
+
+if git pull --rebase origin "$BRANCH"; then
+  success "Updated to latest $BRANCH"
+else
+  error "git pull failed"
+  if [ "$STASHED" -eq 1 ]; then
+    info "Attempting to reapply stashed changes (stash left if conflicts)..."
+    git stash pop || true
+  fi
+  exit 1
+fi
+
+# If we stashed earlier, try to reapply now
+if [ "$STASHED" -eq 1 ]; then
+  info "Reapplying stashed changes..."
+  if git stash pop; then
+    success "Stash reapplied"
+  else
+    error "Failed to pop stash cleanly — stash preserved. Run 'git stash list' and resolve conflicts manually."
+  fi
+fi
 
 if [ "$USE_DOCKER" -eq 1 ]; then
   info "Using Docker flow: pulling images and restarting compose"
