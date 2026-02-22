@@ -224,10 +224,8 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
             --max-memory-restart 4G \
             --node-args="--max-old-space-size=4096"
     else
-        print_status "Using npm start (no standalone output found)..."
-        # Pass --hostname 0.0.0.0 so Next.js 16 accepts requests from nginx proxy
-        # regardless of the Host header value
-        PORT=3000 pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start -- --hostname 0.0.0.0
+        print_status "Using npm start..."
+        PORT=3000 pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start
     fi
 
     # Install Nginx
@@ -264,12 +262,16 @@ server {
         add_header Cache-Control "public, no-transform";
     }
 
-    # Next.js static assets — served directly from disk to bypass Next.js 16 host validation
+    # Next.js static assets
     location /_next/static/ {
-        alias /opt/arzesh-erp/apps/frontend/.next/static/;
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host localhost;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         expires 1y;
         add_header Cache-Control "public, immutable";
-        access_log off;
     }
 
     # Frontend — pass Host:localhost so Next.js 16 host validation passes
