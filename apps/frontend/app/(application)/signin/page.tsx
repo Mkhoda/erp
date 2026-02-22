@@ -293,15 +293,37 @@ export default function SignInPage() {
                       'ارسال کد تایید'
                     )}
                   </button>
-                ) : canResend && (
-                  <button 
-                    type="button" 
-                    onClick={resendOtp} 
-                    disabled={loading}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-3 rounded-xl w-full font-medium text-white text-sm transition-all"
-                  >
-                    ارسال مجدد کد
-                  </button>
+                ) : (
+                  <>
+                    {canResend && (
+                      <button 
+                        type="button" 
+                        onClick={resendOtp} 
+                        disabled={loading}
+                        className="bg-theme-secondary hover:bg-theme-primary disabled:opacity-50 px-4 py-2 border border-theme rounded-xl w-full font-medium text-theme-secondary text-sm transition-all"
+                      >
+                        ارسال مجدد کد
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={loading || otp.length < 4}
+                      className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${
+                        otp.length >= 4 && !loading
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                          : 'bg-theme-secondary text-theme-muted cursor-not-allowed'
+                      }`}
+                    >
+                      {loading ? (
+                        <div className="flex justify-center items-center gap-2">
+                          <div className="border-white border-b-2 rounded-full w-4 h-4 animate-spin"></div>
+                          در حال تایید...
+                        </div>
+                      ) : (
+                        'تایید و ورود'
+                      )}
+                    </button>
+                  </>
                 )}
 
                 <div className="text-sm text-center">
@@ -384,6 +406,25 @@ export default function SignInPage() {
                 </Link>
               </div>
             </div>
+
+            <button
+              type="submit"
+              disabled={loading || !email || !password}
+              className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${
+                email && password && !loading
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-theme-secondary text-theme-muted cursor-not-allowed'
+              }`}
+            >
+              {loading ? (
+                <div className="flex justify-center items-center gap-2">
+                  <div className="border-white border-b-2 rounded-full w-4 h-4 animate-spin"></div>
+                  در حال ورود...
+                </div>
+              ) : (
+                'ورود به حساب کاربری'
+              )}
+            </button>
               </>
             )}
 
