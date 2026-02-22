@@ -3,6 +3,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { isValidPhone, normalizeTo98 } from '../../../lib/phone';
 
 export default function SignInPage() {
   const router = useRouter();
@@ -13,6 +14,8 @@ export default function SignInPage() {
   const [otp, setOtp] = React.useState('');
   const [otpSent, setOtpSent] = React.useState(false);
   const [otpExpiresAt, setOtpExpiresAt] = React.useState<string | null>(null);
+  // use centralized phone helper
+  const validPhone = isValidPhone(phone);
   const [now, setNow] = React.useState<number>(Date.now());
   // no mock OTP exposure in UI
   const [mockOtp, setMockOtp] = React.useState<string | null>(null);
@@ -58,9 +61,9 @@ export default function SignInPage() {
         router.push('/dashboard');
       } else {
         // OTP flow: verify entered code
-        const phoneDigits = phone.replace(/\s/g, '');
-        if (!/^0\d{10}$/.test(phoneDigits)) {
-          throw new Error('شماره موبایل باید با 0 شروع شود و 11 رقم باشد. مثال: 09121234567');
+        const phoneDigits = normalizeTo98(phone);
+        if (!/^98\d{10}$/.test(phoneDigits)) {
+          throw new Error('شماره موبایل نامعتبر است');
         }
         if (!otpSent) {
           // if user didn't click send code, do it now
@@ -106,9 +109,9 @@ export default function SignInPage() {
       setError(null);
       setLoading(true);
       const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const phoneDigits = phone.replace(/\s/g, '');
-      if (!/^0\d{10}$/.test(phoneDigits)) {
-        throw new Error('شماره موبایل باید با 0 شروع شود و 11 رقم باشد. مثال: 09121234567');
+      const phoneDigits = normalizeTo98(phone);
+      if (!/^98\d{10}$/.test(phoneDigits)) {
+        throw new Error('شماره موبایل نامعتبر است');
       }
       const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST',
@@ -208,7 +211,7 @@ export default function SignInPage() {
                       }}
                       required
                       inputMode="tel"
-                      className={`bg-theme-primary px-12 py-3 border ${/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary transition-all ${otpSent && !canResend ? 'opacity-60 cursor-not-allowed':''}`}
+                      className={`bg-theme-primary px-12 py-3 border ${validPhone||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${validPhone||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary transition-all ${otpSent && !canResend ? 'opacity-60 cursor-not-allowed':''}`}
                       disabled={otpSent && !canResend}
                       placeholder="0912 345 6789"
                     />
@@ -278,8 +281,8 @@ export default function SignInPage() {
                   <button 
                     type="button" 
                     onClick={sendOtp} 
-                    disabled={loading || !phone || !/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)} 
-                    className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${phone && /^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone) && !loading ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-theme-secondary text-theme-muted cursor-not-allowed'}`}
+                    disabled={loading || !phone || !validPhone} 
+                      className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${phone && validPhone && !loading ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-theme-secondary text-theme-muted cursor-not-allowed'}`}
                   >
                     {loading ? (
                       <div className="flex justify-center items-center gap-2">
@@ -397,20 +400,6 @@ export default function SignInPage() {
               </motion.div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex justify-center bg-gradient-to-r from-blue-600 hover:from-blue-700 to-purple-600 hover:to-purple-700 disabled:opacity-50 shadow-sm px-4 py-3 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 w-full font-medium text-white text-sm transition-all duration-200 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="border-white border-b-2 rounded-full w-4 h-4 animate-spin"></div>
-                  {mode==='otp' ? 'در حال پردازش...' : 'در حال ورود...'}
-                </div>
-              ) : (
-                mode==='otp' ? (otpSent ? 'تایید کد و ورود' : 'ارسال کد و ورود') : 'ورود به سیستم'
-              )}
-            </button>
           </form>
 
           <div className="mt-6">

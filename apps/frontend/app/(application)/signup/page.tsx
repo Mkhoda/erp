@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { normalizeTo98, isValidPhone } from '../../../lib/phone';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -45,8 +46,9 @@ export default function SignUpPage() {
     setError(null);
 
     // Validation
-    if (!/^0\d{10}$/.test(phone)) {
-      setError('شماره موبایل باید با 0 شروع شود و 11 رقم باشد. مثال: 09121234567');
+    const phoneDigits = phone.replace(/\s+/g, '');
+    if (!isValidPhone(phoneDigits)) {
+      setError('شماره موبایل باید با 0 شروع شود و 11 رقم باشد یا با کد کشور 98. مثال: 09121234567 یا 989121234567');
       setLoading(false);
       return;
     }
@@ -69,10 +71,13 @@ export default function SignUpPage() {
     }
 
     try {
+      // normalize phone to backend expected format: 98XXXXXXXXXX
+      let phoneForApi = normalizeTo98(phoneDigits);
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, email, password, phone })
+        body: JSON.stringify({ firstName, lastName, email, password, phone: phoneForApi })
       });
       
       if (!res.ok) {

@@ -2,6 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { isValidPhone, normalizeTo98 } from '../../../lib/phone';
 
 export default function ForgotPasswordPage() {
   const [phone, setPhone] = React.useState('');
@@ -17,6 +18,7 @@ export default function ForgotPasswordPage() {
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const [now, setNow] = React.useState<number>(Date.now());
   const [otpSent, setOtpSent] = React.useState(false);
+  const validPhone = isValidPhone(phone);
 
   React.useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -31,9 +33,9 @@ export default function ForgotPasswordPage() {
   async function sendOtp() {
     setError(null); setInfo(null); setLoading(true);
     try {
-      const phoneNorm = phone.replace(/\s/g, '');
-      if (!/^0\d{10}$/.test(phoneNorm)) {
-        throw new Error('شماره موبایل باید با 0 شروع شود و 11 رقم باشد. مثال: 09121234567');
+      const phoneNorm = normalizeTo98(phone);
+      if (!/^98\d{10}$/.test(phoneNorm)) {
+        throw new Error('شماره موبایل نامعتبر است');
       }
       const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -62,7 +64,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError(null); setInfo(null); setLoading(true);
     try {
-      const phoneNorm = phone.replace(/\s/g, '');
+      const phoneNorm = normalizeTo98(phone);
       const res = await fetch(`${API}/auth/forgot-password`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phoneNorm, otp, newPassword })
@@ -133,7 +135,7 @@ export default function ForgotPasswordPage() {
                     inputMode="tel"
                     disabled={otpSent && !canResend}
                     dir="ltr"
-                    className={`bg-theme-primary px-12 py-3 border ${/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary text-right transition-all ${otpSent && !canResend ? 'opacity-60 cursor-not-allowed':''}`}
+                    className={`bg-theme-primary px-12 py-3 border ${validPhone||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${validPhone||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary text-right transition-all ${otpSent && !canResend ? 'opacity-60 cursor-not-allowed':''}`}
                     placeholder="0912 345 6789"
                   />
                   <div className="top-3 right-3 absolute flex items-center gap-1 text-theme-muted text-sm">
@@ -152,8 +154,8 @@ export default function ForgotPasswordPage() {
               </div>
               <button 
                 onClick={sendOtp} 
-                disabled={loading || !phone || !/^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone)} 
-                className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${phone && /^0\s\d{3}\s\d{3}\s\d{4}$/.test(phone) && !loading ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-theme-secondary text-theme-muted cursor-not-allowed'}`}
+                  disabled={loading || !phone || !validPhone} 
+                className={`w-full px-4 py-3 rounded-xl font-medium text-sm transition-all ${phone && validPhone && !loading ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-theme-secondary text-theme-muted cursor-not-allowed'}`}
               >
                 {loading ? (
                   <div className="flex justify-center items-center gap-2">

@@ -1,0 +1,81 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Lightweight update script: pulls latest from git, installs, builds, migrates, restarts
+# Usage: ./update.sh [--docker] [--no-install] [--no-build]
+
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$REPO_ROOT"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info(){ echo -e "${BLUE}$1${NC}"; }
+success(){ echo -e "${GREEN}$1${NC}"; }
+error(){ echo -e "${RED}$1${NC}"; }
+
+USE_DOCKER=0
+DO_INSTALL=1
+DO_BUILD=1
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --docker) USE_DOCKER=1; shift ;;
+    --no-install) DO_INSTALL=0; shift ;;
+    --no-build) DO_BUILD=0; shift ;;
+    -h|--help) echo "Usage: ./update.sh [--docker] [--no-install] [--no-build]"; exit 0 ;;
+    *) echo "Unknown flag: $1"; exit 1 ;;
+  esac
+done
+
+info "Pulling latest from Git..."
+git fetch --all --prune
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git pull --rebase origin "$BRANCH"
+success "Updated to latest $BRANCH"
+
+if [ "$USE_DOCKER" -eq 1 ]; then
+  info "Using Docker flow: pulling images and restarting compose"
+  docker-compose -f docker-compose.prod.yml pull --quiet
+  docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+  success "Docker services updated"
+  exit 0
+fi
+
+if [ "$DO_INSTALL" -eq 1 ]; then
+  info "Installing workspace dependencies (root + apps)..."
+  # Clean lockfile/node_modules only when necessary; prefer incremental install
+  npm install --no-audit --legacy-peer-deps || {
+    error "npm install failed; try running: npm install --legacy-peer-deps"
+    exit 1
+  }
+  success "Dependencies installed"
+fi
+
+if [ "$DO_BUILD" -eq 1 ]; then
+  info "Building backend..."
+  npm --prefix apps/backend run build
+  success "Backend built"
+
+  info "Running Prisma migrations (deploy)..."
+  (cd apps/backend && npx prisma migrate deploy) || error "Prisma migrate failed (check DB)"
+
+  info "Building frontend..."
+  npm --prefix apps/frontend run build
+  success "Frontend built"
+fi
+
+info "Restarting services with PM2 (if available)..."
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 restart arzesh-backend || pm2 start apps/backend/dist/main.js --name arzesh-backend || true
+  pm2 restart arzesh-frontend || pm2 start --name arzesh-frontend npm -- start || true
+  pm2 save || true
+  success "PM2 services restarted"
+else
+  info "pm2 not found — to apply changes manually restart your services (pm2 start/stop)"
+fi
+
+success "Update completed"
