@@ -98,8 +98,40 @@ fi
 
 info "Restarting services with PM2 (if available)..."
 if command -v pm2 >/dev/null 2>&1; then
-  pm2 restart arzesh-backend || pm2 start apps/backend/dist/main.js --name arzesh-backend || true
-  pm2 restart arzesh-frontend || pm2 start --name arzesh-frontend npm -- start || true
+  # Delete all frontend/backend entries first to avoid duplicate-process port conflicts,
+  # then start fresh. This handles the EADDRINUSE crash-loop caused by stale entries.
+
+  # Kill anything still holding port 3000 (old Next.js instance that survived)
+  fuser -k 3000/tcp 2>/dev/null || true
+
+  # Backend: delete all instances, start fresh
+  pm2 delete arzesh-backend 2>/dev/null || true
+  pm2 start apps/backend/dist/main.js \
+    --name arzesh-backend \
+    --max-memory-restart 4G \
+    --node-args="--max-old-space-size=4096"
+
+  # Frontend: prefer standalone server.js (built with output:'standalone'),
+  # fall back to npm start
+  pm2 delete arzesh-frontend 2>/dev/null || true
+  FRONTEND_DIR="apps/frontend"
+  STANDALONE_SERVER="$FRONTEND_DIR/.next/standalone/server.js"
+  if [ -f "$STANDALONE_SERVER" ]; then
+    # Copy public and static assets required by standalone mode
+    cp -r "$FRONTEND_DIR/public" "$FRONTEND_DIR/.next/standalone/public" 2>/dev/null || true
+    cp -r "$FRONTEND_DIR/.next/static" "$FRONTEND_DIR/.next/standalone/.next/static" 2>/dev/null || true
+    PORT=3000 pm2 start "$STANDALONE_SERVER" \
+      --name arzesh-frontend \
+      --max-memory-restart 4G \
+      --node-args="--max-old-space-size=4096"
+  else
+    (cd "$FRONTEND_DIR" && pm2 start npm \
+      --name arzesh-frontend \
+      --max-memory-restart 4G \
+      --node-args="--max-old-space-size=4096" \
+      -- start)
+  fi
+
   pm2 save || true
   success "PM2 services restarted"
 else

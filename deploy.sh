@@ -198,11 +198,27 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
     print_status "🚀 Starting frontend service..."
     cd ../frontend
 
+    # Kill anything still holding port 3000 (e.g. stale process from previous deploy)
+    fuser -k 3000/tcp 2>/dev/null || true
+    sleep 1
+
     pm2 delete arzesh-frontend 2>/dev/null || true
 
-    # Use npm start (standard Next.js production mode)
-    print_status "Using npm start..."
-    pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start
+    # Prefer standalone server produced by output:'standalone' in next.config.js
+    STANDALONE_SERVER=".next/standalone/server.js"
+    if [ -f "$STANDALONE_SERVER" ]; then
+        print_status "Using standalone server (output: standalone)..."
+        # Copy public & static assets required by standalone server
+        cp -r public .next/standalone/public 2>/dev/null || true
+        cp -r .next/static .next/standalone/.next/static 2>/dev/null || true
+        PORT=3000 pm2 start "$STANDALONE_SERVER" \
+            --name "arzesh-frontend" \
+            --max-memory-restart 4G \
+            --node-args="--max-old-space-size=4096"
+    else
+        print_status "Using npm start (no standalone output found)..."
+        pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start
+    fi
 
     # Install Nginx
     print_status "📦 Installing Nginx..."
@@ -213,27 +229,51 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
     sudo tee /etc/nginx/sites-available/arzesh-erp > /dev/null <<'EOF'
 server {
     listen 80;
-    server_name erp.arzesh.net 172.17.100.13;
+    server_name erp.arzesh.net 91.92.181.146 172.17.100.13;
 
-    # Frontend
+    client_max_body_size 100M;
+
+    # Backend API
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+
+    # Backend uploads/static files
+    location /uploads {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    # Next.js static assets — pass Host:localhost so Next.js 16 host validation passes
+    location /_next/static/ {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host localhost;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Frontend — pass Host:localhost so Next.js 16 host validation passes
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
+        proxy_set_header Host localhost;
         proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Backend API
-    location /api {
-        rewrite ^/api/(.*) /$1 break;
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
