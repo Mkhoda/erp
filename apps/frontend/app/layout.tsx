@@ -49,10 +49,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <head>
-        <link rel="stylesheet" href="/css/fontiran.css" />
-        <link rel="stylesheet" href="/css/style.css" />
-      </head>
       <body className={`${montserrat.variable} ${poppins.variable} font-montserrat antialiased bg-theme-secondary text-theme-primary`}>
         {children}
       </body>
