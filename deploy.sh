@@ -254,16 +254,12 @@ server {
         add_header Cache-Control "public, no-transform";
     }
 
-    # Next.js static assets — pass Host:localhost so Next.js 16 host validation passes
+    # Next.js static assets — served directly from disk to bypass Next.js 16 host validation
     location /_next/static/ {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host localhost;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        alias /opt/arzesh-erp/apps/frontend/.next/static/;
         expires 1y;
         add_header Cache-Control "public, immutable";
+        access_log off;
     }
 
     # Frontend — pass Host:localhost so Next.js 16 host validation passes
