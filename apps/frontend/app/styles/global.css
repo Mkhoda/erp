@@ -1,6 +1,4 @@
-/* Import the public styles via correct paths - MUST be at the top before all other rules */
-@import url("/css/fontiran.css");
-@import url("/css/style.css");
+/* Tailwind base + project global rules. Public CSS is loaded via <link> tags in layout.tsx */
 @import "tailwindcss";
 
 html, body { 
