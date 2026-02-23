@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException,
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { LoginDto, RegisterDto } from './dto';
+import { LoginDto, LoginByPhoneDto, RegisterDto } from './dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -47,6 +47,16 @@ export class AuthService {
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user.password) throw new UnauthorizedException('Password not set');
+    const valid = await bcrypt.compare(dto.password, user.password);
+    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    return this.signUser(user.id, user.email, user.role);
+  }
+
+  async loginByPhone(dto: LoginByPhoneDto) {
+    const phone = this.normalizePhone(dto.phone);
+    const user = await this.prisma.user.findFirst({ where: { phone } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
     if (!user.password) throw new UnauthorizedException('Password not set');
     const valid = await bcrypt.compare(dto.password, user.password);
