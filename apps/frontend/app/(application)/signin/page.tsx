@@ -24,7 +24,7 @@ export default function SignInPage() {
   const validPhone = isValidPhone(phone);
 
   React.useEffect(() => {
-    document.title = 'ظˆط±ظˆط¯ | ط§ط±ط²ط´ ERP';
+    document.title = 'ورود | ارزش ERP';
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (token) router.replace('/dashboard');
   }, [router]);
@@ -40,7 +40,7 @@ export default function SignInPage() {
       if (mode === 'phone') {
         const phoneDigits = normalizeTo98(phone);
         if (!/^98\d{10}$/.test(phoneDigits)) {
-          throw new Error('ط´ظ…ط§ط±ظ‡ ظ…ظˆط¨ط§غŒظ„ ظ†ط§ظ…ط¹طھط¨ط± ط§ط³طھ');
+          throw new Error('شماره موبایل نامعتبر است');
         }
         const res = await fetch(`${API}/auth/login-phone`, {
           method: 'POST',
@@ -49,7 +49,7 @@ export default function SignInPage() {
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data.message || 'ظˆط±ظˆط¯ ظ†ط§ظ…ظˆظپظ‚ ط¨ظˆط¯');
+          throw new Error(data.message || 'ورود ناموفق بود');
         }
         const data = await res.json();
         localStorage.setItem('token', data.access_token);
@@ -62,7 +62,7 @@ export default function SignInPage() {
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data.message || 'ظˆط±ظˆط¯ ظ†ط§ظ…ظˆظپظ‚ ط¨ظˆط¯');
+          throw new Error(data.message || 'ورود ناموفق بود');
         }
         const data = await res.json();
         localStorage.setItem('token', data.access_token);
@@ -90,10 +90,10 @@ export default function SignInPage() {
             </svg>
           </div>
           <h2 className="bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-bold text-transparent text-3xl">
-            ط®ظˆط´ ط¢ظ…ط¯غŒط¯
+            خوش آمدید
           </h2>
           <p className="mt-2 text-theme-muted">
-            ط¨ط±ط§غŒ ط§ط¯ط§ظ…ظ‡طŒ ظˆط§ط±ط¯ ط­ط³ط§ط¨ ع©ط§ط±ط¨ط±غŒ ط®ظˆط¯ ط´ظˆغŒط¯
+            برای ادامه، وارد حساب کاربری خود شوید
           </p>
         </motion.div>
 
@@ -110,24 +110,23 @@ export default function SignInPage() {
               onClick={() => { setMode('phone'); setError(null); }}
               className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${mode === 'phone' ? 'bg-blue-600 text-white' : 'bg-theme-secondary text-theme-muted'}`}
             >
-              ظˆط±ظˆط¯ ط¨ط§ ط´ظ…ط§ط±ظ‡ ظ…ظˆط¨ط§غŒظ„
+              ورود با شماره موبایل
             </button>
             <button
               type="button"
               onClick={() => { setMode('email'); setError(null); }}
               className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${mode === 'email' ? 'bg-blue-600 text-white' : 'bg-theme-secondary text-theme-muted'}`}
             >
-              ظˆط±ظˆط¯ ط¨ط§ ط§غŒظ…غŒظ„
+              ورود با ایمیل
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {mode === 'phone' ? (
               <>
-                {/* Phone field */}
                 <div>
                   <label htmlFor="phone" className="block mb-2 font-medium text-theme-primary text-sm">
-                    ط´ظ…ط§ط±ظ‡ ظ…ظˆط¨ط§غŒظ„
+                    شماره موبایل
                   </label>
                   <div className="relative">
                     <input
@@ -167,13 +166,12 @@ export default function SignInPage() {
                       <span>+</span>
                     </div>
                   </div>
-                  <p className="mt-1 text-theme-muted text-xs">ظپط±ظ…طھ: 0XXX XXX XXXX</p>
+                  <p className="mt-1 text-theme-muted text-xs">فرمت: 0XXX XXX XXXX</p>
                 </div>
 
-                {/* Password field for phone mode */}
                 <div>
                   <label htmlFor="phone-password" className="block mb-2 font-medium text-theme-primary text-sm">
-                    ط±ظ…ط² ط¹ط¨ظˆط±
+                    رمز عبور
                   </label>
                   <div className="relative">
                     <input
@@ -183,7 +181,7 @@ export default function SignInPage() {
                       onChange={e => setPhonePassword(e.target.value)}
                       required
                       className="bg-theme-primary px-4 py-3 pl-12 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
-                      placeholder="ط±ظ…ط² ط¹ط¨ظˆط± ط®ظˆط¯ ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯"
+                      placeholder="رمز عبور خود را وارد کنید"
                     />
                     <button
                       type="button"
@@ -213,22 +211,21 @@ export default function SignInPage() {
                       className="border-theme rounded focus:ring-blue-500 w-4 h-4 text-blue-600"
                     />
                     <label htmlFor="remember-me-phone" className="block mr-2 text-theme-primary text-sm">
-                      ظ…ط±ط§ ط¨ظ‡ ط®ط§ط·ط± ط¨ط³ظ¾ط§ط±
+                      مرا به خاطر بسپار
                     </label>
                   </div>
                   <div className="text-sm">
                     <Link href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500 dark:hover:text-blue-300 dark:text-blue-400">
-                      ظپط±ط§ظ…ظˆط´غŒ ط±ظ…ط² ط¹ط¨ظˆط±طں
+                      فراموشی رمز عبور؟
                     </Link>
                   </div>
                 </div>
               </>
             ) : (
               <>
-                {/* Email field */}
                 <div>
                   <label htmlFor="email" className="block mb-2 font-medium text-theme-primary text-sm">
-                    ط¢ط¯ط±ط³ ط§غŒظ…غŒظ„
+                    آدرس ایمیل
                   </label>
                   <div className="relative">
                     <input
@@ -246,10 +243,9 @@ export default function SignInPage() {
                   </div>
                 </div>
 
-                {/* Password field for email mode */}
                 <div>
                   <label htmlFor="email-password" className="block mb-2 font-medium text-theme-primary text-sm">
-                    ط±ظ…ط² ط¹ط¨ظˆط±
+                    رمز عبور
                   </label>
                   <div className="relative">
                     <input
@@ -259,7 +255,7 @@ export default function SignInPage() {
                       onChange={e => setEmailPassword(e.target.value)}
                       required
                       className="bg-theme-primary px-4 py-3 pl-12 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
-                      placeholder="ط±ظ…ط² ط¹ط¨ظˆط± ط®ظˆط¯ ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯"
+                      placeholder="رمز عبور خود را وارد کنید"
                     />
                     <button
                       type="button"
@@ -289,12 +285,12 @@ export default function SignInPage() {
                       className="border-theme rounded focus:ring-blue-500 w-4 h-4 text-blue-600"
                     />
                     <label htmlFor="remember-me-email" className="block mr-2 text-theme-primary text-sm">
-                      ظ…ط±ط§ ط¨ظ‡ ط®ط§ط·ط± ط¨ط³ظ¾ط§ط±
+                      مرا به خاطر بسپار
                     </label>
                   </div>
                   <div className="text-sm">
                     <Link href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500 dark:hover:text-blue-300 dark:text-blue-400">
-                      ظپط±ط§ظ…ظˆط´غŒ ط±ظ…ط² ط¹ط¨ظˆط±طں
+                      فراموشی رمز عبور؟
                     </Link>
                   </div>
                 </div>
@@ -322,10 +318,10 @@ export default function SignInPage() {
               {loading ? (
                 <div className="flex justify-center items-center gap-2">
                   <div className="border-white border-b-2 rounded-full w-4 h-4 animate-spin"></div>
-                  ط¯ط± ط­ط§ظ„ ظˆط±ظˆط¯...
+                  در حال ورود...
                 </div>
               ) : (
-                'ظˆط±ظˆط¯'
+                'ورود'
               )}
             </button>
           </form>
@@ -336,15 +332,15 @@ export default function SignInPage() {
                 <div className="border-theme border-t w-full" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="bg-theme-primary px-2 text-theme-muted">غŒط§</span>
+                <span className="bg-theme-primary px-2 text-theme-muted">یا</span>
               </div>
             </div>
 
             <div className="mt-6 text-center">
               <p className="text-theme-secondary text-sm">
-                ط­ط³ط§ط¨ ع©ط§ط±ط¨ط±غŒ ظ†ط¯ط§ط±غŒط¯طں{' '}
+                حساب کاربری ندارید؟{' '}
                 <Link href="/signup" className="font-medium text-blue-600 hover:text-blue-500 dark:hover:text-blue-300 dark:text-blue-400">
-                  ط«ط¨طھ ظ†ط§ظ… ع©ظ†غŒط¯
+                  ثبت نام کنید
                 </Link>
               </p>
             </div>
@@ -358,15 +354,15 @@ export default function SignInPage() {
           className="text-center"
         >
           <p className="text-theme-muted text-xs">
-            ط¨ط§ ظˆط±ظˆط¯ ط¨ظ‡ ط³غŒط³طھظ…طŒ ط´ظ…ط§ ط¨ط§{' '}
+            با ورود به سیستم، شما با{' '}
             <Link href="/terms" className="text-blue-600 hover:text-blue-500 dark:text-blue-400">
-              ط´ط±ط§غŒط· ظˆ ظ‚ظˆط§ظ†غŒظ†
+              شرایط و قوانین
             </Link>{' '}
-            ظˆ{' '}
+            و{' '}
             <Link href="/privacy" className="text-blue-600 hover:text-blue-500 dark:text-blue-400">
-              ط­ط±غŒظ… ط®طµظˆطµغŒ
+              حریم خصوصی
             </Link>{' '}
-            ظ…ظˆط§ظپظ‚طھ ظ…غŒâ€Œع©ظ†غŒط¯.
+            موافقت می‌کنید.
           </p>
         </motion.div>
       </div>
