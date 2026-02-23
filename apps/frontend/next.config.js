@@ -31,6 +31,7 @@ const nextConfig = {
         '91.92.181.146:3000',
         '91.92.181.146:80',
         'erp.arzesh.net',
+        'erp.arzesh.net:443',
       ],
     },
   },

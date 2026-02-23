@@ -228,20 +228,61 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
         PORT=3000 pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start
     fi
 
-    # Install Nginx
-    print_status "📦 Installing Nginx..."
-    sudo apt install -y nginx
+    # Install Nginx and Certbot
+    print_status "📦 Installing Nginx and Certbot..."
+    sudo apt install -y nginx certbot python3-certbot-nginx
 
-    # Configure Nginx
-    print_status "⚙️  Configuring Nginx..."
-    sudo tee /etc/nginx/sites-available/arzesh-erp > /dev/null <<'EOF'
+    DOMAIN="erp.arzesh.net"
+    CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+    CERT_KEY="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
+
+    # Write HTTP-only config first so certbot can complete domain challenge
+    print_status "⚙️  Writing initial HTTP config for certificate issuance..."
+    sudo mkdir -p /var/www/certbot
+    sudo tee /etc/nginx/sites-available/arzesh-erp > /dev/null <<'NGINXEOF'
 server {
     listen 80;
     server_name erp.arzesh.net 91.92.181.146 172.17.100.13;
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { proxy_pass http://localhost:3000; }
+}
+NGINXEOF
 
+    sudo ln -sf /etc/nginx/sites-available/arzesh-erp /etc/nginx/sites-enabled/
+    sudo rm -f /etc/nginx/sites-enabled/default
+    sudo nginx -t && sudo systemctl restart nginx
+
+    # Obtain SSL certificate from Let's Encrypt (skip if already exists)
+    if [ ! -f "$CERT_PATH" ]; then
+        print_status "🔐 Obtaining SSL certificate for $DOMAIN via Let's Encrypt..."
+        sudo certbot certonly --webroot -w /var/www/certbot \
+            -d "$DOMAIN" \
+            --non-interactive --agree-tos \
+            --email admin@arzesh.net \
+            --no-eff-email \
+            && print_success "SSL certificate obtained" \
+            || print_warning "Certbot failed — ensure port 80 is open and DNS for $DOMAIN points to this server. HTTP will still work."
+    else
+        print_success "SSL certificate already exists for $DOMAIN"
+    fi
+
+    # Write full nginx config: HTTP→HTTPS redirect for domain, direct HTTP for IPs, HTTPS server
+    print_status "⚙️  Writing full Nginx config (HTTP + HTTPS)..."
+    sudo tee /etc/nginx/sites-available/arzesh-erp > /dev/null <<'NGINXEOF'
+# Redirect HTTP → HTTPS for the domain name
+server {
+    listen 80;
+    server_name erp.arzesh.net;
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://$host$request_uri; }
+}
+
+# HTTP access via IP (no SSL cert issued for raw IPs)
+server {
+    listen 80;
+    server_name 91.92.181.146 172.17.100.13;
     client_max_body_size 100M;
 
-    # Backend API
     location /api {
         proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
@@ -252,8 +293,6 @@ server {
         proxy_read_timeout 300s;
         proxy_connect_timeout 75s;
     }
-
-    # Backend uploads/static files
     location /uploads {
         proxy_pass http://localhost:3001;
         proxy_set_header Host $host;
@@ -261,20 +300,13 @@ server {
         expires 30d;
         add_header Cache-Control "public, no-transform";
     }
-
-    # Next.js static assets
     location /_next/static/ {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Host localhost;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
-
-    # Frontend — pass Host:localhost so Next.js 16 host validation passes
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
@@ -287,13 +319,98 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
-EOF
 
-    # Enable site and remove default if exists
-    sudo ln -sf /etc/nginx/sites-available/arzesh-erp /etc/nginx/sites-enabled/
-    sudo rm -f /etc/nginx/sites-enabled/default
-    
-    # Test and restart Nginx
+# HTTPS — main secure server for the domain
+server {
+    listen 443 ssl;
+    server_name erp.arzesh.net;
+    client_max_body_size 100M;
+
+    ssl_certificate     /etc/letsencrypt/live/erp.arzesh.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/erp.arzesh.net/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+    location /uploads {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+    location /_next/static/ {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host localhost;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host localhost;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+NGINXEOF
+
+    # Only activate the SSL config if the cert actually exists; fallback to HTTP-only
+    if [ ! -f "$CERT_PATH" ]; then
+        print_warning "SSL cert not found — falling back to HTTP-only config..."
+        sudo tee /etc/nginx/sites-available/arzesh-erp > /dev/null <<'NGINXEOF'
+server {
+    listen 80;
+    server_name erp.arzesh.net 91.92.181.146 172.17.100.13;
+    client_max_body_size 100M;
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_read_timeout 300s;
+    }
+    location /uploads {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        expires 30d;
+    }
+    location /_next/static/ {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host localhost;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host localhost;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+NGINXEOF
+    fi
+
+    # Test and reload Nginx
     print_status "🔍 Testing Nginx configuration..."
     if sudo nginx -t; then
         print_success "Nginx configuration is valid"
@@ -304,6 +421,11 @@ EOF
         print_error "Nginx configuration test failed!"
         exit 1
     fi
+
+    # Set up automatic SSL certificate renewal
+    print_status "🔄 Setting up SSL auto-renewal..."
+    (crontab -l 2>/dev/null | grep -v certbot; echo "0 3 * * * certbot renew --quiet --deploy-hook 'systemctl reload nginx'") | crontab -
+    print_success "SSL auto-renewal scheduled (daily at 3am)"
 
     # Set up PM2 to start on boot
     print_status "📅 Setting up PM2 startup..."
@@ -316,8 +438,9 @@ EOF
 
     print_success "🎉 Native deployment completed!"
     print_success "🌐 Your application is available at:"
-    print_success "   - http://erp.arzesh.net (without port - through Nginx)"
-    print_success "   - http://172.17.100.13 (through Nginx)"
+    print_success "   - https://erp.arzesh.net (HTTPS — if SSL cert was issued)"
+    print_success "   - http://erp.arzesh.net  (redirects to HTTPS)"
+    print_success "   - http://172.17.100.13   (direct IP — HTTP only)"
     echo ""
     print_status "📊 Direct access (for debugging):"
     print_status "   - Frontend: http://localhost:3000"
