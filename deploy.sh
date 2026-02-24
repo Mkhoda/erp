@@ -30,6 +30,99 @@ print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
+urlencode() {
+    local raw="$1"
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$raw"
+    else
+        echo "$raw"
+    fi
+}
+
+configure_env_files() {
+    print_status "⚙️  Configuring environment files..."
+
+    local detected_ip
+    detected_ip=$(hostname -I | awk '{print $1}')
+
+    local server_ip domain_name db_host db_port db_name db_user db_password jwt_secret encoded_db_password api_url cors_origin
+
+    read -p "Server IP [${detected_ip}]: " server_ip
+    server_ip=${server_ip:-$detected_ip}
+
+    read -p "Domain [erp.arzesh.net]: " domain_name
+    domain_name=${domain_name:-erp.arzesh.net}
+
+    read -p "Database host [172.17.100.12]: " db_host
+    db_host=${db_host:-172.17.100.12}
+
+    read -p "Database port [5432]: " db_port
+    db_port=${db_port:-5432}
+
+    read -p "Database name [arzesh_erp]: " db_name
+    db_name=${db_name:-arzesh_erp}
+
+    read -p "Database user [postgres]: " db_user
+    db_user=${db_user:-postgres}
+
+    read -s -p "Database password [hidden, default: ArzeshERP2025!]: " db_password
+    echo ""
+    db_password=${db_password:-ArzeshERP2025!}
+
+    read -s -p "JWT secret [hidden, default existing value]: " jwt_secret
+    echo ""
+    jwt_secret=${jwt_secret:-ArzeshERP_JWT_Secret_2025_Production_Key}
+
+    encoded_db_password=$(urlencode "$db_password")
+
+    if [ -n "$domain_name" ]; then
+        api_url="https://${domain_name}/api"
+    else
+        api_url="http://${server_ip}/api"
+    fi
+
+    cors_origin="http://${server_ip}:3000,http://${server_ip},http://localhost:3000,http://${domain_name},https://${domain_name}"
+
+    cat > apps/backend/.env.production <<EOF
+DATABASE_URL=postgresql://${db_user}:${encoded_db_password}@${db_host}:${db_port}/${db_name}?schema=public
+DIRECT_URL=postgresql://${db_user}:${encoded_db_password}@${db_host}:${db_port}/${db_name}
+PORT=3001
+JWT_SECRET=${jwt_secret}
+NODE_ENV=production
+
+# File upload settings
+MAX_FILE_SIZE=10485760
+UPLOAD_DIRECTORY=uploads
+
+# CORS settings
+CORS_ORIGIN=${cors_origin}
+
+# Security settings
+BCRYPT_ROUNDS=12
+JWT_EXPIRATION=24h
+REFRESH_TOKEN_EXPIRATION=7d
+EOF
+
+    cp apps/backend/.env.production apps/backend/.env
+
+    cat > apps/frontend/.env.production <<EOF
+NEXT_PUBLIC_API_URL=${api_url}
+NODE_ENV=production
+NEXT_TELEMETRY_DISABLED=1
+
+# PWA settings
+NEXT_PUBLIC_PWA_ENABLED=true
+
+# Application settings
+NEXT_PUBLIC_APP_NAME=Arzesh ERP
+NEXT_PUBLIC_APP_VERSION=1.0.0
+EOF
+
+    cp apps/frontend/.env.production apps/frontend/.env
+
+    print_success "Environment files updated: apps/backend/.env(.production), apps/frontend/.env(.production)"
+}
+
 # Ask deployment method
 print_status "🚀 Arzesh ERP Deployment Script"
 echo ""
@@ -72,6 +165,9 @@ if [ "$(pwd)" != "/opt/arzesh-erp" ]; then
 fi
 
 cd /opt/arzesh-erp
+
+# Generate env files automatically for this deployment
+configure_env_files
 
 ###########################################
 # NATIVE DEPLOYMENT (PM2)
