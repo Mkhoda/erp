@@ -249,18 +249,31 @@ model UserDepartment {
 }
 
 // Department-based page access control
+// role: '*' = applies to ANY role in that department; or a specific Role value e.g. 'MANAGER'
 model PagePermission {
   id            String      @id @default(cuid())
   departmentId  String
   department    Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   page          String
+  role          String      @default("*")
   canRead       Boolean     @default(true)
   canWrite      Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  @@unique([departmentId, page])
+  @@unique([departmentId, page, role])
   @@index([page])
+}
+
+// Registered dashboard pages — source of truth for the menu system.
+// isActive=false disables the page system-wide (hidden from menu for all users including admin).
+model Page {
+  id        String   @id @default(cuid())
+  path      String   @unique
+  label     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // OTP codes used for phone-based authentication and password reset

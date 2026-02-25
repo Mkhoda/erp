@@ -8,26 +8,34 @@ export class PagePermissionGuard implements CanActivate {
   constructor(private reflector: Reflector, private prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext) {
-    const page = this.reflector.get<string>(PAGE_KEY, context.getHandler()) || this.reflector.get<string>(PAGE_KEY, context.getClass());
-    if (!page) return true; // no page metadata => no page check
+    const page = this.reflector.get<string>(PAGE_KEY, context.getHandler())
+      ?? this.reflector.get<string>(PAGE_KEY, context.getClass());
+    if (!page) return true; // no page metadata — skip check
 
     const req = context.switchToHttp().getRequest();
     const user = req.user;
     if (!user) return false;
 
-    // Admins bypass page permission checks
+    // Admins bypass all page permission checks
     if (user.role === 'ADMIN') return true;
 
-    // Collect department ids (primary + memberships)
-    const deptIds = new Set<string>();
-    if (user.departmentId) deptIds.add(user.departmentId);
+    // Collect department ids from memberships
     const memberships = await this.prisma.userDepartment.findMany({ where: { userId: user.userId ?? user.id } });
-    memberships.forEach(m => deptIds.add(m.departmentId));
+    const deptIds = memberships.map(m => m.departmentId);
 
-    if (deptIds.size === 0) throw new ForbiddenException('No department assigned for page access');
+    if (deptIds.length === 0) throw new ForbiddenException('No department assigned for page access');
 
-    const found = await this.prisma.pagePermission.findFirst({ where: { page, departmentId: { in: Array.from(deptIds) } } });
-    if (!found || !found.canRead) throw new ForbiddenException('Access to page denied');
+    // Find a row matching: (dept IN user.depts) AND (role='*' OR role=user.role) AND canRead=true
+    const found = await this.prisma.pagePermission.findFirst({
+      where: {
+        page,
+        departmentId: { in: deptIds },
+        role: { in: ['*', user.role ?? ''] },
+        canRead: true,
+      },
+    });
+    if (!found) throw new ForbiddenException('Access to page denied');
     return true;
   }
 }
+
