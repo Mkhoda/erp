@@ -56,7 +56,9 @@ configure_env_files() {
 
     encoded_db_password=$(urlencode "$db_password")
 
+    # choose api_url based on whether domain resolves and cert will be used
     if [ -n "$domain_name" ]; then
+        # prefer http; upgrade to https later if certificate is obtained
         api_url="http://${domain_name}/api"
     else
         api_url="http://${server_ip}/api"
@@ -383,8 +385,57 @@ NGINXEOF
     fi
 
     # Write full nginx config: HTTP→HTTPS redirect for domain, direct HTTP for IPs, HTTPS server
+    # use DISABLE_HTTP_REDIRECT=1 to keep the domain on plain HTTP
     print_status "⚙️  Writing full Nginx config (HTTP + HTTPS)..."
-    sudo tee /etc/nginx/sites-available/arzesh-erp > /dev/null <<'NGINXEOF'
+    if [ "${DISABLE_HTTP_REDIRECT}" = "1" ]; then
+        cat <<'NGINXEOF' | sudo tee /etc/nginx/sites-available/arzesh-erp >/dev/null
+# HTTP access for domain (redirect disabled)
+server {
+    listen 80;
+    server_name erp.arzesh.net;
+    client_max_body_size 100M;
+
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+    location /uploads {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+    location /_next/static/ {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host localhost;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host localhost;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# HTTP access via IP (no SSL cert issued for raw IPs)
+server {
+NGINXEOF
+    else
+        cat <<'NGINXEOF' | sudo tee /etc/nginx/sites-available/arzesh-erp >/dev/null
 # Redirect HTTP → HTTPS for the domain name
 server {
     listen 80;
@@ -395,6 +446,8 @@ server {
 
 # HTTP access via IP (no SSL cert issued for raw IPs)
 server {
+NGINXEOF
+    fi
     listen 80;
     server_name 91.92.181.146 172.17.100.13;
     client_max_body_size 100M;
