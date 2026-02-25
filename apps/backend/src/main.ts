@@ -9,7 +9,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   // Read CORS origin from environment variable
-  const corsOrigin = process.env.CORS_ORIGIN 
+  // If CORS_ONLY_HTTP is set to "1", filter out any https origins
+  const rawOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
     : [
         'http://localhost:3000',
@@ -17,7 +18,15 @@ async function bootstrap() {
         'http://localhost:3001',
         'http://127.0.0.1:3001',
       ];
-  
+
+  const corsOrigin = process.env.CORS_ONLY_HTTP === '1'
+    ? rawOrigins.filter(o => !o.startsWith('https://'))
+    : rawOrigins;
+
+  if (process.env.CORS_ONLY_HTTP === '1') {
+    console.log('CORS_ONLY_HTTP set: https origins will be ignored');
+  }
+
   app.enableCors({
     origin: corsOrigin,
     credentials: true,

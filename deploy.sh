@@ -57,12 +57,17 @@ configure_env_files() {
     encoded_db_password=$(urlencode "$db_password")
 
     if [ -n "$domain_name" ]; then
-        api_url="https://${domain_name}/api"
+        api_url="http://${domain_name}/api"
     else
         api_url="http://${server_ip}/api"
     fi
 
-    cors_origin="http://${server_ip}:3000,http://${server_ip},http://localhost:3000,http://${domain_name},https://${domain_name}"
+    # by default only http origins are listed; https schemes can be added by
+    # setting CORS_INCLUDE_HTTPS=1 in the environment before running deploy.
+    cors_origin="http://${server_ip}:3000,http://${server_ip},http://localhost:3000,http://${domain_name}"
+    if [ "${CORS_INCLUDE_HTTPS}" = "1" ]; then
+        cors_origin+=",https://${domain_name}"
+    fi
 
     cat > apps/backend/.env.production <<EOF
 DATABASE_URL=postgresql://${db_user}:${encoded_db_password}@${db_host}:${db_port}/${db_name}?schema=public
