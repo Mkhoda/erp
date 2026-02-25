@@ -490,14 +490,17 @@ server {
 }
 NGINXIP
 
+    # Append HTTPS server block only when a valid certificate exists
+    if [ -f "$CERT_PATH" ]; then
+        cat <<NGINXHTTPS | sudo tee -a /etc/nginx/sites-available/arzesh-erp >/dev/null
 # HTTPS — main secure server for the domain
 server {
     listen 443 ssl;
     server_name erp.arzesh.net;
     client_max_body_size 100M;
 
-    ssl_certificate     /etc/letsencrypt/live/erp.arzesh.net/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/erp.arzesh.net/privkey.pem;
+    ssl_certificate     ${CERT_PATH};
+    ssl_certificate_key ${CERT_KEY};
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
     ssl_session_cache   shared:SSL:10m;
@@ -507,17 +510,17 @@ server {
     location /api {
         proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_read_timeout 300s;
         proxy_connect_timeout 75s;
     }
     location /uploads {
         proxy_pass http://localhost:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
         expires 30d;
         add_header Cache-Control "public, no-transform";
     }
@@ -531,53 +534,19 @@ server {
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host localhost;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
     }
 }
-NGINXEOF
-
-    # Only activate the SSL config if the cert actually exists; fallback to HTTP-only
-    if [ ! -f "$CERT_PATH" ]; then
-        print_warning "SSL cert not found — falling back to HTTP-only config..."
-        sudo tee /etc/nginx/sites-available/arzesh-erp > /dev/null <<'NGINXEOF'
-server {
-    listen 80;
-    server_name erp.arzesh.net 91.92.181.146 172.17.100.13;
-    client_max_body_size 100M;
-    location /api {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_read_timeout 300s;
-    }
-    location /uploads {
-        proxy_pass http://localhost:3001;
-        proxy_set_header Host $host;
-        expires 30d;
-    }
-    location /_next/static/ {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host localhost;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host localhost;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-NGINXEOF
+NGINXHTTPS
+        print_success "HTTPS server block written (cert: $CERT_PATH)"
+    else
+        print_warning "No SSL cert found — HTTPS server block skipped; site runs HTTP-only"
     fi
 
     # Test and reload Nginx
