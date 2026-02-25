@@ -448,6 +448,10 @@ server {
 server {
 NGINXEOF
     fi
+
+    # Append HTTP access via IP (no SSL cert issued for raw IPs)
+    cat <<'NGINXIP' | sudo tee -a /etc/nginx/sites-available/arzesh-erp >/dev/null
+server {
     listen 80;
     server_name 91.92.181.146 172.17.100.13;
     client_max_body_size 100M;
@@ -488,6 +492,7 @@ NGINXEOF
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
+NGINXIP
 
 # HTTPS — main secure server for the domain
 server {
