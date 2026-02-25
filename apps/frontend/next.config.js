@@ -14,9 +14,6 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  // Standalone output for efficient PM2 deployment
-  output: 'standalone',
-
   // Next.js 16 host-header security: whitelist trusted origins.
   // Without this, static assets and pages return 400 when proxied via nginx
   // with a Host header that differs from localhost.

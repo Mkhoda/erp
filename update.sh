@@ -101,12 +101,13 @@ if command -v pm2 >/dev/null 2>&1; then
   # Delete all frontend/backend entries first to avoid duplicate-process port conflicts,
   # then start fresh. This handles the EADDRINUSE crash-loop caused by stale entries.
 
-  # Kill anything holding port 3001 (includes root-owned processes from prior sudo deploys)
+  # Kill anything holding port 3001 or 3000 (includes root-owned processes from prior sudo deploys)
   fuser -k 3001/tcp 2>/dev/null || true
   sudo lsof -ti :3001 2>/dev/null | xargs -r sudo kill -9 2>/dev/null || true
 
-  # Kill anything still holding port 3000 (old Next.js instance that survived)
   fuser -k 3000/tcp 2>/dev/null || true
+  sudo lsof -ti :3000 2>/dev/null | xargs -r sudo kill -9 2>/dev/null || true
+  sleep 1
 
   # Backend: delete all instances, start fresh
   pm2 delete arzesh-backend 2>/dev/null || true
@@ -126,7 +127,6 @@ if command -v pm2 >/dev/null 2>&1; then
 
   if [ -f "$STANDALONE_SERVER" ]; then
     info "Using standalone server (output: standalone)..."
-    # Copy public and static assets required by standalone mode
     cp -r "$FRONTEND_DIR/public" "$FRONTEND_DIR/.next/standalone/public" 2>/dev/null || true
     mkdir -p "$FRONTEND_DIR/.next/standalone/.next/static"
     cp -r "$FRONTEND_DIR/.next/static/." "$FRONTEND_DIR/.next/standalone/.next/static/" 2>/dev/null || true
@@ -135,9 +135,7 @@ if command -v pm2 >/dev/null 2>&1; then
       --max-memory-restart 4G \
       --node-args="--max-old-space-size=4096"
   else
-    info "Standalone server not found — falling back to npm start..."
-    info "  (This can happen if \`output: standalone\` build did not complete.)"
-    info "  Check: ls $FRONTEND_DIR/.next/standalone/"
+    info "Using npm start..."
     (cd "$FRONTEND_DIR" && PORT=3000 HOSTNAME=0.0.0.0 pm2 start npm \
       --name arzesh-frontend \
       --max-memory-restart 4G \
