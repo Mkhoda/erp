@@ -33,6 +33,7 @@ async function bootstrap() {
   });
   // static for uploaded files
   app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+  app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   // Default to 3001 to avoid clashing with Next.js dev server on 3000
   const port = Number(process.env.PORT || 3001);
