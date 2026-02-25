@@ -63,6 +63,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       fetch((process.env.NEXT_PUBLIC_API_URL||'http://localhost:3001')+'/auth/me', { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.ok?r.json():null).then(me=>setRole(me?.role||null)).catch(()=>setRole(null));
     }
   }, [router]);
+  const [allowedPages, setAllowedPages] = React.useState<string[]|null>(null);
+  React.useEffect(()=>{
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+    const url = (process.env.NEXT_PUBLIC_API_URL||'http://localhost:3001') + '/permissions/menu';
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(r=>r.ok?r.json():null).then(data=>{
+      setAllowedPages(data?.menuPages || []);
+    }).catch(()=>setAllowedPages([]));
+  },[]);
+
+  React.useEffect(()=>{
+    if (!allowedPages) return; // still loading
+    if (!pathname) return;
+    // Allow dashboard root
+    if (pathname === '/dashboard' || pathname === '/dashboard/profile' || pathname === '/signin') return;
+    const ok = allowedPages.some(p => pathname === p || pathname.startsWith(p + '/') );
+    if (!ok) {
+      // redirect away if not allowed
+      router.replace('/dashboard');
+    }
+  }, [allowedPages, pathname, router]);
   React.useEffect(()=>{
     if (typeof document !== 'undefined') {
       const root = document.documentElement;

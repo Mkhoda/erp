@@ -12,6 +12,7 @@ export default function UsersPage() {
 
   const [users, setUsers] = React.useState<User[]>([]);
   const [view, setView] = React.useState<'list'|'grid'>('list');
+  const [bulkOpen, setBulkOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [open, setOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Partial<User> | null>(null);
@@ -93,6 +94,13 @@ export default function UsersPage() {
             >
               <Plus className="w-4 h-4" /> 
               افزودن کاربر
+            </button>
+            <button 
+              onClick={()=>setBulkOpen(true)} 
+              className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 shadow-sm hover:shadow-md px-4 py-2 rounded-lg font-medium text-white transition-all duration-200"
+            >
+              <Plus className="w-4 h-4" />
+              وارد کردن دسته‌ای
             </button>
           </div>
         </div>
@@ -365,6 +373,156 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk Import Modal */}
+      {bulkOpen && (
+        <BulkImportModal onClose={()=>{ setBulkOpen(false); }} onImported={async()=>{ setBulkOpen(false); await load(); }} departments={departments} />
+      )}
+    </div>
+  );
+}
+
+function BulkImportModal({ onClose, onImported, departments }: { onClose: ()=>void; onImported: ()=>void; departments: Array<{id:string;name:string}> }) {
+  const [text, setText] = React.useState('');
+  const [fileName, setFileName] = React.useState<string|null>(null);
+  const [preview, setPreview] = React.useState<Array<Record<string,string>> | null>(null);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const API = process.env.NEXT_PUBLIC_API_URL || '/api';
+
+  function parseCSV(src: string) {
+    // RFC-like simple CSV parser supporting quoted fields and comma/tab detection
+    const lines = src.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length === 0) return { headers: [], rows: [] };
+    const sample = lines[0];
+    const delim = sample.includes('\t') && !sample.includes(',') ? '\t' : ',';
+    const parseLine = (line: string) => {
+      const cols: string[] = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i+1] === '"') { cur += '"'; i++; } else { inQuotes = !inQuotes; }
+        } else if (ch === delim && !inQuotes) {
+          cols.push(cur); cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      cols.push(cur);
+      return cols.map(c => c.trim());
+    };
+    const headerCols = parseLine(lines[0]);
+    const rows = lines.slice(1).map(line => {
+      const cols = parseLine(line);
+      const obj: Record<string,string> = {};
+      for (let i=0;i<headerCols.length;i++) obj[headerCols[i]] = (cols[i] ?? '').trim();
+      return obj;
+    });
+    return { headers: headerCols, rows };
+  }
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return; setFileName(f.name);
+    const txt = await f.text(); setText(txt);
+    const parsed = parseCSV(txt); setPreview(parsed.rows); setHeaders(parsed.headers);
+  }
+
+  function onPaste(e: React.FormEvent<HTMLTextAreaElement>) { const v=(e.target as HTMLTextAreaElement).value; setText(v); const parsed = parseCSV(v); setPreview(parsed.rows); setHeaders(parsed.headers); }
+
+  const [headers, setHeaders] = React.useState<string[] | null>(null);
+  const [mapping, setMapping] = React.useState<Record<string,string>>({});
+
+  React.useEffect(()=>{
+    if (!headers) return;
+    // auto-map common headers if mapping is empty
+    if (Object.keys(mapping).length === 0) {
+      const map: Record<string,string> = {};
+      const lower = (h: string) => h.toLowerCase();
+      for (const h of headers) {
+        const l = lower(h);
+        if (!map.email && (l==='email' || l.includes('email') || l==='ایمیل')) map.email = h;
+        if (!map.firstName && (l==='firstname' || l.includes('first') || l==='نام')) map.firstName = h;
+        if (!map.lastName && (l==='lastname' || l.includes('last') || l==='نام خانوادگی')) map.lastName = h;
+        if (!map.role && (l==='role' || l.includes('نقش'))) map.role = h;
+        if (!map.departmentId && (l==='departmentid' || l.includes('department') || l==='دپارتمان')) map.departmentId = h;
+        if (!map.password && (l==='password' || l.includes('password') || l==='رمز')) map.password = h;
+        if (!map.phone && (l==='phone' || l.includes('phone') || l==='تلفن')) map.phone = h;
+      }
+      setMapping(map);
+    }
+  }, [headers]);
+
+  async function importNow() {
+    if (!preview || preview.length===0) return alert('هیچ داده‌ای برای وارد کردن نیست');
+    const users = preview.map(r => ({
+      email: (mapping.email ? r[mapping.email] : r.email || r.Email) || '',
+      firstName: (mapping.firstName ? r[mapping.firstName] : r.firstName || r.FirstName) || '',
+      lastName: (mapping.lastName ? r[mapping.lastName] : r.lastName || r.LastName) || '',
+      role: ((mapping.role ? r[mapping.role] : r.role) || 'USER') as any,
+      departmentId: mapping.departmentId ? r[mapping.departmentId] : (r.departmentId || r.department || r.Department || undefined),
+      password: mapping.password ? r[mapping.password] : (r.password || undefined),
+      phone: mapping.phone ? r[mapping.phone] : (r.phone || r.Phone || undefined),
+    }));
+    try {
+      const res = await fetch(`${API}/users/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ users }) });
+      if (!res.ok) { const t = await res.text(); throw new Error(t || 'Upload failed'); }
+      const data = await res.json();
+      alert(`وارد شده: ${data.imported}\nخطاها: ${data.errors?.length||0}`);
+      onImported();
+    } catch (err:any) { alert('خطا: ' + (err?.message||String(err))); }
+  }
+
+  return (
+    <div className="z-50 fixed inset-0 flex justify-center items-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white/95 dark:bg-gray-900/95 shadow-2xl backdrop-blur-sm mx-4 p-6 border border-gray-200/50 dark:border-gray-700/50 rounded-xl w-full max-w-2xl">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-semibold text-lg">وارد کردن دسته‌ای کاربران (CSV یا متن)</h3>
+          <button onClick={onClose} className="text-gray-500">✕</button>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm mb-1">فایل CSV</label>
+            <input type="file" accept=".csv,text/csv" onChange={onFile} />
+            <div className="text-sm text-gray-500 mt-2">یا متن CSV را در سمت راست پیست کنید. لازم است هدرها شامل: email, firstName, lastName, role, departmentId (اختیاری)</div>
+          </div>
+          <div>
+            <label className="block text-sm mb-1">پیست CSV / متن</label>
+            <textarea rows={10} value={text} onChange={(e)=>{ setText(e.target.value); setPreview(parseCSV(e.target.value)); }} onBlur={onPaste} className="w-full p-2 border rounded" />
+          </div>
+        </div>
+          {headers && (
+            <div className="mt-4 border-t pt-4">
+              <div className="text-sm font-medium mb-2">نقشه ستون‌ها</div>
+              <div className="grid grid-cols-2 gap-2">
+                {['email','firstName','lastName','role','departmentId','password','phone'].map(field=> (
+                  <label key={field} className="text-sm flex items-center gap-2">
+                    <span className="w-28 text-right">{field}</span>
+                    <select className="flex-1 p-1 border rounded" value={mapping[field]||''} onChange={e=>setMapping(m=>({ ...m, [field]: e.target.value }))}>
+                      <option value="">-- انتخاب ستون --</option>
+                      {headers.map(h=> <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        <div className="mt-4">
+          <div className="text-sm font-medium">پیش‌نمایش ({preview?.length||0} ردیف)</div>
+          <div className="mt-2 max-h-40 overflow-auto border rounded p-2 bg-gray-50">
+            {preview && preview.length>0 ? (
+              <table className="w-full text-xs">
+                <thead><tr>{Object.keys(preview[0]).slice(0,6).map(h=> <th key={h} className="text-right p-1">{h}</th>)}</tr></thead>
+                <tbody>{preview.slice(0,10).map((r,idx)=>(<tr key={idx}>{Object.values(r).slice(0,6).map((v,i)=>(<td key={i} className="p-1 text-right">{v}</td>))}</tr>))}</tbody>
+              </table>
+            ) : (<div className="text-sm text-gray-500">هیچ داده‌ای برای پیش‌نمایش</div>)}
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-4">
+          <button onClick={onClose} className="px-4 py-2 rounded border">انصراف</button>
+          <button onClick={importNow} className="px-4 py-2 rounded bg-amber-600 text-white">وارد کن</button>
+        </div>
+      </div>
     </div>
   );
 }
