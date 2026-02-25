@@ -111,21 +111,31 @@ EOF
     print_success "Environment files updated: apps/backend/.env(.production), apps/frontend/.env(.production)"
 }
 
-free_port_3000() {
-    print_status "🧹 Releasing port 3000 if occupied..."
+free_port() {
+    local port="$1"
+    print_status "🧹 Releasing port ${port} if occupied..."
 
-    # Try graceful kill first
-    fuser -k 3000/tcp 2>/dev/null || true
+    # Try graceful kill (non-root processes)
+    fuser -k "${port}/tcp" 2>/dev/null || true
 
-    # Force kill any remaining listener PID from ss
+    # Use sudo lsof to catch root-owned processes (invisible to fuser without sudo)
+    local root_pids
+    root_pids=$(sudo lsof -ti ":${port}" 2>/dev/null || true)
+    if [ -n "$root_pids" ]; then
+        echo "$root_pids" | xargs -r sudo kill -9 2>/dev/null || true
+    fi
+
+    # Force kill any remaining listener PID from ss (fallback)
     local pids
-    pids=$(ss -ltnp 2>/dev/null | awk '/:3000 / {print $NF}' | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)
+    pids=$(ss -ltnp 2>/dev/null | awk "/:${port} / {print \$NF}" | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)
     if [ -n "$pids" ]; then
-        echo "$pids" | xargs -r kill -9 2>/dev/null || true
+        echo "$pids" | xargs -r sudo kill -9 2>/dev/null || true
     fi
 
     sleep 1
 }
+
+free_port_3000() { free_port 3000; }
 
 # Ask deployment method
 print_status "🚀 Arzesh ERP Deployment Script"
@@ -299,6 +309,7 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
         print_success "Backend production environment loaded"
     fi
 
+    free_port 3001
     pm2 delete arzesh-backend 2>/dev/null || true
     pm2 start dist/main.js --name "arzesh-backend" --max-memory-restart 4G --node-args="--max-old-space-size=4096"
 

@@ -101,6 +101,10 @@ if command -v pm2 >/dev/null 2>&1; then
   # Delete all frontend/backend entries first to avoid duplicate-process port conflicts,
   # then start fresh. This handles the EADDRINUSE crash-loop caused by stale entries.
 
+  # Kill anything holding port 3001 (includes root-owned processes from prior sudo deploys)
+  fuser -k 3001/tcp 2>/dev/null || true
+  sudo lsof -ti :3001 2>/dev/null | xargs -r sudo kill -9 2>/dev/null || true
+
   # Kill anything still holding port 3000 (old Next.js instance that survived)
   fuser -k 3000/tcp 2>/dev/null || true
 
