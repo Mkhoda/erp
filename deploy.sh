@@ -6,6 +6,14 @@
 
 set -e
 
+# Refuse to run as root — running as root creates a root PM2 daemon that
+# hijacks ports 3000/3001 and conflicts with the app-user PM2 instance.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "❌ Do not run this script as root or with sudo."
+    echo "   Run as the application user (e.g. mahdi): bash deploy.sh"
+    exit 1
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
