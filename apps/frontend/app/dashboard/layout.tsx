@@ -3,6 +3,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Boxes, Users, Shield, Settings, FileText, CircleDollarSign, Layers, Tag, Handshake, Menu, X, UserRound, LogOut, Search, Moon, Sun, ChevronLeft, UserCog, Building, MapPin, Home } from "lucide-react";
+import TwoLayerSidebar from "../components/TwoLayerSidebar";
 
 const links = [
   { href: "/dashboard", label: "نمای کلی", icon: LayoutDashboard },
@@ -102,36 +103,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button className="md:hidden hover:bg-theme-secondary p-2 rounded-lg transition-colors" onClick={() => setSidebarOpen(false)} aria-label="بستن"><X className="w-5 h-5 text-theme-secondary"/></button>
           </div>
         </div>
-        <nav className="flex-1 space-y-1 p-2">
-          {links.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
-            return (
-              <Link key={href} href={href} onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${active? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}>
-                <Icon className="w-4 h-4" />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
-          <Link href="/dashboard/profile" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/profile'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><UserCog className="w-4 h-4"/> پروفایل</Link>
-          <div className="mt-6 px-3 font-semibold text-[10px] text-theme-muted uppercase tracking-widest">مدیریت دارایی</div>
-          <Link href="/dashboard/assets" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Boxes className="w-4 h-4"/> دارایی‌ها</Link>
-          <Link href="/dashboard/assets/types" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets/types'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Layers className="w-4 h-4"/> انواع دارایی</Link>
-          <Link href="/dashboard/assets/categories" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets/categories'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Tag className="w-4 h-4"/> دسته‌بندی‌ها</Link>
-          <Link href="/dashboard/assets/assignments" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/assets/assignments'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Handshake className="w-4 h-4"/> واگذاری‌ها</Link>
-          {(role==='EXPERT'||role==='ADMIN'||role==='MANAGER') && (
-            <Link href="/dashboard/accounting" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/accounting'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}>
-              <CircleDollarSign className="w-4 h-4"/>
-              <span>حسابداری دارایی</span>
-              <span className="inline-block bg-amber-100 dark:bg-amber-900/50 ms-auto px-1.5 py-0.5 rounded-md font-medium text-[10px] text-amber-700 dark:text-amber-300">EXPERT</span>
-            </Link>
-          )}
-          
-          <div className="mt-6 px-3 font-semibold text-[10px] text-theme-muted uppercase tracking-widest">مدیریت سازمان</div>
-          <Link href="/dashboard/departments" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/departments'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><MapPin className="w-4 h-4"/> دپارتمان‌ها</Link>
-          <Link href="/dashboard/buildings" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/buildings'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Building className="w-4 h-4"/> ساختمان‌ها</Link>
-          <Link href="/dashboard/floors" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/floors'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Layers className="w-4 h-4"/> طبقات</Link>
-          <Link href="/dashboard/rooms" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/rooms'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><Home className="w-4 h-4"/> اتاق‌ها</Link>
-        </nav>
+        <div className="flex-1 p-2">
+          <div className="px-3 py-2">
+            {/* profile link */}
+            <Link href="/dashboard/profile" onClick={() => setSidebarOpen(false)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname==='/dashboard/profile'?'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30':'hover:bg-theme-secondary hover:text-blue-700 dark:hover:text-blue-300 text-theme-secondary'}`}><UserCog className="w-4 h-4"/> پروفایل</Link>
+          </div>
+          <div className="px-3 mt-2">
+            <TwoLayerSidebar />
+          </div>
+        </div>
       </aside>
       {/* Main */}
       <div className="flex flex-col flex-1 bg-gradient-theme">
