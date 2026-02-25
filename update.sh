@@ -120,16 +120,25 @@ if command -v pm2 >/dev/null 2>&1; then
   pm2 delete arzesh-frontend 2>/dev/null || true
   FRONTEND_DIR="apps/frontend"
   STANDALONE_SERVER="$FRONTEND_DIR/.next/standalone/server.js"
+
+  # HOSTNAME=0.0.0.0 is required so the server binds on all interfaces
+  # (by default standalone binds only IPv6 ::1 which nginx can't reach via 127.0.0.1)
+
   if [ -f "$STANDALONE_SERVER" ]; then
+    info "Using standalone server (output: standalone)..."
     # Copy public and static assets required by standalone mode
     cp -r "$FRONTEND_DIR/public" "$FRONTEND_DIR/.next/standalone/public" 2>/dev/null || true
-    cp -r "$FRONTEND_DIR/.next/static" "$FRONTEND_DIR/.next/standalone/.next/static" 2>/dev/null || true
-    PORT=3000 pm2 start "$STANDALONE_SERVER" \
+    mkdir -p "$FRONTEND_DIR/.next/standalone/.next/static"
+    cp -r "$FRONTEND_DIR/.next/static/." "$FRONTEND_DIR/.next/standalone/.next/static/" 2>/dev/null || true
+    PORT=3000 HOSTNAME=0.0.0.0 pm2 start "$STANDALONE_SERVER" \
       --name arzesh-frontend \
       --max-memory-restart 4G \
       --node-args="--max-old-space-size=4096"
   else
-    (cd "$FRONTEND_DIR" && pm2 start npm \
+    info "Standalone server not found — falling back to npm start..."
+    info "  (This can happen if \`output: standalone\` build did not complete.)"
+    info "  Check: ls $FRONTEND_DIR/.next/standalone/"
+    (cd "$FRONTEND_DIR" && PORT=3000 HOSTNAME=0.0.0.0 pm2 start npm \
       --name arzesh-frontend \
       --max-memory-restart 4G \
       --node-args="--max-old-space-size=4096" \

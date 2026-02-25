@@ -330,13 +330,13 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
         cp -r public .next/standalone/public 2>/dev/null || true
         mkdir -p .next/standalone/.next/static
         cp -r .next/static/. .next/standalone/.next/static/ 2>/dev/null || true
-        PORT=3000 pm2 start "$STANDALONE_SERVER" \
+        PORT=3000 HOSTNAME=0.0.0.0 pm2 start "$STANDALONE_SERVER" \
             --name "arzesh-frontend" \
             --max-memory-restart 4G \
             --node-args="--max-old-space-size=4096"
     else
-        print_status "Using npm start..."
-        PORT=3000 pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start
+        print_status "Using npm start (no standalone output found)..."
+        PORT=3000 HOSTNAME=0.0.0.0 pm2 start npm --name "arzesh-frontend" --max-memory-restart 4G --node-args="--max-old-space-size=4096" -- start
     fi
 
     # Install Nginx and Certbot
