@@ -431,8 +431,6 @@ server {
     }
 }
 
-# HTTP access via IP (no SSL cert issued for raw IPs)
-server {
 NGINXEOF
     else
         cat <<'NGINXEOF' | sudo tee /etc/nginx/sites-available/arzesh-erp >/dev/null
@@ -444,8 +442,6 @@ server {
     location / { return 301 https://$host$request_uri; }
 }
 
-# HTTP access via IP (no SSL cert issued for raw IPs)
-server {
 NGINXEOF
     fi
 
