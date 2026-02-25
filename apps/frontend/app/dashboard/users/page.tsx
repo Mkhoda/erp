@@ -3,7 +3,7 @@ import React from 'react';
 import { List, LayoutGrid, Plus, Pencil, Trash2, X, Users as UsersIcon } from 'lucide-react';
 
 type User = { id: string; email: string; firstName: string; lastName: string; role: 'ADMIN'|'MANAGER'|'USER'|'EXPERT'; departmentId?: string|null; department?: { id:string; name:string }; userDepartments?: Array<{ departmentId: string; department?: { id: string; name: string } }> };
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export default function UsersPage() {
   React.useEffect(() => {

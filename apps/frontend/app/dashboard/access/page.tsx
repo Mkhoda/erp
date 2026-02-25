@@ -5,7 +5,7 @@ import React from 'react';
 type Department = { id: string; name: string };
 type Permission = { departmentId: string; page: string; canRead: boolean; canWrite: boolean };
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 const PAGES = [
   { key: 'dashboard', label: 'نمای کلی' },
   { key: 'assets', label: 'دارایی‌ها' },

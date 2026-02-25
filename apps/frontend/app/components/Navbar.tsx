@@ -166,7 +166,7 @@ function AuthCorner({ onAction }: { onAction?: () => void } = {}) {
     const t = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     setToken(t);
     if (t) {
-      fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/auth/me', { headers: { Authorization: `Bearer ${t}` } })
+      fetch((process.env.NEXT_PUBLIC_API_URL || '/api') + '/auth/me', { headers: { Authorization: `Bearer ${t}` } })
         .then(r => r.ok ? r.json() : null)
         .then(data => setMe(data))
         .catch(() => setMe(null));

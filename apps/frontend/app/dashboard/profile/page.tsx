@@ -2,7 +2,7 @@
 import React from 'react';
 import { User, Mail, Shield, Edit, Save, Camera, Key, Bell } from 'lucide-react';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 type Me = { id:string; email:string; phone?:string; hasPassword?:boolean; firstName?:string; lastName?:string; role?:string };
 

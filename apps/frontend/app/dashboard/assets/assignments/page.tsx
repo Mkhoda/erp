@@ -1,7 +1,7 @@
 "use client";
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 type Row = { id:string; assetId:string; userId?:string; departmentId?:string; buildingId?:string; floorId?:string; roomId?:string; assignedAt:string; returnedAt?:string; asset?:any; user?:any; department?:any; };
 export default function AssignmentsPage(){
   const [rows,setRows]=React.useState<Row[]>([]);

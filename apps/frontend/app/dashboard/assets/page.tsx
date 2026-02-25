@@ -33,7 +33,7 @@ type AssetCategory = {
   name: string;
 };
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export default function AssetsPage() {
   React.useEffect(() => {

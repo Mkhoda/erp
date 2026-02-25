@@ -35,7 +35,8 @@ export default function SignInPage() {
     setError(null);
 
     try {
-      const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      // use the configured API URL or default to same‑origin /api proxy
+    const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
       if (mode === 'phone') {
         const phoneDigits = normalizeTo98(phone);

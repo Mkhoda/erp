@@ -1,7 +1,7 @@
 "use client";
 import React from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 type Item = { id:string; name:string; description?:string };
 export default function AssetTypesPage(){
   const [items,setItems]=React.useState<Item[]>([]);

@@ -15,7 +15,7 @@ export default function ForgotPasswordPage() {
   const [otpExpiresAt, setOtpExpiresAt] = React.useState<string | null>(null);
   // no mock otp exposure
   const [mockOtp, setMockOtp] = React.useState<string | null>(null);
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const API = process.env.NEXT_PUBLIC_API_URL || '/api';
   const [now, setNow] = React.useState<number>(Date.now());
   const [otpSent, setOtpSent] = React.useState(false);
   const validPhone = isValidPhone(phone);

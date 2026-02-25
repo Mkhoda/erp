@@ -5,7 +5,7 @@ export default function ChangePasswordPage() {
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [msg, setMsg] = useState<string>("");
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
   async function requestOtp() {
     setMsg("");

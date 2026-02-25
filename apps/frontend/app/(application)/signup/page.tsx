@@ -74,7 +74,7 @@ export default function SignUpPage() {
       // normalize phone to backend expected format: 98XXXXXXXXXX
       let phoneForApi = normalizeTo98(phoneDigits);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/register`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ firstName, lastName, email, password, phone: phoneForApi })
