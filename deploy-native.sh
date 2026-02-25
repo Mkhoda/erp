@@ -97,7 +97,7 @@ if [ -d ".next/standalone" ]; then
     mkdir -p .next/standalone/public
     mkdir -p .next/standalone/.next/static
     cp -r public/* .next/standalone/public/ 2>/dev/null || true
-    cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
+    cp -r .next/static/. .next/standalone/.next/static/ 2>/dev/null || true
     print_success "Static assets copied successfully"
 fi
 

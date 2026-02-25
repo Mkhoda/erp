@@ -42,36 +42,17 @@ urlencode() {
 configure_env_files() {
     print_status "⚙️  Configuring environment files..."
 
-    local detected_ip
-    detected_ip=$(hostname -I | awk '{print $1}')
-
     local server_ip domain_name db_host db_port db_name db_user db_password jwt_secret encoded_db_password api_url cors_origin
 
-    read -p "Server IP [${detected_ip}]: " server_ip
-    server_ip=${server_ip:-$detected_ip}
-
-    read -p "Domain [erp.arzesh.net]: " domain_name
-    domain_name=${domain_name:-erp.arzesh.net}
-
-    read -p "Database host [172.17.100.12]: " db_host
-    db_host=${db_host:-172.17.100.12}
-
-    read -p "Database port [5432]: " db_port
-    db_port=${db_port:-5432}
-
-    read -p "Database name [arzesh_erp]: " db_name
-    db_name=${db_name:-arzesh_erp}
-
-    read -p "Database user [postgres]: " db_user
-    db_user=${db_user:-postgres}
-
-    read -s -p "Database password [hidden, default: ArzeshERP2025!]: " db_password
-    echo ""
-    db_password=${db_password:-ArzeshERP2025!}
-
-    read -s -p "JWT secret [hidden, default existing value]: " jwt_secret
-    echo ""
-    jwt_secret=${jwt_secret:-ArzeshERP_JWT_Secret_2025_Production_Key}
+    # Hardcoded deployment values
+    server_ip="91.92.181.146"
+    domain_name="erp.arzesh.net"
+    db_host="172.17.100.12"
+    db_port="5432"
+    db_name="arzesh_erp"
+    db_user="postgres"
+    db_password="123m123M"
+    jwt_secret="ArzeshERP_JWT_Secret_2025_Production_Key"
 
     encoded_db_password=$(urlencode "$db_password")
 
@@ -121,6 +102,22 @@ EOF
     cp apps/frontend/.env.production apps/frontend/.env
 
     print_success "Environment files updated: apps/backend/.env(.production), apps/frontend/.env(.production)"
+}
+
+free_port_3000() {
+    print_status "🧹 Releasing port 3000 if occupied..."
+
+    # Try graceful kill first
+    fuser -k 3000/tcp 2>/dev/null || true
+
+    # Force kill any remaining listener PID from ss
+    local pids
+    pids=$(ss -ltnp 2>/dev/null | awk '/:3000 / {print $NF}' | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)
+    if [ -n "$pids" ]; then
+        echo "$pids" | xargs -r kill -9 2>/dev/null || true
+    fi
+
+    sleep 1
 }
 
 # Ask deployment method
@@ -303,8 +300,7 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
     cd ../frontend
 
     # Kill anything still holding port 3000 (e.g. stale process from previous deploy)
-    fuser -k 3000/tcp 2>/dev/null || true
-    sleep 1
+    free_port_3000
 
     pm2 delete arzesh-frontend 2>/dev/null || true
 
@@ -314,7 +310,8 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
         print_status "Using standalone server (output: standalone)..."
         # Copy public & static assets required by standalone server
         cp -r public .next/standalone/public 2>/dev/null || true
-        cp -r .next/static .next/standalone/.next/static 2>/dev/null || true
+        mkdir -p .next/standalone/.next/static
+        cp -r .next/static/. .next/standalone/.next/static/ 2>/dev/null || true
         PORT=3000 pm2 start "$STANDALONE_SERVER" \
             --name "arzesh-frontend" \
             --max-memory-restart 4G \
@@ -332,6 +329,9 @@ if [ "$DEPLOY_METHOD" == "1" ]; then
     CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
     CERT_KEY="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
 
+    # allow overriding paths when using self-signed
+    export CERT_PATH CERT_KEY
+
     # Write HTTP-only config first so certbot can complete domain challenge
     print_status "⚙️  Writing initial HTTP config for certificate issuance..."
     sudo mkdir -p /var/www/certbot
@@ -348,16 +348,31 @@ NGINXEOF
     sudo rm -f /etc/nginx/sites-enabled/default
     sudo nginx -t && sudo systemctl restart nginx
 
-    # Obtain SSL certificate from Let's Encrypt (skip if already exists)
+    # Obtain SSL certificate from Let's Encrypt (skip if already exists or domain doesn't resolve)
     if [ ! -f "$CERT_PATH" ]; then
-        print_status "🔐 Obtaining SSL certificate for $DOMAIN via Let's Encrypt..."
-        sudo certbot certonly --webroot -w /var/www/certbot \
-            -d "$DOMAIN" \
-            --non-interactive --agree-tos \
-            --email admin@arzesh.net \
-            --no-eff-email \
-            && print_success "SSL certificate obtained" \
-            || print_warning "Certbot failed — ensure port 80 is open and DNS for $DOMAIN points to this server. HTTP will still work."
+        # check DNS A/AAAA record
+        if ! host "$DOMAIN" >/dev/null 2>&1; then
+            print_warning "Domain $DOMAIN does not resolve publicly, skipping Let's Encrypt. Generating self-signed cert instead."
+            sudo mkdir -p /etc/ssl/private /etc/ssl/certs
+            sudo openssl req -x509 -nodes -days 365 \
+              -newkey rsa:2048 \
+              -keyout /etc/ssl/private/arzesh.key \
+              -out /etc/ssl/certs/arzesh.crt \
+              -subj "/CN=$DOMAIN" 2>/dev/null
+            CERT_PATH="/etc/ssl/certs/arzesh.crt"
+            CERT_KEY="/etc/ssl/private/arzesh.key"
+        else
+            print_status "🔐 Obtaining SSL certificate for $DOMAIN via Let's Encrypt..."
+            if sudo certbot certonly --webroot -w /var/www/certbot \
+                -d "$DOMAIN" \
+                --non-interactive --agree-tos \
+                --email admin@arzesh.net \
+                --no-eff-email; then
+                print_success "SSL certificate obtained"
+            else
+                print_warning "Certbot failed — ensure port 80 is open and DNS for $DOMAIN points to this server. HTTP will still work."
+            fi
+        fi
     else
         print_success "SSL certificate already exists for $DOMAIN"
     fi
