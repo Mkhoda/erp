@@ -21,7 +21,7 @@ export class UsersController {
   me(@Req() req: any) { return this.usersService.findOne(req.user.userId); }
 
   @Patch('me')
-  updateMe(@Req() req: any, @Body() body: any) { return this.usersService.update(req.user.userId, { firstName: body.firstName, lastName: body.lastName }); }
+  updateMe(@Req() req: any, @Body() body: any) { return this.usersService.update(req.user.userId, { firstName: body.firstName, lastName: body.lastName, phone: body.phone }); }
 
   @Get(':id')
   @Roles('ADMIN', 'MANAGER')

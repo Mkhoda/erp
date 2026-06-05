@@ -153,11 +153,11 @@ export default function DashboardPage() {
                 <div className="font-bold text-blue-600 dark:text-blue-400 text-2xl">
                   {new Date().toLocaleDateString('fa-IR', { day: 'numeric' })}
                 </div>
-                <div className="text-gray-500 dark:text-gray-400 text-xs">
+                <div className="text-theme-muted text-xs">
                   {new Date().toLocaleDateString('fa-IR', { month: 'long' })}
                 </div>
               </div>
-              <Calendar className="w-8 h-8 text-gray-400" />
+              <Calendar className="w-8 h-8 text-theme-muted" />
             </div>
           </div>
         </div>
@@ -168,7 +168,7 @@ export default function DashboardPage() {
         {statCards.map((stat, index) => (
           <div key={index} className="group relative">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/5 dark:to-gray-800/5 rounded-xl rotate-1 group-hover:rotate-0 transition-transform transform"></div>
-            <div className={`relative p-6 ${stat.bg} border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-sm hover:shadow-md transition-all duration-200`}>
+            <div className={`relative p-6 ${stat.bg} border border-theme rounded-xl shadow-sm hover:shadow-md transition-all duration-200`}>
               <div className="flex justify-between items-center mb-4">
                 <div className={`p-3 rounded-lg ${stat.color.replace('text-', 'bg-').replace('dark:text-', 'dark:bg-').replace('-600', '-100').replace('-400', '-900')}`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
@@ -201,7 +201,7 @@ export default function DashboardPage() {
             <div className="gap-4 grid grid-cols-1 md:grid-cols-2">
               {quickActions.map((action, index) => (
                 <Link key={index} href={action.href} className="group">
-                  <div className={`p-4 ${action.bgColor} border border-gray-200/50 dark:border-gray-700/50 rounded-lg hover:shadow-md transition-all duration-200 group-hover:scale-[1.02]`}>
+                  <div className={`p-4 ${action.bgColor} border border-theme rounded-lg hover:shadow-md transition-all duration-200 group-hover:scale-[1.02]`}>
                     <div className="flex items-start gap-4">
                       <div className={`p-2 ${action.color} rounded-lg flex-shrink-0`}>
                         <action.icon className="w-5 h-5 text-white" />
@@ -233,7 +233,7 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-4">
               {recentActivities.map((activity) => (
-                <div key={activity.id} className="flex items-start gap-3 bg-gray-50/50 dark:bg-gray-800/50 p-3 rounded-lg">
+                <div key={activity.id} className="flex items-start gap-3 bg-theme-secondary p-3 rounded-lg">
                   <div className={`p-1.5 rounded-full flex-shrink-0 ${
                     activity.type === 'asset' ? 'bg-blue-100 dark:bg-blue-900' :
                     activity.type === 'assignment' ? 'bg-green-100 dark:bg-green-900' :

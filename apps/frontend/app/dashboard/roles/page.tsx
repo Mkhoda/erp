@@ -42,8 +42,8 @@ const ROLES: StaticRole[] = [
     name: 'کاربر عادی', 
     description: 'دسترسی استاندارد به مشاهده و ورود اطلاعات پایه', 
     icon: User,
-    color: 'text-gray-600 dark:text-gray-400',
-    bgColor: 'bg-gray-50 dark:bg-gray-800'
+    color: 'text-theme-secondary',
+    bgColor: 'bg-theme-secondary'
   },
 ];
 
@@ -160,15 +160,15 @@ export default function RolesPage(){
                   {role.id === 'USER' && (
                     <>
                       <div className="flex items-center gap-2 text-theme-secondary text-sm">
-                        <div className="bg-gray-500 rounded-full w-1.5 h-1.5"></div>
+                        <div className="bg-theme-muted rounded-full w-1.5 h-1.5"></div>
                         مشاهده اطلاعات دارایی‌ها
                       </div>
                       <div className="flex items-center gap-2 text-theme-secondary text-sm">
-                        <div className="bg-gray-500 rounded-full w-1.5 h-1.5"></div>
+                        <div className="bg-theme-muted rounded-full w-1.5 h-1.5"></div>
                         ثبت درخواست‌های جدید
                       </div>
                       <div className="flex items-center gap-2 text-theme-secondary text-sm">
-                        <div className="bg-gray-500 rounded-full w-1.5 h-1.5"></div>
+                        <div className="bg-theme-muted rounded-full w-1.5 h-1.5"></div>
                         دسترسی به پروفایل شخصی
                       </div>
                     </>

@@ -2,356 +2,443 @@
 import React from 'react';
 import { normalizeTo98, isValidPhone } from '../../../lib/phone';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { Eye, EyeOff, Phone, Lock, User, UserPlus, ArrowRight, Moon, Sun } from 'lucide-react';
+
+type Step = 'form' | 'otp';
 
 export default function SignUpPage() {
   const router = useRouter();
+  const [step, setStep] = React.useState<Step>('form');
   const [firstName, setFirstName] = React.useState('');
   const [lastName, setLastName] = React.useState('');
   const [phone, setPhone] = React.useState('');
-  const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [otp, setOtp] = React.useState('');
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirm, setShowConfirm] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [showPassword, setShowPassword] = React.useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const [acceptTerms, setAcceptTerms] = React.useState(false);
+  const [otpExpiresAt, setOtpExpiresAt] = React.useState<string | null>(null);
+  const [now, setNow] = React.useState(Date.now());
+  const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
+
+  const API = process.env.NEXT_PUBLIC_API_URL || '/api';
+  const validPhone = isValidPhone(phone);
+  const passwordsMatch = password === confirmPassword;
 
   React.useEffect(() => {
     document.title = 'ثبت نام | ارزش ERP';
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (token) router.replace('/dashboard');
+    const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    if (saved) {
+      setTheme(saved);
+      if (saved === 'dark') document.documentElement.classList.add('dark');
+    }
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
   }, [router]);
 
-  // Password strength calculation
-  const getPasswordStrength = (password: string) => {
-    let strength = 0;
-    if (password.length >= 8) strength++;
-    if (/[a-z]/.test(password)) strength++;
-    if (/[A-Z]/.test(password)) strength++;
-    if (/[0-9]/.test(password)) strength++;
-    if (/[^A-Za-z0-9]/.test(password)) strength++;
-    return strength;
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem('theme', next);
+    if (next === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   };
 
-  const passwordStrength = getPasswordStrength(password);
-  const strengthLabels = ['خیلی ضعیف', 'ضعیف', 'متوسط', 'قوی', 'خیلی قوی'];
-  const strengthColors = ['red', 'orange', 'yellow', 'green', 'green'];
+  const expiresMs = otpExpiresAt ? new Date(otpExpiresAt).getTime() : null;
+  const remainingMs = expiresMs ? Math.max(0, expiresMs - now) : 0;
+  const remainingSec = Math.ceil(remainingMs / 1000);
+  const canResend = expiresMs ? now >= expiresMs : false;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
+  const formatPhone = (raw: string) => {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.startsWith('0') && digits.length <= 11) {
+      return digits.replace(/^(0)(\d{0,3})(\d{0,3})(\d{0,4})/, (_, p1, p2, p3, p4) => {
+        let r = p1;
+        if (p2) r += ' ' + p2;
+        if (p3) r += ' ' + p3;
+        if (p4) r += ' ' + p4;
+        return r.trim();
+      });
+    }
+    return digits;
+  };
+
+  const getStrength = (p: string) => {
+    let s = 0;
+    if (p.length >= 8) s++;
+    if (/[a-z]/.test(p)) s++;
+    if (/[A-Z]/.test(p)) s++;
+    if (/[0-9]/.test(p)) s++;
+    if (/[^A-Za-z0-9]/.test(p)) s++;
+    return s;
+  };
+  const strength = getStrength(password);
+  const strengthColor = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a'][strength - 1] || '#e2e8f0';
+  const strengthLabel = ['خیلی ضعیف', 'ضعیف', 'متوسط', 'قوی', 'خیلی قوی'][strength - 1] || '';
+
+  async function sendOtp() {
     setError(null);
-
-    // Validation
-    const phoneDigits = phone.replace(/\s+/g, '');
-    if (!isValidPhone(phoneDigits)) {
-      setError('شماره موبایل باید با 0 شروع شود و 11 رقم باشد یا با کد کشور 98. مثال: 09121234567 یا 989121234567');
-      setLoading(false);
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('رمزهای عبور مطابقت ندارند');
-      setLoading(false);
-      return;
-    }
-
-    if (passwordStrength < 2) {
-      setError('رمز عبور باید حداقل ۸ کاراکتر و شامل حروف و اعداد باشد');
-      setLoading(false);
-      return;
-    }
-
-    if (!acceptTerms) {
-      setError('پذیرش شرایط و قوانین الزامی است');
-      setLoading(false);
-      return;
-    }
-
+    setLoading(true);
     try {
-      // normalize phone to backend expected format: 98XXXXXXXXXX
-      let phoneForApi = normalizeTo98(phoneDigits);
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/auth/register`, {
+      const phoneNorm = normalizeTo98(phone);
+      const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, email, password, phone: phoneForApi })
+        body: JSON.stringify({ phone: phoneNorm, purpose: 'signup' }),
       });
-      
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || 'ثبت نام ناموفق بود (ایمیل یا شماره تکراری است)');
-      }
-      
-      router.push('/signin?message=registration-success');
-    } catch (err: any) {
-      setError(err.message);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'ارسال کد تایید ناموفق بود');
+      setOtpExpiresAt(data.expiresAt || null);
+    } catch (e: any) {
+      throw e;
     } finally {
       setLoading(false);
     }
   }
 
+  async function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!validPhone) { setError('شماره موبایل نامعتبر است'); return; }
+    if (!passwordsMatch) { setError('رمزهای عبور مطابقت ندارند'); return; }
+    if (strength < 2) { setError('رمز عبور باید حداقل ۸ کاراکتر باشد'); return; }
+    setLoading(true);
+    try {
+      await sendOtp();
+      setStep('otp');
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleOtpSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (otp.length !== 6) { setError('کد تایید باید ۶ رقم باشد'); return; }
+    setLoading(true);
+    try {
+      const phoneNorm = normalizeTo98(phone);
+      // Verify OTP first
+      const verifyRes = await fetch(`${API}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNorm, otp, purpose: 'signup' }),
+      });
+      const verifyData = await verifyRes.json().catch(() => ({}));
+      if (!verifyRes.ok) throw new Error(verifyData.message || 'کد تایید اشتباه است');
+
+      // Register the user
+      const regRes = await fetch(`${API}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName, lastName, phone: phoneNorm, password }),
+      });
+      const regData = await regRes.json().catch(() => ({}));
+      if (!regRes.ok) throw new Error(regData.message || 'ثبت نام ناموفق بود');
+
+      // Auto-login after register
+      const loginRes = await fetch(`${API}/auth/login-phone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNorm, password }),
+      });
+      if (loginRes.ok) {
+        const loginData = await loginRes.json();
+        localStorage.setItem('token', loginData.access_token);
+        router.push('/dashboard');
+      } else {
+        router.push('/signin?message=registration-success');
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const otpRefs = Array.from({ length: 6 }, () => React.createRef<HTMLInputElement>());
+
   return (
-    <div className="flex justify-center items-center bg-gradient-theme-light px-4 py-12 min-h-screen">
-      <div className="space-y-8 w-full max-w-md">
+    <div className="relative flex justify-center items-center bg-gradient-theme-light px-4 py-10 min-h-screen overflow-hidden" dir="rtl">
+      {/* Background blobs */}
+      <div className="top-[-10%] left-[-5%] absolute bg-purple-500/10 dark:bg-purple-500/5 blur-3xl rounded-full w-96 h-96 pointer-events-none" />
+      <div className="bottom-[-10%] right-[-5%] absolute bg-blue-500/10 dark:bg-blue-500/5 blur-3xl rounded-full w-96 h-96 pointer-events-none" />
+
+      {/* Theme toggle */}
+      <button
+        onClick={toggleTheme}
+        className="top-4 left-4 absolute bg-theme-card hover:bg-theme-hover p-2.5 border border-theme rounded-xl text-theme-secondary transition-all"
+      >
+        {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+      </button>
+
+      <div className="relative w-full max-w-sm">
+        {/* Header */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center"
+          className="mb-6 text-center"
         >
-          <div className="flex justify-center items-center bg-gradient-to-r from-blue-600 to-purple-600 mx-auto mb-6 rounded-2xl w-16 h-16">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
+          <div className="inline-flex justify-center items-center bg-gradient-to-br from-purple-600 to-blue-600 shadow-lg shadow-purple-500/30 mb-4 rounded-2xl w-16 h-16">
+            <UserPlus className="w-7 h-7 text-white" />
           </div>
-          <h2 className="bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-bold text-transparent text-3xl">
-            ثبت نام
-          </h2>
-          <p className="mt-2 text-theme-muted">
-            حساب کاربری جدید ایجاد کنید
+          <h1 className="font-bold text-theme-primary text-2xl">
+            {step === 'form' ? 'ثبت نام' : 'تایید شماره موبایل'}
+          </h1>
+          <p className="mt-1 text-theme-muted text-sm">
+            {step === 'form' ? 'حساب کاربری جدید بسازید' : `کد ارسال شده به ${phone} را وارد کنید`}
           </p>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="bg-theme-card shadow-xl backdrop-blur-sm p-8 border border-theme rounded-2xl"
-        >
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="gap-4 grid grid-cols-1 sm:grid-cols-2">
-              <div>
-                <label htmlFor="firstName" className="block mb-2 font-medium text-theme-primary text-sm">نام</label>
-                <div className="relative">
-                  <input
-                    id="firstName"
-                    type="text"
-                    value={firstName}
-                    onChange={e => setFirstName(e.target.value)}
-                    required
-                    className="bg-theme-primary px-4 py-3 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
-                    placeholder="نام"
-                  />
+        {/* Step indicator */}
+        <div className="flex items-center gap-2 mb-5 px-1">
+          <div className={`flex-1 h-1 rounded-full transition-colors ${step === 'form' ? 'bg-blue-600' : 'bg-blue-600'}`} />
+          <div className={`flex-1 h-1 rounded-full transition-colors ${step === 'otp' ? 'bg-blue-600' : 'bg-theme-secondary'}`} />
+        </div>
+
+        <AnimatePresence mode="wait">
+          {step === 'form' ? (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-theme-card shadow-xl backdrop-blur-sm p-6 border border-theme rounded-2xl"
+            >
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                {/* Name row */}
+                <div className="gap-3 grid grid-cols-2">
+                  <div>
+                    <label className="block mb-1.5 font-medium text-theme-primary text-xs">نام</label>
+                    <div className="relative">
+                      <User className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={e => setFirstName(e.target.value)}
+                        required
+                        className="input-theme pr-10 text-sm"
+                        placeholder="نام"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block mb-1.5 font-medium text-theme-primary text-xs">نام خانوادگی</label>
+                    <input
+                      type="text"
+                      value={lastName}
+                      onChange={e => setLastName(e.target.value)}
+                      required
+                      className="input-theme text-sm"
+                      placeholder="نام خانوادگی"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label htmlFor="lastName" className="block mb-2 font-medium text-theme-primary text-sm">نام خانوادگی</label>
-                <div className="relative">
-                  <input
-                    id="lastName"
-                    type="text"
-                    value={lastName}
-                    onChange={e => setLastName(e.target.value)}
-                    required
-                    className="bg-theme-primary px-4 py-3 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
-                    placeholder="نام خانوادگی"
-                  />
+
+                {/* Phone */}
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-primary text-xs">شماره موبایل</label>
+                  <div className="relative">
+                    <Phone className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      dir="ltr"
+                      value={phone}
+                      onChange={e => setPhone(formatPhone(e.target.value))}
+                      required
+                      className={`input-theme pr-10 text-right text-sm ${phone && !validPhone ? 'border-red-400' : ''}`}
+                      placeholder="0912 345 6789"
+                    />
+                  </div>
+                  {phone && !validPhone && <p className="mt-1 text-red-500 text-xs">شماره موبایل معتبر نیست</p>}
                 </div>
-              </div>
-            </div>
 
-            <div>
-              <label htmlFor="phone" className="block mb-2 font-medium text-theme-primary text-sm">شماره موبایل (فرمت: 0XXXXXXXXXX)</label>
-              <div className="relative">
-                <input
-                  id="phone"
-                  type="tel"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value.replace(/\s+/g,''))}
-                  required
-                  pattern="0\\d{10}"
-                  className={`bg-theme-primary px-4 py-3 border ${/^0\d{10}$/.test(phone)||!phone? 'border-theme':'border-red-300 dark:border-red-600'} focus:border-transparent rounded-xl outline-none focus:ring-2 ${/^0\d{10}$/.test(phone)||!phone? 'focus:ring-blue-500':'focus:ring-red-500'} w-full text-theme-primary transition-all`}
-                  placeholder="مثال: 09121234567"
-                />
-                <span className="top-3 left-3 absolute text-theme-muted text-xs">IR</span>
-              </div>
-              <p className="mt-1 text-theme-muted text-xs">شماره باید با 0 شروع شود و 11 رقم باشد.</p>
-            </div>
+                {/* Password */}
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-primary text-xs">رمز عبور</label>
+                  <div className="relative">
+                    <Lock className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      required
+                      className="input-theme pr-10 pl-10 text-sm"
+                      placeholder="حداقل ۸ کاراکتر"
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="top-1/2 left-3 absolute text-theme-muted -translate-y-1/2">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {password && (
+                    <div className="mt-2">
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map(l => (
+                          <div key={l} className="flex-1 h-1 rounded-full transition-colors" style={{ backgroundColor: l <= strength ? strengthColor : undefined }} />
+                        ))}
+                      </div>
+                      {strengthLabel && <p className="mt-0.5 text-xs" style={{ color: strengthColor }}>{strengthLabel}</p>}
+                    </div>
+                  )}
+                </div>
 
-            <div>
-              <label htmlFor="email" className="block mb-2 font-medium text-theme-primary text-sm">
-                آدرس ایمیل
-              </label>
-              <div className="relative">
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                  className="bg-theme-primary px-4 py-3 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
-                  placeholder="your@email.com"
-                />
-                <svg className="top-3 left-3 absolute w-5 h-5 text-theme-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                </svg>
-              </div>
-            </div>
+                {/* Confirm Password */}
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-primary text-xs">تکرار رمز عبور</label>
+                  <div className="relative">
+                    <Lock className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
+                    <input
+                      type={showConfirm ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      required
+                      className={`input-theme pr-10 pl-10 text-sm ${confirmPassword && !passwordsMatch ? 'border-red-400' : ''}`}
+                      placeholder="تکرار رمز عبور"
+                    />
+                    <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="top-1/2 left-3 absolute text-theme-muted -translate-y-1/2">
+                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {confirmPassword && !passwordsMatch && <p className="mt-1 text-red-500 text-xs">رمزها مطابقت ندارند</p>}
+                </div>
 
-            <div>
-              <label htmlFor="password" className="block mb-2 font-medium text-theme-primary text-sm">
-                رمز عبور
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  className="bg-theme-primary px-4 py-3 pl-12 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
-                  placeholder="رمز عبور قوی انتخاب کنید"
-                />
+                {error && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 bg-red-50 dark:bg-red-950/40 p-3 border border-red-200 dark:border-red-800 rounded-xl">
+                    <div className="flex-shrink-0 bg-red-500 rounded-full w-1.5 h-1.5" />
+                    <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+                  </motion.div>
+                )}
+
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="top-3 left-3 absolute text-theme-muted hover:text-theme-secondary"
+                  type="submit"
+                  disabled={loading || !validPhone || !passwordsMatch || strength < 2}
+                  className="btn-theme-primary justify-center gap-2 w-full py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  {showPassword ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                    </svg>
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="border-white/40 border-t-white border-2 rounded-full w-4 h-4 animate-spin" />
+                      ارسال کد تایید...
+                    </span>
                   ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
+                    <>ارسال کد تایید <ArrowRight className="w-4 h-4" /></>
                   )}
                 </button>
+              </form>
+
+              <div className="mt-5 text-center">
+                <p className="text-theme-muted text-sm">
+                  قبلاً حساب دارید؟{' '}
+                  <Link href="/signin" className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 transition-colors">وارد شوید</Link>
+                </p>
               </div>
-              {password && (
-                <div className="mt-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-theme-secondary">قدرت رمز عبور:</span>
-                    <span className={`font-medium text-${strengthColors[passwordStrength - 1]}-600`}>
-                      {strengthLabels[passwordStrength - 1] || 'خیلی ضعیف'}
-                    </span>
-                  </div>
-                  <div className="flex gap-1 mt-1">
-                    {[1, 2, 3, 4, 5].map((level) => (
-                      <div
-                        key={level}
-                        className={`h-1 flex-1 rounded ${
-                          level <= passwordStrength
-                            ? `bg-${strengthColors[passwordStrength - 1]}-500`
-                            : 'bg-theme-secondary'
-                        }`}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="otp"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-theme-card shadow-xl backdrop-blur-sm p-6 border border-theme rounded-2xl"
+            >
+              <form onSubmit={handleOtpSubmit} className="space-y-5">
+                {/* OTP boxes */}
+                <div>
+                  <label className="block mb-3 font-medium text-theme-primary text-sm text-center">کد ۶ رقمی را وارد کنید</label>
+                  <div className="flex justify-center gap-2" dir="ltr">
+                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                      <input
+                        key={i}
+                        ref={otpRefs[i]}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={otp[i] || ''}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          const arr = otp.split('');
+                          arr[i] = val;
+                          setOtp(arr.join(''));
+                          if (val && i < 5) otpRefs[i + 1].current?.focus();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Backspace' && !otp[i] && i > 0) otpRefs[i - 1].current?.focus();
+                        }}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                          setOtp(pasted.padEnd(6, '').slice(0, 6));
+                          const lastIdx = Math.min(pasted.length, 5);
+                          otpRefs[lastIdx].current?.focus();
+                        }}
+                        className="bg-theme-primary focus:bg-white dark:focus:bg-slate-700 border border-theme focus:border-blue-500 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 w-11 h-12 font-semibold text-theme-primary text-lg text-center transition-all"
                       />
                     ))}
                   </div>
+                  {/* Timer */}
+                  {otpExpiresAt && !canResend && (
+                    <p className="mt-3 text-center text-theme-muted text-xs">
+                      ارسال مجدد تا: {Math.floor(remainingSec / 60)}:{String(remainingSec % 60).padStart(2, '0')}
+                    </p>
+                  )}
+                  {canResend && (
+                    <div className="mt-3 text-center">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try { await sendOtp(); }
+                          catch (e: any) { setError(e.message); }
+                        }}
+                        disabled={loading}
+                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm underline"
+                      >
+                        ارسال مجدد کد
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <div>
-              <label htmlFor="confirmPassword" className="block mb-2 font-medium text-theme-primary text-sm">
-                تکرار رمز عبور
-              </label>
-              <div className="relative">
-                <input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  required
-                  className="bg-theme-primary px-4 py-3 pl-12 border border-theme focus:border-transparent rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full text-theme-primary transition-all"
-                  placeholder="رمز عبور را مجدداً وارد کنید"
-                />
+                {error && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 bg-red-50 dark:bg-red-950/40 p-3 border border-red-200 dark:border-red-800 rounded-xl">
+                    <div className="flex-shrink-0 bg-red-500 rounded-full w-1.5 h-1.5" />
+                    <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+                  </motion.div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || otp.length !== 6}
+                  className="btn-theme-primary justify-center w-full py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="border-white/40 border-t-white border-2 rounded-full w-4 h-4 animate-spin" />
+                      در حال ثبت نام...
+                    </span>
+                  ) : 'تایید و ثبت نام'}
+                </button>
+
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="top-3 left-3 absolute text-theme-muted hover:text-theme-secondary"
+                  onClick={() => { setStep('form'); setOtp(''); setError(null); }}
+                  className="w-full text-center text-theme-muted hover:text-theme-secondary text-sm transition-colors"
                 >
-                  {showConfirmPassword ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
+                  ← ویرایش اطلاعات
                 </button>
-              </div>
-              {confirmPassword && password !== confirmPassword && (
-                <p className="mt-1 text-red-600 dark:text-red-400 text-sm">رمزهای عبور مطابقت ندارند</p>
-              )}
-            </div>
-
-            <div className="flex items-center">
-              <input
-                id="accept-terms"
-                type="checkbox"
-                checked={acceptTerms}
-                onChange={(e) => setAcceptTerms(e.target.checked)}
-                className="border-gray-300 rounded focus:ring-blue-500 w-4 h-4 text-blue-600"
-              />
-              <label htmlFor="accept-terms" className="block mr-2 text-theme-primary text-sm">
-                من با{' '}
-                <Link href="/terms" className="text-blue-600 hover:text-blue-500 dark:hover:text-blue-300 dark:text-blue-400">
-                  شرایط و قوانین
-                </Link>{' '}
-                و{' '}
-                <Link href="/privacy" className="text-blue-600 hover:text-blue-500 dark:hover:text-blue-300 dark:text-blue-400">
-                  حریم خصوصی
-                </Link>{' '}
-                موافقم
-              </label>
-            </div>
-
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-2 bg-red-50 dark:bg-red-900/30 p-3 border border-red-200 dark:border-red-800 rounded-xl"
-              >
-                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
-              </motion.div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || !acceptTerms}
-              className="flex justify-center bg-gradient-to-r from-blue-600 hover:from-blue-700 to-purple-600 hover:to-purple-700 disabled:opacity-50 shadow-sm px-4 py-3 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 w-full font-medium text-white text-sm transition-all duration-200 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="border-white border-b-2 rounded-full w-4 h-4 animate-spin"></div>
-                  در حال ثبت نام...
-                </div>
-              ) : (
-                'ثبت نام'
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="border-theme border-t w-full" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="bg-theme-card px-2 text-theme-muted">یا</span>
-              </div>
-            </div>
-
-            <div className="mt-6 text-center">
-              <p className="text-theme-secondary text-sm">
-                قبلاً حساب کاربری دارید؟{' '}
-                <Link href="/signin" className="font-medium text-blue-600 hover:text-blue-500 dark:hover:text-blue-300 dark:text-blue-400">
-                  وارد شوید
-                </Link>
-              </p>
-            </div>
-          </div>
-        </motion.div>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
