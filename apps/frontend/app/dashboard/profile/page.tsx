@@ -1,343 +1,315 @@
 "use client";
 import React from 'react';
-import { User, Mail, Shield, Edit, Save, Camera, Key, Bell } from 'lucide-react';
+import { User, Shield, Save, Key, Bell, Phone, Check, AlertCircle } from 'lucide-react';
+import { isValidPhone, normalizeTo98 } from '../../../lib/phone';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
-type Me = { id:string; email:string; phone?:string; hasPassword?:boolean; firstName?:string; lastName?:string; role?:string };
+type Me = { id: string; email?: string; phone?: string; hasPassword?: boolean; firstName?: string; lastName?: string; role?: string };
 
-export default function ProfilePage(){
-  React.useEffect(() => {
-    document.title = 'پروفایل کاربری | Arzesh ERP';
-  }, []);
+const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
+  ADMIN: { label: 'مدیر ارشد', cls: 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800' },
+  MANAGER: { label: 'مدیر', cls: 'bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
+  EXPERT: { label: 'کارشناس', cls: 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
+  USER: { label: 'کاربر', cls: 'bg-theme-secondary text-theme-secondary border-theme' },
+};
 
-  const [me,setMe]=React.useState<Me|null>(null);
-  const [edit,setEdit]=React.useState<Partial<Me>>({});
-  const [saving,setSaving]=React.useState(false);
+export default function ProfilePage() {
+  React.useEffect(() => { document.title = 'پروفایل | Arzesh ERP'; }, []);
+
+  const [me, setMe] = React.useState<Me | null>(null);
+  const [edit, setEdit] = React.useState<Partial<Me>>({});
+  const [saving, setSaving] = React.useState(false);
+  const [saveMsg, setSaveMsg] = React.useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [activeTab, setActiveTab] = React.useState('profile');
+
+  // OTP / change password
   const [sendingOtp, setSendingOtp] = React.useState(false);
   const [otpSent, setOtpSent] = React.useState(false);
   const [otp, setOtp] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
   const [otpExpiresAt, setOtpExpiresAt] = React.useState<string | null>(null);
-  // no mock otp exposure
-  const [mockOtp, setMockOtp] = React.useState<string | null>(null);
-  const token = typeof window!=='undefined'? localStorage.getItem('token'):null;
+  const [pwMsg, setPwMsg] = React.useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [now, setNow] = React.useState(Date.now());
 
-  React.useEffect(()=>{ (async ()=>{
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  React.useEffect(() => {
     if (!token) return;
-    try{ 
-      const r = await fetch(`${API}/auth/me`, { headers:{ Authorization:`Bearer ${token}` } }); 
-      if (!r.ok) {
-        console.error('Failed to fetch user profile');
-        return;
-      }
-      const data = await r.json(); 
-      setMe(data); 
-      setEdit({ firstName:data?.firstName||'', lastName:data?.lastName||'' }); 
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    }
-  })(); }, [token]);
+    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        setMe(data);
+        setEdit({ firstName: data?.firstName || '', lastName: data?.lastName || '', phone: data?.phone || '' });
+      })
+      .catch(() => {});
+  }, [token]);
 
-  async function save(){ 
-    if(!me) return; 
-    setSaving(true); 
-    try{ 
-      const response = await fetch(`${API}/users/me`, { 
-        method:'PATCH', 
-        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` }, 
-        body: JSON.stringify({ firstName: edit.firstName, lastName: edit.lastName }) 
+  const expiresMs = otpExpiresAt ? new Date(otpExpiresAt).getTime() : null;
+  const remainingSec = expiresMs ? Math.max(0, Math.ceil((expiresMs - now) / 1000)) : 0;
+  const canResend = expiresMs ? now >= expiresMs : true;
+
+  async function save() {
+    if (!me) return;
+    if (edit.phone && !isValidPhone(edit.phone)) { setSaveMsg({ type: 'err', text: 'شماره موبایل نامعتبر است' }); return; }
+    setSaving(true); setSaveMsg(null);
+    try {
+      const res = await fetch(`${API}/users/me`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ firstName: edit.firstName, lastName: edit.lastName, phone: edit.phone ? normalizeTo98(edit.phone) : undefined }),
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
-      }
-      
-      setMe(prev => prev ? {...prev, firstName: edit.firstName, lastName: edit.lastName} : prev);
-      alert('اطلاعات با موفقیت ذخیره شد'); 
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      alert('خطا در ذخیره اطلاعات');
-    } finally{ 
-      setSaving(false); 
-    }
+      if (!res.ok) throw new Error('خطا در ذخیره');
+      setMe(prev => prev ? { ...prev, firstName: edit.firstName, lastName: edit.lastName, phone: edit.phone ? normalizeTo98(edit.phone!) : prev.phone } : prev);
+      setSaveMsg({ type: 'ok', text: 'اطلاعات با موفقیت ذخیره شد' });
+    } catch { setSaveMsg({ type: 'err', text: 'خطا در ذخیره اطلاعات' }); }
+    finally { setSaving(false); }
   }
 
-  const getRoleDisplay = (role?: string) => {
-    switch(role) {
-      case 'ADMIN': return { label: 'مدیر سیستم', color: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' };
-      case 'MANAGER': return { label: 'مدیر', color: 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200' };
-      case 'EXPERT': return { label: 'متخصص', color: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' };
-      case 'USER': return { label: 'کاربر عادی', color: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200' };
-      default: return { label: 'نامشخص', color: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200' };
-    }
-  };
+  async function sendOtp() {
+    if (!me?.phone) return;
+    setSendingOtp(true); setPwMsg(null);
+    try {
+      const res = await fetch(`${API}/auth/send-otp`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ phone: me.phone, purpose: 'change' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'ارسال کد ناموفق');
+      setOtpSent(true); setOtpExpiresAt(data.expiresAt || null);
+    } catch (e: any) { setPwMsg({ type: 'err', text: e.message }); }
+    finally { setSendingOtp(false); }
+  }
 
-  const tabs = [
-    { id: 'profile', label: 'اطلاعات شخصی', icon: User },
-    { id: 'security', label: 'امنیت', icon: Key },
-    { id: 'notifications', label: 'اعلان‌ها', icon: Bell },
-  ];
+  async function changePassword() {
+    setPwMsg(null);
+    if (!/^\d{4,6}$/.test(otp)) { setPwMsg({ type: 'err', text: 'کد تایید نامعتبر است' }); return; }
+    if (newPassword.length < 6) { setPwMsg({ type: 'err', text: 'رمز عبور باید حداقل ۶ کاراکتر باشد' }); return; }
+    try {
+      const res = await fetch(`${API}/auth/change-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ otp, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'تغییر رمز ناموفق');
+      setPwMsg({ type: 'ok', text: 'رمز عبور با موفقیت تغییر کرد' });
+      setOtp(''); setNewPassword(''); setOtpSent(false); setOtpExpiresAt(null);
+    } catch (e: any) { setPwMsg({ type: 'err', text: e.message }); }
+  }
 
-  if(!me) return (
-    <div className="flex justify-center items-center min-h-96">
-      <div className="text-center">
-        <div className="mx-auto mb-4 border-b-2 border-blue-600 rounded-full w-12 h-12 animate-spin"></div>
-        <p className="text-gray-600 dark:text-gray-400">در حال بارگذاری...</p>
+  if (!me) return (
+    <div className="flex justify-center items-center min-h-64">
+      <div className="flex flex-col items-center gap-3 text-theme-muted">
+        <div className="border-blue-600 border-t-transparent border-2 rounded-full w-8 h-8 animate-spin" />
+        <span className="text-sm">در حال بارگذاری...</span>
       </div>
     </div>
   );
 
-  const roleInfo = getRoleDisplay(me.role);
+  const role = ROLE_LABELS[me.role || ''] || ROLE_LABELS.USER;
+  const fullName = `${me.firstName || ''} ${me.lastName || ''}`.trim() || 'کاربر';
+  const initial = (me.firstName?.[0] || me.phone?.[0] || 'U').toUpperCase();
+
+  const tabs = [
+    { id: 'profile', label: 'اطلاعات شخصی', Icon: User },
+    { id: 'security', label: 'امنیت و رمز عبور', Icon: Key },
+    { id: 'notifications', label: 'اعلان‌ها', Icon: Bell },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="bg-white/70 dark:bg-gray-900/70 shadow-sm backdrop-blur-sm p-6 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className="flex justify-center items-center bg-gradient-to-br from-blue-500 to-purple-500 rounded-full w-16 h-16">
-              <User className="w-8 h-8 text-white" />
+    <div className="space-y-4 max-w-3xl" dir="rtl">
+      {/* Header card */}
+      <div className="card-theme">
+        <div className="card-theme-body">
+          <div className="flex items-center gap-4">
+            <div className="flex justify-center items-center bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg shadow-blue-500/20 rounded-2xl w-16 h-16 text-2xl font-bold text-white shrink-0">
+              {initial}
             </div>
-            <button className="-right-1 -bottom-1 absolute flex justify-center items-center bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 border-2 border-gray-200 dark:border-gray-700 rounded-full w-6 h-6 transition-colors">
-              <Camera className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-            </button>
-          </div>
-          <div>
-            <h1 className="font-bold text-gray-900 dark:text-gray-100 text-2xl">
-              {me.firstName || me.lastName ? `${me.firstName || ''} ${me.lastName || ''}`.trim() : 'کاربر ارزش ERP'}
-            </h1>
-            <p className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-              <Mail className="w-4 h-4" />
-              {me.email}
-            </p>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium mt-2 ${roleInfo.color}`}>
-              <Shield className="w-3 h-3" />
-              {roleInfo.label}
-            </span>
+            <div>
+              <h1 className="font-bold text-theme-primary text-xl">{fullName}</h1>
+              {me.phone && <p className="text-theme-muted text-sm mt-0.5" dir="ltr">{me.phone}</p>}
+              <span className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium border ${role.cls}`}>
+                <Shield className="w-3 h-3" /> {role.label}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white/70 dark:bg-gray-900/70 shadow-sm backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-xl overflow-hidden">
-        <div className="flex border-gray-200 dark:border-gray-700 border-b">
-          {tabs.map((tab) => (
+      <div className="card-theme overflow-hidden">
+        <div className="flex border-theme border-b">
+          {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium transition-all border-b-2 ${
                 activeTab === tab.id
-                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/50'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-50/50 dark:hover:bg-gray-800/50'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30'
+                  : 'border-transparent text-theme-muted hover:text-theme-secondary hover:bg-theme-hover'
               }`}
             >
-              <tab.icon className="w-4 h-4" />
+              <tab.Icon className="w-4 h-4" />
               {tab.label}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Tab Content */}
-      <div className="bg-white/70 dark:bg-gray-900/70 shadow-sm backdrop-blur-sm p-6 border border-gray-200/50 dark:border-gray-700/50 rounded-xl">
-        {activeTab === 'profile' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">اطلاعات شخصی</h2>
-              <Edit className="w-5 h-5 text-gray-400" />
-            </div>
-
-            <div className="gap-6 grid md:grid-cols-2">
-              <div>
-                <label className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                  نام
-                </label>
-                <input 
-                  value={edit.firstName||''} 
-                  onChange={e=>setEdit(s=>({...s, firstName:e.target.value}))} 
-                  className="bg-gray-50 dark:bg-gray-800 px-4 py-3 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100 transition-colors"
-                  placeholder="نام خود را وارد کنید"
-                />
-              </div>
-              <div>
-                <label className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                  نام خانوادگی
-                </label>
-                <input 
-                  value={edit.lastName||''} 
-                  onChange={e=>setEdit(s=>({...s, lastName:e.target.value}))} 
-                  className="bg-gray-50 dark:bg-gray-800 px-4 py-3 border border-gray-200 dark:border-gray-700 focus:border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900 dark:text-gray-100 transition-colors"
-                  placeholder="نام خانوادگی خود را وارد کنید"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                ایمیل
-              </label>
-              <input 
-                value={me.email} 
-                disabled
-                className="bg-gray-100 dark:bg-gray-800 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg w-full text-gray-500 dark:text-gray-400 cursor-not-allowed"
-              />
-              <p className="mt-1 text-gray-500 dark:text-gray-400 text-xs">
-                ایمیل قابل تغییر نیست
-              </p>
-            </div>
-
-            <div>
-              <label className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                نقش سیستمی
-              </label>
-              <div className="flex items-center gap-3">
-                <span className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${roleInfo.color}`}>
-                  <Shield className="w-4 h-4" />
-                  {roleInfo.label}
-                </span>
-                <p className="text-gray-500 dark:text-gray-400 text-xs">
-                  نقش توسط مدیر سیستم تعیین می‌شود
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-4">
-              <button 
-                disabled={saving} 
-                onClick={save} 
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 hover:from-blue-700 to-blue-700 hover:to-blue-800 disabled:opacity-50 shadow-sm px-6 py-3 rounded-lg font-medium text-white transition-all duration-200 disabled:cursor-not-allowed"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? 'در حال ذخیره...' : 'ذخیره تغییرات'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'security' && (
-          <div className="space-y-6">
-            <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">تنظیمات امنیتی</h2>
-            {me?.phone ? (
-              <div className="space-y-3 bg-blue-50/50 dark:bg-blue-950/50 p-4 border border-blue-200/50 dark:border-blue-800/50 rounded-lg">
-                <h3 className="font-semibold text-blue-800 dark:text-blue-200">تغییر رمز عبور با تایید پیام‌رسان بله</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">شماره ثبت‌شده: <span className="font-mono">{me.phone}</span></p>
-                <div className="flex gap-2">
-                  <button
-                    disabled={sendingOtp}
-                    onClick={async ()=>{
-                      try{
-                        setSendingOtp(true);
-                        const res = await fetch(`${API}/auth/send-otp`, {
-                          method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
-                          body: JSON.stringify({ phone: me.phone, purpose: 'change' })
-                        });
-                        const data = await res.json().catch(()=>({}));
-                        if(!res.ok) {
-                          if (res.status === 404) throw new Error('کاربری با این شماره یافت نشد');
-                          throw new Error(data.message || 'ارسال کد ناموفق بود');
-                        }
-                        setOtpSent(true);
-                        setOtpExpiresAt(data.expiresAt || null);
-                        setMockOtp(null);
-                      }catch(err:any){ alert(err.message); }
-                      finally{ setSendingOtp(false); }
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded-lg text-white text-sm"
-                  >
-                    {otpSent? 'ارسال مجدد کد' : 'ارسال کد تایید'}
-                  </button>
-                  {otpExpiresAt && <span className="self-center text-gray-500 text-xs">انقضا: {new Date(otpExpiresAt).toLocaleTimeString()}</span>}
-                  {/* no mock otp display */}
-                </div>
-                {otpSent && (
-                  <div className="gap-3 grid md:grid-cols-2">
-                    <input
-                      placeholder="کد تایید"
-                      value={otp}
-                      onChange={(e)=>setOtp(e.target.value.replace(/[^0-9]/g,''))}
-                      className="bg-white dark:bg-gray-800 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg"
-                    />
-                    <input
-                      placeholder="رمز عبور جدید"
-                      type="password"
-                      value={newPassword}
-                      onChange={(e)=>setNewPassword(e.target.value)}
-                      className="bg-white dark:bg-gray-800 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg"
-                    />
-                    <div className="flex justify-end md:col-span-2">
-                      <button
-                        onClick={async()=>{
-                          try{
-                            if(!/^\d{4,6}$/.test(otp)) throw new Error('کد تایید نامعتبر است');
-                            if(newPassword.length<6) throw new Error('رمز عبور باید حداقل ۶ کاراکتر باشد');
-                            const res = await fetch(`${API}/auth/change-password`, {
-                              method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
-                              body: JSON.stringify({ otp, newPassword })
-                            });
-                            const data = await res.json().catch(()=>({}));
-                            if(!res.ok) throw new Error(data.message || 'تغییر رمز ناموفق بود');
-                            alert('رمز عبور با موفقیت تغییر کرد');
-                            setOtp(''); setNewPassword(''); setOtpSent(false); setOtpExpiresAt(null); setMockOtp(null);
-                          }catch(err:any){ alert(err.message); }
-                        }}
-                        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white text-sm"
-                      >
-                        تایید و تغییر رمز
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {!me?.hasPassword && (
-                  <p className="text-amber-700 dark:text-amber-300 text-sm">پیشنهاد می‌شود برای افزایش امنیت، رمز عبور تنظیم کنید.</p>
-                )}
-              </div>
-            ) : (
-              <div className="bg-amber-50/50 dark:bg-amber-950/50 p-4 border border-amber-200/50 dark:border-amber-800/50 rounded-lg">
-                <h3 className="mb-2 font-semibold text-amber-800 dark:text-amber-200">شماره موبایل ثبت نشده است</h3>
-                <p className="text-amber-700 dark:text-amber-300 text-sm">برای استفاده از تغییر رمز با بله، لطفاً با مدیر سیستم تماس بگیرید تا شماره موبایل شما ثبت شود.</p>
-              </div>
-            )}
-
-            <div className="gap-4 grid">
-              <div className="flex justify-between items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+        <div className="card-theme-body">
+          {/* Profile tab */}
+          {activeTab === 'profile' && (
+            <div className="space-y-5">
+              <div className="gap-4 grid md:grid-cols-2">
                 <div>
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100">احراز هویت دو مرحله‌ای</h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm">افزایش امنیت حساب کاربری</p>
+                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">نام</label>
+                  <input value={edit.firstName || ''} onChange={e => setEdit(s => ({ ...s, firstName: e.target.value }))} className="input-theme" placeholder="نام" />
                 </div>
-                <button className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 text-sm">
-                  غیرفعال
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">نام خانوادگی</label>
+                  <input value={edit.lastName || ''} onChange={e => setEdit(s => ({ ...s, lastName: e.target.value }))} className="input-theme" placeholder="نام خانوادگی" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block mb-1.5 font-medium text-theme-secondary text-sm">شماره موبایل</label>
+                <div className="relative">
+                  <Phone className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    value={edit.phone || ''}
+                    onChange={e => setEdit(s => ({ ...s, phone: e.target.value }))}
+                    className="input-theme pr-10 text-right"
+                    placeholder="09123456789"
+                  />
+                </div>
+                <p className="mt-1 text-theme-muted text-xs">برای بازیابی رمز عبور و تایید هویت استفاده می‌شود</p>
+              </div>
+
+              {me.email && (
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">ایمیل</label>
+                  <input value={me.email} disabled className="input-theme opacity-60 cursor-not-allowed" dir="ltr" />
+                </div>
+              )}
+
+              {saveMsg && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl border text-sm ${saveMsg.type === 'ok' ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
+                  {saveMsg.type === 'ok' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  {saveMsg.text}
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button onClick={save} disabled={saving} className="btn-theme-primary disabled:opacity-50">
+                  <Save className="w-4 h-4" />
+                  {saving ? 'در حال ذخیره...' : 'ذخیره تغییرات'}
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'notifications' && (
-          <div className="space-y-6">
-            <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">تنظیمات اعلان‌ها</h2>
-            
-            <div className="space-y-4">
-              {[
-                { title: 'اعلان‌های سیستم', description: 'دریافت اعلان‌های مهم سیستم', enabled: true },
-                { title: 'اعلان واگذاری', description: 'اطلاع از واگذاری‌های جدید', enabled: true },
-                { title: 'گزارش‌های دوره‌ای', description: 'دریافت گزارش‌های هفتگی', enabled: false },
-              ].map((notification, index) => (
-                <div key={index} className="flex justify-between items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                  <div>
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">{notification.title}</h3>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm">{notification.description}</p>
+          {/* Security tab */}
+          {activeTab === 'security' && (
+            <div className="space-y-5">
+              <h2 className="font-semibold text-theme-primary">تغییر رمز عبور</h2>
+
+              {me.phone ? (
+                <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/50 rounded-xl p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-theme-secondary text-sm">شماره: <span className="font-mono text-theme-primary" dir="ltr">{me.phone}</span></span>
                   </div>
-                  <label className="inline-flex relative items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked={notification.enabled} />
-                    <div className="peer after:top-[2px] after:left-[2px] after:absolute bg-gray-200 after:bg-white dark:bg-gray-700 peer-checked:bg-blue-600 after:border after:border-gray-300 dark:border-gray-600 peer-checked:after:border-white rounded-full after:rounded-full peer-focus:outline-none dark:peer-focus:ring-blue-800 peer-focus:ring-4 peer-focus:ring-blue-300 w-11 after:w-5 h-6 after:h-5 after:content-[''] after:transition-all peer-checked:after:translate-x-full"></div>
+
+                  {!otpSent ? (
+                    <button
+                      onClick={sendOtp}
+                      disabled={sendingOtp}
+                      className="btn-theme-primary text-sm disabled:opacity-50"
+                    >
+                      {sendingOtp ? (
+                        <span className="flex items-center gap-2">
+                          <span className="border-white/40 border-t-white border-2 rounded-full w-3.5 h-3.5 animate-spin" />
+                          ارسال کد...
+                        </span>
+                      ) : 'ارسال کد تایید بله'}
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-theme-muted text-xs">
+                          {canResend ? 'می‌توانید کد را مجدد ارسال کنید' : `ارسال مجدد: ${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, '0')}`}
+                        </span>
+                        {canResend && (
+                          <button onClick={sendOtp} disabled={sendingOtp} className="text-blue-600 dark:text-blue-400 text-xs underline">ارسال مجدد</button>
+                        )}
+                      </div>
+                      <div className="gap-3 grid md:grid-cols-2">
+                        <div>
+                          <label className="block mb-1.5 text-theme-secondary text-xs">کد تایید</label>
+                          <input
+                            value={otp}
+                            onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                            maxLength={6}
+                            className="input-theme text-center font-mono tracking-widest"
+                            placeholder="_ _ _ _ _ _"
+                            dir="ltr"
+                          />
+                        </div>
+                        <div>
+                          <label className="block mb-1.5 text-theme-secondary text-xs">رمز عبور جدید</label>
+                          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="input-theme" placeholder="حداقل ۶ کاراکتر" />
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <button onClick={changePassword} className="btn-theme-primary text-sm">تایید و تغییر رمز</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/50 rounded-xl p-4">
+                  <p className="text-amber-700 dark:text-amber-300 text-sm">برای تغییر رمز عبور، ابتدا شماره موبایل خود را در تب اطلاعات شخصی ثبت کنید.</p>
+                </div>
+              )}
+
+              {pwMsg && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl border text-sm ${pwMsg.type === 'ok' ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
+                  {pwMsg.type === 'ok' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  {pwMsg.text}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Notifications tab */}
+          {activeTab === 'notifications' && (
+            <div className="space-y-4">
+              <h2 className="font-semibold text-theme-primary">تنظیمات اعلان‌ها</h2>
+              {[
+                { title: 'اعلان‌های سیستم', desc: 'دریافت اعلان‌های مهم سیستم', on: true },
+                { title: 'اعلان واگذاری', desc: 'اطلاع از واگذاری‌های جدید', on: true },
+                { title: 'گزارش‌های دوره‌ای', desc: 'دریافت گزارش‌های هفتگی', on: false },
+              ].map((n, i) => (
+                <div key={i} className="flex justify-between items-center p-4 border border-theme rounded-xl">
+                  <div>
+                    <div className="font-medium text-theme-primary text-sm">{n.title}</div>
+                    <div className="text-theme-muted text-xs mt-0.5">{n.desc}</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" defaultChecked={n.on} />
+                    <div className="bg-theme-secondary peer-checked:bg-blue-600 rounded-full w-10 h-5 after:absolute after:top-0.5 after:right-0.5 peer-checked:after:right-auto peer-checked:after:left-0.5 after:bg-white after:rounded-full after:w-4 after:h-4 after:transition-all" />
                   </label>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

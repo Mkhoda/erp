@@ -1,380 +1,153 @@
 "use client";
 import React from 'react';
-import { Plus, Trash2, Edit, Home, Building, Layers } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Home, Building, Layers } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
-
-type Room = {
-  id: string;
-  name: string;
-  buildingId: string;
-  floorId?: string;
-  description?: string;
-  capacity?: number;
-  createdAt: string;
-  updatedAt: string;
-  building?: {
-    id: string;
-    name: string;
-  };
-  floor?: {
-    id: string;
-    name: string;
-  };
-};
-
-type BuildingType = {
-  id: string;
-  name: string;
-};
-
-type Floor = {
-  id: string;
-  name: string;
-  buildingId: string;
-};
+type Room = { id: string; name: string; buildingId: string; floorId?: string; description?: string; capacity?: number; createdAt: string; building?: { id: string; name: string }; floor?: { id: string; name: string } };
+type BuildingType = { id: string; name: string };
+type Floor = { id: string; name: string; buildingId: string };
 
 export default function RoomsPage() {
-  React.useEffect(() => {
-    document.title = 'اتاق‌ها | Arzesh ERP';
-  }, []);
-
+  React.useEffect(() => { document.title = 'اتاق‌ها | Arzesh ERP'; }, []);
   const [rooms, setRooms] = React.useState<Room[]>([]);
   const [buildings, setBuildings] = React.useState<BuildingType[]>([]);
   const [floors, setFloors] = React.useState<Floor[]>([]);
   const [open, setOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Partial<Room> | null>(null);
   const [loading, setLoading] = React.useState(false);
-
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
-  async function loadRooms() {
+  async function load() {
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await fetch(`${API}/rooms`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setRooms(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error('Failed to load rooms:', e);
-      setRooms([]);
-    } finally {
-      setLoading(false);
-    }
+      const [r, b, f] = await Promise.all([
+        fetch(`${API}/rooms`, { headers: { Authorization: `Bearer ${token}` } }).then(x => x.json()),
+        fetch(`${API}/buildings`, { headers: { Authorization: `Bearer ${token}` } }).then(x => x.json()),
+        fetch(`${API}/floors`, { headers: { Authorization: `Bearer ${token}` } }).then(x => x.json()),
+      ]);
+      setRooms(Array.isArray(r) ? r : []);
+      setBuildings(Array.isArray(b) ? b : []);
+      setFloors(Array.isArray(f) ? f : []);
+    } catch { setRooms([]); } finally { setLoading(false); }
   }
-
-  async function loadBuildings() {
-    try {
-      const res = await fetch(`${API}/buildings`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setBuildings(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error('Failed to load buildings:', e);
-      setBuildings([]);
-    }
-  }
-
-  async function loadFloors() {
-    try {
-      const res = await fetch(`${API}/floors`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setFloors(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error('Failed to load floors:', e);
-      setFloors([]);
-    }
-  }
-
-  React.useEffect(() => {
-    loadRooms();
-    loadBuildings();
-    loadFloors();
-  }, []);
+  React.useEffect(() => { load(); }, []);
 
   const filteredFloors = floors.filter(f => f.buildingId === editing?.buildingId);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editing || !editing.name?.trim() || !editing.buildingId) return;
-
-    try {
-      setLoading(true);
-      const method = editing.id ? 'PATCH' : 'POST';
-      const url = editing.id ? `${API}/rooms/${editing.id}` : `${API}/rooms`;
-      
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(editing)
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      setOpen(false);
-      setEditing(null);
-      await loadRooms();
-    } catch (e) {
-      console.error('Failed to save room:', e);
-      alert('خطا در ذخیره اتاق');
-    } finally {
-      setLoading(false);
-    }
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault(); if (!editing?.name?.trim() || !editing.buildingId) return;
+    const m = editing.id ? 'PATCH' : 'POST';
+    const u = editing.id ? `${API}/rooms/${editing.id}` : `${API}/rooms`;
+    await fetch(u, { method: m, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(editing) });
+    setOpen(false); setEditing(null); await load();
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('آیا از حذف این اتاق اطمینان دارید؟')) return;
-
-    try {
-      await fetch(`${API}/rooms/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      await loadRooms();
-    } catch (e) {
-      console.error('Failed to delete room:', e);
-      alert('خطا در حذف اتاق');
-    }
+  async function onDelete(id: string) {
+    if (!confirm('آیا از حذف اطمینان دارید؟')) return;
+    await fetch(`${API}/rooms/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    await load();
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex sm:flex-row flex-col justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="font-bold text-gray-900 dark:text-gray-100 text-2xl">اتاق‌ها</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400 text-sm">
-            مدیریت اتاق‌های ساختمان‌ها
-          </p>
+    <div className="space-y-4" dir="rtl">
+      <div className="card-theme">
+        <div className="card-theme-body">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="flex justify-center items-center bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl w-10 h-10">
+                <Home className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="font-bold text-theme-primary text-xl">اتاق‌ها</h1>
+                <p className="text-theme-muted text-sm">{rooms.length} اتاق</p>
+              </div>
+            </div>
+            <button onClick={() => { setEditing({}); setOpen(true); }} className="btn-theme-primary text-sm gap-1.5">
+              <Plus className="w-4 h-4" /> اتاق جدید
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => {
-            setEditing({});
-            setOpen(true);
-          }}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium text-white text-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          اتاق جدید
-        </button>
       </div>
 
       <div className="table-theme-container">
         <div className="overflow-x-auto">
           <table className="table-theme">
             <thead>
-              <tr>
-                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs text-right uppercase tracking-wider">
-                  نام اتاق
-                </th>
-                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs text-right uppercase tracking-wider">
-                  ساختمان
-                </th>
-                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs text-right uppercase tracking-wider">
-                  طبقه
-                </th>
-                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs text-right uppercase tracking-wider">
-                  ظرفیت
-                </th>
-                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs text-right uppercase tracking-wider">
-                  توضیحات
-                </th>
-                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs text-right uppercase tracking-wider">
-                  عملیات
-                </th>
-              </tr>
+              <tr><th>نام اتاق</th><th>ساختمان</th><th>طبقه</th><th>ظرفیت</th><th>توضیحات</th><th>اقدامات</th></tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {rooms.map((room) => (
-                <tr key={room.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Home className="ml-3 w-5 h-5 text-gray-400" />
-                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">
-                        {room.name}
-                      </div>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={6} className="py-12 text-center text-theme-muted">در حال بارگیری...</td></tr>
+              ) : rooms.length === 0 ? (
+                <tr><td colSpan={6} className="py-12 text-center text-theme-muted">هیچ اتاقی یافت نشد</td></tr>
+              ) : rooms.map(r => (
+                <tr key={r.id}>
+                  <td><div className="flex items-center gap-2"><Home className="w-4 h-4 text-theme-muted" /><span className="font-medium text-theme-primary">{r.name}</span></div></td>
+                  <td><div className="flex items-center gap-1.5 text-theme-secondary text-sm"><Building className="w-3.5 h-3.5 text-theme-muted" />{r.building?.name || '-'}</div></td>
+                  <td><div className="flex items-center gap-1.5 text-theme-secondary text-sm"><Layers className="w-3.5 h-3.5 text-theme-muted" />{r.floor?.name || '-'}</div></td>
+                  <td><span className="text-theme-secondary text-sm">{r.capacity || '-'}</span></td>
+                  <td><span className="text-theme-muted text-sm">{r.description || '-'}</span></td>
+                  <td>
+                    <div className="flex gap-2">
+                      <button onClick={() => { setEditing(r); setOpen(true); }} className="btn-theme-secondary text-xs py-1 px-2.5"><Pencil className="w-3 h-3" /> ویرایش</button>
+                      <button onClick={() => onDelete(r.id)} className="btn-theme-danger text-xs py-1 px-2.5"><Trash2 className="w-3 h-3" /></button>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Building className="ml-2 w-4 h-4 text-gray-400" />
-                      <div className="text-gray-900 dark:text-gray-100 text-sm">
-                        {room.building?.name || 'نامشخص'}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Layers className="ml-2 w-4 h-4 text-gray-400" />
-                      <div className="text-gray-900 dark:text-gray-100 text-sm">
-                        {room.floor?.name || '-'}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-gray-900 dark:text-gray-100 text-sm whitespace-nowrap">
-                    {room.capacity || '-'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-gray-900 dark:text-gray-100 text-sm">
-                      {room.description || '-'}
-                    </div>
-                  </td>
-                  <td className="space-x-2 space-x-reverse px-6 py-4 font-medium text-sm whitespace-nowrap">
-                    <button
-                      onClick={() => {
-                        setEditing(room);
-                        setOpen(true);
-                      }}
-                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-900 dark:hover:text-blue-300 dark:text-blue-400"
-                    >
-                      <Edit className="w-4 h-4" />
-                      ویرایش
-                    </button>
-                    <button
-                      onClick={() => handleDelete(room.id)}
-                      className="inline-flex items-center gap-1 text-red-600 hover:text-red-900 dark:hover:text-red-300 dark:text-red-400"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      حذف
-                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {rooms.length === 0 && (
-            <div className="py-8 text-gray-500 dark:text-gray-400 text-center">
-              {loading ? 'در حال بارگیری...' : 'هیچ اتاقی یافت نشد'}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Modal */}
-      {open && (
-        <div className="z-50 fixed inset-0 flex justify-center items-center bg-black/50">
-          <div className="bg-white dark:bg-gray-800 shadow-xl mx-4 rounded-lg w-full max-w-md">
-            <div className="flex justify-between items-center p-6 border-gray-200 dark:border-gray-700 border-b">
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">
-                {editing?.id ? 'ویرایش اتاق' : 'اتاق جدید'}
-              </h3>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4 p-6">
-              <div>
-                <label className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                  ساختمان *
-                </label>
-                <select
-                  required
-                  className="bg-white dark:bg-gray-700 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                  value={editing?.buildingId || ''}
-                  onChange={(e) => setEditing(prev => ({ ...prev, buildingId: e.target.value, floorId: '' }))}
-                >
-                  <option value="">انتخاب ساختمان</option>
-                  {buildings.map((building) => (
-                    <option key={building.id} value={building.id}>
-                      {building.name}
-                    </option>
-                  ))}
-                </select>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="z-50 fixed inset-0 flex justify-center items-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}>
+            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95 }}
+              className="bg-theme-primary shadow-2xl border border-theme rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center px-5 py-4 border-theme border-b">
+                <h3 className="font-semibold text-theme-primary">{editing?.id ? 'ویرایش' : 'افزودن'} اتاق</h3>
+                <button onClick={() => setOpen(false)} className="hover:bg-theme-hover p-1.5 rounded-lg text-theme-muted"><X className="w-4 h-4" /></button>
               </div>
-
-              <div>
-                <label className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                  طبقه
-                </label>
-                <select
-                  className="bg-white dark:bg-gray-700 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                  value={editing?.floorId || ''}
-                  onChange={(e) => setEditing(prev => ({ ...prev, floorId: e.target.value }))}
-                  disabled={!editing?.buildingId}
-                >
-                  <option value="">انتخاب طبقه (اختیاری)</option>
-                  {filteredFloors.map((floor) => (
-                    <option key={floor.id} value={floor.id}>
-                      {floor.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                  نام اتاق *
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="bg-white dark:bg-gray-700 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                  value={editing?.name || ''}
-                  onChange={(e) => setEditing(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="نام اتاق را وارد کنید"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                  ظرفیت
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  className="bg-white dark:bg-gray-700 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                  value={editing?.capacity || ''}
-                  onChange={(e) => setEditing(prev => ({ ...prev, capacity: e.target.value ? parseInt(e.target.value) : undefined }))}
-                  placeholder="ظرفیت اتاق"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-2 font-medium text-gray-700 dark:text-gray-300 text-sm">
-                  توضیحات
-                </label>
-                <textarea
-                  className="bg-white dark:bg-gray-700 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                  rows={3}
-                  value={editing?.description || ''}
-                  onChange={(e) => setEditing(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="توضیحات اضافی"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-gray-200 dark:border-gray-700 border-t">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 transition-colors"
-                >
-                  انصراف
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading || !editing?.name?.trim() || !editing?.buildingId}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded-lg text-white transition-colors disabled:cursor-not-allowed"
-                >
-                  {loading ? 'در حال ذخیره...' : 'ذخیره'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              <form onSubmit={onSubmit} className="px-5 py-4 space-y-4">
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">ساختمان *</label>
+                  <select value={editing?.buildingId || ''} onChange={e => setEditing(s => ({ ...s, buildingId: e.target.value, floorId: '' }))} required className="select-theme">
+                    <option value="">انتخاب ساختمان...</option>
+                    {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">طبقه</label>
+                  <select value={editing?.floorId || ''} onChange={e => setEditing(s => ({ ...s, floorId: e.target.value }))} disabled={!editing?.buildingId} className="select-theme disabled:opacity-50">
+                    <option value="">انتخاب طبقه (اختیاری)</option>
+                    {filteredFloors.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">نام اتاق *</label>
+                  <input value={editing?.name || ''} onChange={e => setEditing(s => ({ ...s, name: e.target.value }))} required className="input-theme" placeholder="نام اتاق" />
+                </div>
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">ظرفیت</label>
+                  <input type="number" min="1" value={editing?.capacity || ''} onChange={e => setEditing(s => ({ ...s, capacity: e.target.value ? parseInt(e.target.value) : undefined }))} className="input-theme" placeholder="تعداد نفر" />
+                </div>
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">توضیحات</label>
+                  <textarea value={editing?.description || ''} onChange={e => setEditing(s => ({ ...s, description: e.target.value }))} rows={2} className="input-theme resize-none" placeholder="توضیحات" />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setOpen(false)} className="btn-theme-secondary text-sm">انصراف</button>
+                  <button type="submit" disabled={!editing?.name?.trim() || !editing?.buildingId} className="btn-theme-primary text-sm disabled:opacity-50">ذخیره</button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
