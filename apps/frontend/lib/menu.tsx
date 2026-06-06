@@ -1,5 +1,5 @@
 "use client";
-import { LucideIcon, LayoutDashboard, Boxes, Users, Shield, Settings, FileText, CircleDollarSign, Layers, Tag, Handshake, MapPin, Building, Home, BookOpen } from "lucide-react";
+import { LucideIcon, LayoutDashboard, Boxes, Users, Settings, FileText, CircleDollarSign, Layers, Tag, Handshake, MapPin, Building, Home } from "lucide-react";
 
 export type Role = 'ADMIN'|'MANAGER'|'USER'|'EXPERT';
 
@@ -9,7 +9,7 @@ export type MenuItem = {
   page?: string;
   icon?: LucideIcon;
   children?: MenuItem[];
-  roles?: Role[]; // optional role hints
+  roles?: Role[];
 };
 
 export const MENU: MenuItem[] = [
@@ -32,9 +32,7 @@ export const MENU: MenuItem[] = [
     ]
   },
   { id: 'users', title: 'کاربران', page: '/dashboard/users', icon: Users, roles: ['ADMIN','MANAGER'] },
-  { id: 'roles', title: 'نقش‌ها', page: '/dashboard/roles', icon: Shield, roles: ['ADMIN'] },
-  { id: 'access', title: 'دسترسی صفحات', page: '/dashboard/access', icon: FileText, roles: ['ADMIN'] },
-  { id: 'pages', title: 'مدیریت صفحات', page: '/dashboard/pages', icon: BookOpen, roles: ['ADMIN'] },
+  { id: 'access', title: 'مدیریت دسترسی', page: '/dashboard/access', icon: FileText, roles: ['ADMIN'] },
   { id: 'settings', title: 'تنظیمات', page: '/dashboard/settings', icon: Settings, roles: ['ADMIN','MANAGER'] },
 ];
 
