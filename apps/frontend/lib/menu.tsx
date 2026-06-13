@@ -1,7 +1,29 @@
 "use client";
-import { LucideIcon, LayoutDashboard, Boxes, Users, Settings, FileText, CircleDollarSign, Layers, Tag, Handshake, MapPin, Building, Home } from "lucide-react";
+import {
+  LucideIcon,
+  LayoutDashboard,
+  Boxes,
+  Users,
+  Settings,
+  FileText,
+  CircleDollarSign,
+  Layers,
+  Tag,
+  Handshake,
+  MapPin,
+  Building,
+  Home,
+  MessageSquare,
+  Brain,
+  Workflow,
+  Bot,
+  BookOpen,
+  Sparkles,
+  Shield,
+  BarChart3,
+} from "lucide-react";
 
-export type Role = 'ADMIN'|'MANAGER'|'USER'|'EXPERT';
+export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
 
 export type MenuItem = {
   id: string;
@@ -10,30 +32,118 @@ export type MenuItem = {
   icon?: LucideIcon;
   children?: MenuItem[];
   roles?: Role[];
+  section?: string; // section label shown above the item group
+  badge?: string;
+  isNew?: boolean;
 };
 
 export const MENU: MenuItem[] = [
-  { id: 'overview', title: 'نمای کلی', page: '/dashboard', icon: LayoutDashboard },
+  // ── AI WORKSPACE ──────────────────────────────────────────
   {
-    id: 'assets', title: 'مدیریت دارایی', icon: Boxes, children: [
+    id: 'workspace',
+    title: 'فضای کاری',
+    page: '/dashboard',
+    icon: LayoutDashboard,
+    section: 'هوش مصنوعی',
+  },
+  {
+    id: 'ai.chat',
+    title: 'گفتگو با AI',
+    page: '/dashboard/chat',
+    icon: MessageSquare,
+    isNew: true,
+  },
+  {
+    id: 'ai.knowledge',
+    title: 'پایگاه دانش',
+    page: '/dashboard/knowledge',
+    icon: Brain,
+  },
+  {
+    id: 'ai.workflows',
+    title: 'گردش‌کارها',
+    page: '/dashboard/workflows',
+    icon: Workflow,
+  },
+  {
+    id: 'ai.agents',
+    title: 'عوامل هوشمند',
+    page: '/dashboard/agents',
+    icon: Bot,
+    isNew: true,
+  },
+
+  // ── ERP SUITE ─────────────────────────────────────────────
+  {
+    id: 'assets',
+    title: 'مدیریت دارایی',
+    icon: Boxes,
+    section: 'ERP',
+    children: [
       { id: 'assets.list', title: 'دارایی‌ها', page: '/dashboard/assets', icon: Boxes },
       { id: 'assets.types', title: 'انواع دارایی', page: '/dashboard/assets/types', icon: Layers },
       { id: 'assets.categories', title: 'دسته‌بندی‌ها', page: '/dashboard/assets/categories', icon: Tag },
       { id: 'assets.assignments', title: 'واگذاری‌ها', page: '/dashboard/assets/assignments', icon: Handshake },
-    ]
+    ],
   },
-  { id: 'accounting', title: 'حسابداری دارایی', page: '/dashboard/accounting', icon: CircleDollarSign, roles: ['ADMIN','MANAGER','EXPERT'] },
   {
-    id: 'org', title: 'مدیریت سازمان', icon: MapPin, children: [
+    id: 'accounting',
+    title: 'حسابداری دارایی',
+    page: '/dashboard/accounting',
+    icon: CircleDollarSign,
+    roles: ['ADMIN', 'MANAGER', 'EXPERT'],
+  },
+  {
+    id: 'org',
+    title: 'مدیریت سازمان',
+    icon: MapPin,
+    children: [
       { id: 'departments', title: 'دپارتمان‌ها', page: '/dashboard/departments', icon: MapPin },
       { id: 'buildings', title: 'ساختمان‌ها', page: '/dashboard/buildings', icon: Building },
       { id: 'floors', title: 'طبقات', page: '/dashboard/floors', icon: Layers },
       { id: 'rooms', title: 'اتاق‌ها', page: '/dashboard/rooms', icon: Home },
-    ]
+    ],
   },
-  { id: 'users', title: 'کاربران', page: '/dashboard/users', icon: Users, roles: ['ADMIN','MANAGER'] },
-  { id: 'access', title: 'مدیریت دسترسی', page: '/dashboard/access', icon: FileText, roles: ['ADMIN'] },
-  { id: 'settings', title: 'تنظیمات', page: '/dashboard/settings', icon: Settings, roles: ['ADMIN','MANAGER'] },
+  {
+    id: 'users',
+    title: 'کاربران',
+    page: '/dashboard/users',
+    icon: Users,
+    roles: ['ADMIN', 'MANAGER'],
+  },
+
+  // ── ANALYTICS ─────────────────────────────────────────────
+  {
+    id: 'reports',
+    title: 'گزارش‌ها',
+    page: '/dashboard/reports',
+    icon: BarChart3,
+    section: 'تحلیل',
+  },
+
+  // ── ADMIN ─────────────────────────────────────────────────
+  {
+    id: 'access',
+    title: 'دسترسی صفحات',
+    page: '/dashboard/access',
+    icon: FileText,
+    roles: ['ADMIN'],
+    section: 'مدیریت',
+  },
+  {
+    id: 'admin.roles',
+    title: 'نقش‌ها',
+    page: '/dashboard/roles',
+    icon: Shield,
+    roles: ['ADMIN'],
+  },
+  {
+    id: 'settings',
+    title: 'تنظیمات',
+    page: '/dashboard/settings',
+    icon: Settings,
+    roles: ['ADMIN', 'MANAGER'],
+  },
 ];
 
 export default MENU;

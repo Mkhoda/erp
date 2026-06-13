@@ -3,7 +3,7 @@ import React from 'react';
 import { Settings as SettingsIcon, Globe, Smartphone, Database, Save, CheckCircle } from 'lucide-react';
 
 export default function SettingsPage() {
-  React.useEffect(() => { document.title = 'تنظیمات | ارزش ERP'; }, []);
+  React.useEffect(() => { document.title = "تنظیمات | Arzesh AI"; }, []);
 
   const [activeTab, setActiveTab] = React.useState('general');
   const [saved, setSaved] = React.useState(false);

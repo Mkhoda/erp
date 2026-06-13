@@ -27,6 +27,10 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@jridgewell/gen-mapping": "^0.3.13",
+    "@jridgewell/resolve-uri": "^3.1.2",
+    "@jridgewell/sourcemap-codec": "^1.5.5",
+    "@jridgewell/trace-mapping": "^0.3.31"
+  }
 }
-

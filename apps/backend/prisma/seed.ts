@@ -206,11 +206,11 @@ async function main() {
   const assets = await Promise.all([
     prisma.asset.upsert({
       where: { barcode: 'HW001' },
-      update: {},
-      create: {
-        name: 'لپ‌تاپ Dell Latitude',
-        barcode: 'HW001',
-        description: 'لپ‌تاپ Dell Latitude 5520 با پردازنده i7',
+        update: {},
+        create: {
+          name: 'لپ‌تاپ Dell Latitude',
+          barcode: 'HW001',
+          description: 'لپ‌تاپ Dell Latitude 5520 با پردازنده i7',
         typeId: assetTypes[0].id,
         categoryId: assetCategories[0].id,
         condition: 'NEW',

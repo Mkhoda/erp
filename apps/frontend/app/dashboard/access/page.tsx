@@ -1,7 +1,10 @@
 "use client";
-import React from 'react';
-import { Plus, Trash2, RefreshCw, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from "react";
+import { Plus, Trash2, RefreshCw, ShieldCheck, ChevronDown, ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import PageHeader from "../../components/ui/PageHeader";
+import { useConfirm } from "../../components/ui/ConfirmDialog";
+import { useToast } from "../../components/ui/Toast";
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 type Dept = { id: string; name: string };
@@ -12,8 +15,10 @@ const ROLES = ['*', 'ADMIN', 'MANAGER', 'EXPERT', 'USER'] as const;
 const ROLE_LABELS: Record<string, string> = { '*': 'همه نقش‌ها', ADMIN: 'مدیر ارشد', MANAGER: 'مدیر', EXPERT: 'کارشناس', USER: 'کاربر' };
 
 export default function AccessPage() {
-  React.useEffect(() => { document.title = 'دسترسی صفحات | Arzesh ERP'; }, []);
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  React.useEffect(() => { document.title = "دسترسی صفحات | Arzesh AI"; }, []);
+  const toast = useToast();
+  const { confirm: confirmDialog, Dialog: ConfirmDlg } = useConfirm();
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const authH = { Authorization: `Bearer ${token}` };
 
   const [pages, setPages] = React.useState<KnownPage[]>([]);
@@ -47,13 +52,14 @@ export default function AccessPage() {
     setSyncing(true);
     try {
       const r = await fetch(`${API}/permissions/sync-defaults`, { method: 'POST', headers: authH });
-      if (r.ok) { const d = await r.json(); alert(`${d.created} ردیف پیش‌فرض ایجاد شد`); await loadAll(); }
+      if (r.ok) { const d = await r.json(); toast.success(`${d.created} ردیف پیش‌فرض ایجاد شد`); await loadAll(); }
     } finally { setSyncing(false); }
   }
 
   async function removeRow(row: PermRow) {
-    if (!confirm(`حذف دسترسی "${row.page}" برای "${row.department.name}"؟`)) return;
-    await fetch(`${API}/permissions/${row.department.id}/${encodeURIComponent(row.page)}/${encodeURIComponent(row.role)}`, { method: 'DELETE', headers: authH });
+    const ok = await confirmDialog("حذف دسترسی", `حذف دسترسی "${row.page}" برای "${row.department.name}"؟`);
+    if (!ok) return;
+    await fetch(`${API}/permissions/${row.department.id}/${encodeURIComponent(row.page)}/${encodeURIComponent(row.role)}`, { method: "DELETE", headers: authH });
     await loadAll();
   }
 
@@ -66,7 +72,7 @@ export default function AccessPage() {
   }
 
   async function addRule(page: string) {
-    if (!newDept) return alert('یک بخش انتخاب کنید');
+    if (!newDept) { toast.warning("یک بخش انتخاب کنید"); return; }
     await fetch(`${API}/permissions`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...authH },
       body: JSON.stringify({ departmentId: newDept, page, role: newRole, canRead: newRead, canWrite: newWrite }),
@@ -82,30 +88,18 @@ export default function AccessPage() {
 
   return (
     <div className="space-y-4" dir="rtl">
-      <div className="card-theme">
-        <div className="card-theme-body">
-          <div className="flex flex-wrap justify-between items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex justify-center items-center bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl w-10 h-10">
-                <ShieldCheck className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="font-bold text-theme-primary text-xl">مدیریت دسترسی صفحات</h1>
-                <p className="text-theme-muted text-sm">بخش + نقش ← صفحه</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={loadAll} disabled={loading} className="btn-theme-secondary text-sm gap-1.5 disabled:opacity-50">
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> تازه‌سازی
-              </button>
-              <button onClick={syncDefaults} disabled={syncing} className="btn-theme-primary text-sm gap-1.5 disabled:opacity-50">
-                <ShieldCheck className="w-4 h-4" /> {syncing ? '...' : 'اعمال پیش‌فرض'}
-              </button>
-            </div>
-          </div>
-          <p className="mt-3 text-theme-muted text-xs">«اعمال پیش‌فرض» برای هر صفحه × هر بخش یک ردیف canRead=true ایجاد می‌کند. ADMIN همیشه دسترسی کامل دارد.</p>
-        </div>
-      </div>
+      {ConfirmDlg}
+      <PageHeader
+        title="مدیریت دسترسی صفحات"
+        subtitle="بخش + نقش ← صفحه"
+        icon={ShieldCheck}
+        iconColor="from-blue-500 to-indigo-600"
+        actions={[
+          { label: "تازه‌سازی", icon: RefreshCw, onClick: loadAll, variant: "secondary" },
+          { label: syncing ? "..." : "اعمال پیش‌فرض", icon: ShieldCheck, onClick: syncDefaults },
+        ]}
+      />
+      <div className="card-theme"><div className="card-theme-body py-2"><p className="text-theme-muted text-xs">«اعمال پیش‌فرض» برای هر صفحه × هر بخش یک ردیف canRead=true ایجاد می‌کند. ADMIN همیشه دسترسی کامل دارد.</p></div></div>
 
       {loading && <div className="py-8 text-center text-theme-muted">در حال بارگیری...</div>}
 

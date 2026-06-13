@@ -1,12 +1,14 @@
 "use client";
-import React from 'react';
-import { RefreshCw, BookOpen, ToggleLeft, ToggleRight, Plus } from 'lucide-react';
+import React from "react";
+import { RefreshCw, BookOpen, ToggleLeft, ToggleRight, Plus } from "lucide-react";
+import { useToast } from "../../components/ui/Toast";
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 type PageRow = { id: string; path: string; label: string; isActive: boolean; createdAt: string };
 
 export default function PagesPage() {
-  React.useEffect(() => { document.title = 'مدیریت صفحات | Arzesh ERP'; }, []);
+  React.useEffect(() => { document.title = "مدیریت صفحات | Arzesh AI"; }, []);
+  const toast = useToast();
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const authH = { Authorization: `Bearer ${token}` };
 
@@ -26,7 +28,7 @@ export default function PagesPage() {
     setSyncing(true);
     try {
       const r = await fetch(`${API}/permissions/pages/sync`, { method: 'POST', headers: authH });
-      if (r.ok) { const d = await r.json(); alert(`${d.created} صفحه جدید اضافه شد`); await load(); }
+      if (r.ok) { const d = await r.json(); toast.success(`${d.created} صفحه جدید اضافه شد`); await load(); }
     } finally { setSyncing(false); }
   }
 

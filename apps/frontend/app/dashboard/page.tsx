@@ -1,12 +1,17 @@
 "use client";
-import React from 'react';
-import Link from 'next/link';
+import React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
-  Boxes, Users, Handshake, Plus, ArrowLeft,
-  Activity, CheckCircle, Clock, Building
-} from 'lucide-react';
+  Sparkles, Send, Paperclip, Mic, ArrowLeft,
+  Boxes, Users, Handshake, Building, BarChart3,
+  MessageSquare, Brain, Workflow, Bot, Plus,
+  Clock, Activity, CheckCircle, ChevronLeft,
+  Lightbulb, ArrowUpRight, Zap,
+} from "lucide-react";
 
-const API = process.env.NEXT_PUBLIC_API_URL || '/api';
+const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 type Stats = {
   totalAssets: number;
@@ -15,17 +20,87 @@ type Stats = {
   totalDepartments: number;
 };
 
-export default function DashboardPage() {
-  React.useEffect(() => { document.title = 'داشبورد | ارزش ERP'; }, []);
+type Message = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
 
-  const [stats, setStats] = React.useState<Stats>({ totalAssets: 0, totalUsers: 0, activeAssignments: 0, totalDepartments: 0 });
-  const [recentAssets, setRecentAssets] = React.useState<any[]>([]);
-  const [recentAssignments, setRecentAssignments] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
+const QUICK_PROMPTS = [
+  { label: "دارایی‌های تخصیص‌نیافته", icon: Boxes },
+  { label: "درخواست‌های مرخصی معلق", icon: Clock },
+  { label: "گزارش ماهانه دارایی", icon: BarChart3 },
+  { label: "آمار کلی سیستم", icon: Activity },
+];
+
+const QUICK_ACTIONS = [
+  { title: "دارایی جدید", subtitle: "ثبت دارایی", href: "/dashboard/assets", icon: Boxes, color: "blue" },
+  { title: "واگذاری جدید", subtitle: "تخصیص دارایی", href: "/dashboard/assets/assignments", icon: Handshake, color: "green" },
+  { title: "کاربر جدید", subtitle: "افزودن کاربر", href: "/dashboard/users", icon: Users, color: "purple" },
+  { title: "گفتگو با AI", subtitle: "چت هوشمند", href: "/dashboard/chat", icon: MessageSquare, color: "ai" },
+];
+
+const colorVariants: Record<string, { bg: string; icon: string; border: string }> = {
+  blue: {
+    bg: "bg-blue-50 dark:bg-blue-950/30",
+    icon: "bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400",
+    border: "border-blue-100 dark:border-blue-900/60",
+  },
+  green: {
+    bg: "bg-green-50 dark:bg-green-950/30",
+    icon: "bg-green-100 dark:bg-green-900/60 text-green-600 dark:text-green-400",
+    border: "border-green-100 dark:border-green-900/60",
+  },
+  purple: {
+    bg: "bg-purple-50 dark:bg-purple-950/30",
+    icon: "bg-purple-100 dark:bg-purple-900/60 text-purple-600 dark:text-purple-400",
+    border: "border-purple-100 dark:border-purple-900/60",
+  },
+  ai: {
+    bg: "glass-ai",
+    icon: "bg-ai-gradient text-white",
+    border: "border-purple-200/60 dark:border-purple-800/40",
+  },
+};
+
+const ACTIVITY_ITEMS = [
+  { text: "علی رضایی یک دارایی جدید ثبت کرد", time: "۵ دقیقه پیش", color: "bg-blue-500" },
+  { text: "سارا احمدی — تایم‌شیت تأیید شد", time: "۱۲ دقیقه پیش", color: "bg-green-500" },
+  { text: "تخصیص LP-2024-003 به رضا موسوی", time: "۳۰ دقیقه پیش", color: "bg-amber-500" },
+  { text: "کاربر جدید پریسا کریمی اضافه شد", time: "۱ ساعت پیش", color: "bg-purple-500" },
+];
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "صبح بخیر";
+  if (h < 17) return "ظهر بخیر";
+  return "عصر بخیر";
+}
+
+export default function WorkspacePage() {
+  const router = useRouter();
+
   const [me, setMe] = React.useState<any>(null);
+  const [stats, setStats] = React.useState<Stats>({ totalAssets: 0, totalUsers: 0, activeAssignments: 0, totalDepartments: 0 });
+  const [statsLoading, setStatsLoading] = React.useState(true);
+
+  // Chat state
+  const [messages, setMessages] = React.useState<Message[]>([
+    {
+      id: "welcome",
+      role: "assistant",
+      content: "سلام! من دستیار هوشمند Arzesh هستم. می‌توانم اطلاعات دارایی‌ها، کاربران، گزارش‌ها و هر سوالی درباره سیستم را به شما بدهم. چطور می‌توانم کمک کنم؟",
+    },
+  ]);
+  const [inputValue, setInputValue] = React.useState("");
+  const [isTyping, setIsTyping] = React.useState(false);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => { document.title = "فضای کاری | Arzesh AI"; }, []);
 
   React.useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (!token) return;
     const h = { Authorization: `Bearer ${token}` };
 
@@ -41,195 +116,316 @@ export default function DashboardPage() {
       const usersArr = Array.isArray(users) ? users : [];
       const assignArr = Array.isArray(assignments) ? assignments : [];
       const deptsArr = Array.isArray(depts) ? depts : [];
-
       setStats({
         totalAssets: assetsArr.length,
         totalUsers: usersArr.length,
         activeAssignments: assignArr.filter((a: any) => !a.returnedAt).length,
         totalDepartments: deptsArr.length,
       });
-
-      setRecentAssets(assetsArr.slice(0, 5));
-      setRecentAssignments(assignArr.filter((a: any) => !a.returnedAt).slice(0, 5));
-    }).catch(console.error).finally(() => setLoading(false));
+    }).catch(console.error).finally(() => setStatsLoading(false));
   }, []);
 
-  const greeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'صبح بخیر';
-    if (h < 17) return 'ظهر بخیر';
-    return 'عصر بخیر';
+  React.useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
+
+  const sendMessage = (text?: string) => {
+    const content = (text ?? inputValue).trim();
+    if (!content) return;
+
+    setInputValue("");
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user", content }]);
+    setIsTyping(true);
+
+    // Placeholder AI response — replace with real streaming endpoint
+    setTimeout(() => {
+      setIsTyping(false);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `قابلیت گفتگوی هوش مصنوعی در حال پیاده‌سازی است. برای چت کامل به صفحه «گفتگو با AI» بروید.`,
+        },
+      ]);
+    }, 1400);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
 
   const statCards = [
-    { title: 'کل دارایی‌ها', value: stats.totalAssets, icon: Boxes, color: 'blue', href: '/dashboard/assets' },
-    { title: 'کاربران سیستم', value: stats.totalUsers, icon: Users, color: 'green', href: '/dashboard/users' },
-    { title: 'واگذاری‌های فعال', value: stats.activeAssignments, icon: Handshake, color: 'orange', href: '/dashboard/assets/assignments' },
-    { title: 'دپارتمان‌ها', value: stats.totalDepartments, icon: Building, color: 'purple', href: '/dashboard/departments' },
+    { title: "کل دارایی‌ها", value: stats.totalAssets, icon: Boxes, color: "blue", href: "/dashboard/assets" },
+    { title: "کاربران سیستم", value: stats.totalUsers, icon: Users, color: "green", href: "/dashboard/users" },
+    { title: "واگذاری فعال", value: stats.activeAssignments, icon: Handshake, color: "amber", href: "/dashboard/assets/assignments" },
+    { title: "دپارتمان‌ها", value: stats.totalDepartments, icon: Building, color: "purple", href: "/dashboard/departments" },
   ];
 
-  const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900',
-    green: 'bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 border-green-100 dark:border-green-900',
-    orange: 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-900',
-    purple: 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900',
-  };
-  const iconBg: Record<string, string> = {
-    blue: 'bg-blue-100 dark:bg-blue-900/60',
-    green: 'bg-green-100 dark:bg-green-900/60',
-    orange: 'bg-orange-100 dark:bg-orange-900/60',
-    purple: 'bg-purple-100 dark:bg-purple-900/60',
+  const statColor: Record<string, string> = {
+    blue: "text-blue-600 dark:text-blue-400",
+    green: "text-green-600 dark:text-green-400",
+    amber: "text-amber-600 dark:text-amber-400",
+    purple: "text-purple-600 dark:text-purple-400",
   };
 
   return (
-    <div className="space-y-6">
-      {/* Welcome */}
-      <div className="card-theme card-theme-body">
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-theme-primary">
-              {greeting()}، {me?.firstName || 'کاربر'} 👋
-            </h1>
-            <p className="text-theme-secondary mt-1 text-sm">
-              {new Date().toLocaleDateString('fa-IR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
-          <Link
-            href="/dashboard/assets"
-            className="btn-theme-primary inline-flex items-center gap-2 self-start"
-          >
-            <Plus className="w-4 h-4" />
-            افزودن دارایی
-          </Link>
-        </div>
-      </div>
+    <div className="flex gap-4 h-[calc(100vh-88px)]" dir="rtl">
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((s) => (
-          <Link key={s.title} href={s.href} className={`group p-5 rounded-xl border ${colorMap[s.color]} hover:shadow-md transition-all`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className={`p-2 rounded-lg ${iconBg[s.color]}`}>
-                <s.icon className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-theme-primary">
-              {loading ? '...' : s.value.toLocaleString('fa-IR')}
-            </div>
-            <div className="text-xs mt-1 opacity-75">{s.title}</div>
-          </Link>
-        ))}
-      </div>
+      {/* ── CENTER: Chat Workspace ── */}
+      <div className="flex-1 flex flex-col min-w-0">
 
-      {/* Content Grid */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent Assets */}
-        <div className="card-theme">
-          <div className="card-theme-header flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Boxes className="w-4 h-4 text-blue-500" />
-              <h2 className="font-semibold text-theme-primary">آخرین دارایی‌ها</h2>
-            </div>
-            <Link href="/dashboard/assets" className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-              مشاهده همه <ArrowLeft className="w-3 h-3" />
-            </Link>
-          </div>
-          <div className="card-theme-body">
-            {loading ? (
-              <div className="text-center py-6 text-theme-muted text-sm">در حال بارگذاری...</div>
-            ) : recentAssets.length === 0 ? (
-              <div className="text-center py-6 text-theme-muted text-sm">دارایی‌ای ثبت نشده</div>
-            ) : (
-              <div className="space-y-2">
-                {recentAssets.map((a) => (
-                  <Link key={a.id} href={`/dashboard/assets/${a.id}`}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-theme-secondary hover:bg-theme-hover transition-colors">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0">
-                      <Boxes className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-theme-primary truncate">{a.name}</p>
-                      <p className="text-xs text-theme-muted">{a.barcode}</p>
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      a.availability === 'AVAILABLE' ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300' :
-                      a.availability === 'IN_USE' ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' :
-                      'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {a.availability === 'AVAILABLE' ? 'موجود' : a.availability === 'IN_USE' ? 'در استفاده' : a.availability}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Greeting */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="mb-4"
+        >
+          <h1 className="text-xl font-bold text-theme-primary">
+            {greeting()}، {me?.firstName || "کاربر"} 👋
+          </h1>
+          <p className="text-sm text-theme-muted mt-0.5">
+            {new Date().toLocaleDateString("fa-IR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+          </p>
+        </motion.div>
 
-        {/* Active Assignments */}
-        <div className="card-theme">
-          <div className="card-theme-header flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-orange-500" />
-              <h2 className="font-semibold text-theme-primary">واگذاری‌های فعال</h2>
-            </div>
-            <Link href="/dashboard/assets/assignments" className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-              مشاهده همه <ArrowLeft className="w-3 h-3" />
-            </Link>
-          </div>
-          <div className="card-theme-body">
-            {loading ? (
-              <div className="text-center py-6 text-theme-muted text-sm">در حال بارگذاری...</div>
-            ) : recentAssignments.length === 0 ? (
-              <div className="text-center py-6 text-theme-muted text-sm">واگذاری فعالی وجود ندارد</div>
-            ) : (
-              <div className="space-y-2">
-                {recentAssignments.map((a) => (
-                  <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg bg-theme-secondary">
-                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center flex-shrink-0">
-                      <Handshake className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-theme-primary truncate">
-                        {a.asset?.name || 'دارایی'}
-                      </p>
-                      <p className="text-xs text-theme-muted">
-                        {a.user ? `${a.user.firstName || ''} ${a.user.lastName || ''}`.trim() : a.department?.name || 'نامشخص'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400">
-                      <Clock className="w-3 h-3" />
-                      فعال
-                    </div>
-                  </div>
-                ))}
+        {/* Stat row */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.05 }}
+          className="grid grid-cols-4 gap-3 mb-4"
+        >
+          {statCards.map((s) => (
+            <Link
+              key={s.title}
+              href={s.href}
+              className="card-theme p-3 flex flex-col gap-1 hover:shadow-md transition-all quick-action-card group"
+            >
+              <div className="flex items-center justify-between">
+                <s.icon className={`w-4 h-4 ${statColor[s.color]}`} />
+                <ArrowUpRight className="w-3 h-3 text-theme-muted opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="card-theme">
-        <div className="card-theme-header">
-          <h2 className="font-semibold text-theme-primary">دسترسی سریع</h2>
-        </div>
-        <div className="card-theme-body grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { title: 'دارایی جدید', href: '/dashboard/assets', icon: Plus, color: 'blue' },
-            { title: 'واگذاری جدید', href: '/dashboard/assets/assignments', icon: Handshake, color: 'green' },
-            { title: 'کاربر جدید', href: '/dashboard/users', icon: Users, color: 'purple' },
-            { title: 'گزارش حسابداری', href: '/dashboard/accounting', icon: CheckCircle, color: 'orange' },
-          ].map((q) => (
-            <Link key={q.title} href={q.href}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border ${colorMap[q.color]} hover:shadow-md transition-all text-center`}>
-              <div className={`p-2 rounded-lg ${iconBg[q.color]}`}>
-                <q.icon className="w-5 h-5" />
+              <div className={`text-xl font-bold ${statColor[s.color]}`}>
+                {statsLoading ? <span className="skeleton h-6 w-10 block rounded" /> : s.value.toLocaleString("fa-IR")}
               </div>
-              <span className="text-xs font-medium">{q.title}</span>
+              <div className="text-xs text-theme-muted">{s.title}</div>
             </Link>
           ))}
-        </div>
+        </motion.div>
+
+        {/* Chat area */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="flex-1 card-theme flex flex-col min-h-0 overflow-hidden"
+        >
+          {/* Chat header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-ai-gradient flex items-center justify-center shadow">
+                <Sparkles className="w-3.5 h-3.5 text-white" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-theme-primary">دستیار هوشمند</div>
+                <div className="text-xs text-green-500 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                  آنلاین
+                </div>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/chat"
+              className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              گفتگوی کامل
+              <ArrowLeft className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+              >
+                {msg.role === "assistant" && (
+                  <div className="w-7 h-7 rounded-full bg-ai-gradient flex items-center justify-center shrink-0 shadow mt-0.5">
+                    <Sparkles className="w-3.5 h-3.5 text-white" />
+                  </div>
+                )}
+                <div className={`max-w-[78%] ${msg.role === "user" ? "chat-bubble-user px-4 py-2.5 text-sm" : "chat-bubble-assistant px-4 py-2.5 text-sm"}`}>
+                  {msg.content}
+                </div>
+                {msg.role === "user" && (
+                  <div className="w-7 h-7 rounded-full bg-theme-secondary border border-theme flex items-center justify-center shrink-0 text-xs font-bold text-theme-secondary mt-0.5">
+                    {(me?.firstName?.[0] || "م").toUpperCase()}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Typing indicator */}
+            {isTyping && (
+              <div className="flex gap-2.5 items-start">
+                <div className="w-7 h-7 rounded-full bg-ai-gradient flex items-center justify-center shrink-0 shadow">
+                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                </div>
+                <div className="chat-bubble-assistant px-4 py-3 flex items-center gap-1.5">
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Quick prompts */}
+          <div className="px-4 pb-2 flex gap-2 overflow-x-auto scrollbar-none">
+            {QUICK_PROMPTS.map((p) => (
+              <button
+                key={p.label}
+                onClick={() => sendMessage(p.label)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full bg-theme-secondary border border-theme text-theme-secondary hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 dark:hover:bg-blue-950/30 dark:hover:border-blue-800 dark:hover:text-blue-400 transition-all whitespace-nowrap shrink-0"
+              >
+                <p.icon className="w-3 h-3" />
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Input */}
+          <div className="px-4 pb-4">
+            <div className="chat-input-container flex items-center gap-2 px-3 py-2">
+              <div className="flex gap-1">
+                <button className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted transition-colors" title="پیوست">
+                  <Paperclip className="w-4 h-4" />
+                </button>
+                <button className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted transition-colors" title="صوت">
+                  <Mic className="w-4 h-4" />
+                </button>
+              </div>
+              <input
+                ref={inputRef}
+                value={inputValue}
+                onChange={e => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="بپرس، دستور بده، یا جستجو کن..."
+                className="flex-1 bg-transparent text-sm text-theme-primary placeholder:text-theme-muted outline-none text-right"
+              />
+              <button
+                onClick={() => sendMessage()}
+                disabled={!inputValue.trim()}
+                className="w-8 h-8 rounded-xl bg-ai-gradient flex items-center justify-center text-white shadow disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </motion.div>
       </div>
+
+      {/* ── RIGHT PANEL ── */}
+      <motion.div
+        initial={{ opacity: 0, x: 12 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3, delay: 0.15 }}
+        className="hidden lg:flex flex-col w-72 gap-4 overflow-y-auto"
+      >
+        {/* Quick Actions */}
+        <div className="card-theme p-4">
+          <h3 className="text-xs font-bold text-theme-muted uppercase tracking-wider mb-3">اقدامات سریع</h3>
+          <div className="space-y-2">
+            {QUICK_ACTIONS.map((qa) => {
+              const cv = colorVariants[qa.color] || colorVariants.blue;
+              return (
+                <Link
+                  key={qa.title}
+                  href={qa.href}
+                  className={`flex items-center gap-3 p-3 rounded-xl border ${cv.bg} ${cv.border} hover:shadow-sm transition-all quick-action-card`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${qa.color === "ai" ? "bg-ai-gradient" : cv.icon} shrink-0`}>
+                    <qa.icon className={`w-4 h-4 ${qa.color === "ai" ? "text-white" : ""}`} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-theme-primary">{qa.title}</div>
+                    <div className="text-xs text-theme-muted">{qa.subtitle}</div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* AI Suggestions */}
+        <div className="card-theme p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+            <h3 className="text-xs font-bold text-theme-muted uppercase tracking-wider">پیشنهادات AI</h3>
+          </div>
+          <div className="space-y-2">
+            {[
+              "دارایی‌های منقضی را بررسی کن",
+              "گزارش ماهانه دارایی بگیر",
+              "درخواست‌های معلق را تأیید کن",
+            ].map((suggestion) => (
+              <button
+                key={suggestion}
+                onClick={() => inputRef.current?.focus()}
+                className="w-full text-right flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-all"
+              >
+                <Zap className="w-3.5 h-3.5 shrink-0" />
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* AI Platform shortcuts */}
+        <div className="card-theme p-4">
+          <h3 className="text-xs font-bold text-theme-muted uppercase tracking-wider mb-3">پلتفرم AI</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { icon: MessageSquare, label: "چت", href: "/dashboard/chat", color: "text-blue-500" },
+              { icon: Brain, label: "دانش", href: "/dashboard/knowledge", color: "text-purple-500" },
+              { icon: Workflow, label: "گردش‌کار", href: "/dashboard/workflows", color: "text-green-500" },
+              { icon: Bot, label: "عوامل", href: "/dashboard/agents", color: "text-amber-500" },
+            ].map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-theme-secondary hover:bg-theme-hover border border-theme transition-all quick-action-card"
+              >
+                <item.icon className={`w-5 h-5 ${item.color}`} />
+                <span className="text-xs font-medium text-theme-secondary">{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Team Activity */}
+        <div className="card-theme p-4">
+          <h3 className="text-xs font-bold text-theme-muted uppercase tracking-wider mb-3">فعالیت تیم</h3>
+          <div className="space-y-3">
+            {ACTIVITY_ITEMS.map((item, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${item.color}`} />
+                <div>
+                  <p className="text-xs text-theme-secondary leading-relaxed">{item.text}</p>
+                  <p className="text-[10px] text-theme-muted mt-0.5">{item.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

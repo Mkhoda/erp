@@ -15,7 +15,7 @@ const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
 };
 
 export default function ProfilePage() {
-  React.useEffect(() => { document.title = 'پروفایل | Arzesh ERP'; }, []);
+  React.useEffect(() => { document.title = "پروفایل | Arzesh AI"; }, []);
 
   const [me, setMe] = React.useState<Me | null>(null);
   const [edit, setEdit] = React.useState<Partial<Me>>({});

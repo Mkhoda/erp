@@ -6,7 +6,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 type AssetRow = { id: string; name: string; barcode: string; cost?: number; purchaseDate?: string };
 
 export default function AccountingPage() {
-  React.useEffect(() => { document.title = 'حسابداری دارایی | Arzesh ERP'; }, []);
+  React.useEffect(() => { document.title = "حسابداری دارایی | Arzesh AI"; }, []);
 
   const [rows, setRows] = React.useState<AssetRow[]>([]);
   const [q, setQ] = React.useState('');

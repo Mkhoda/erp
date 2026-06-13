@@ -49,7 +49,7 @@ const ROLES: StaticRole[] = [
 
 export default function RolesPage(){
   React.useEffect(() => {
-    document.title = 'مدیریت نقش‌ها | Arzesh ERP';
+    document.title = "مدیریت نقش‌ها | Arzesh AI";
   }, []);
 
   return (

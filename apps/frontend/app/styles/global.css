@@ -687,3 +687,214 @@ html:not(.dark) body {
 .dark .divider-theme {
   border-color: rgb(51 65 85);
 }
+
+/* =================================================================
+   🤖 AI PLATFORM — Colors, Surfaces, Animations
+   ================================================================= */
+
+/* AI gradient accent — used on AI feature elements */
+.bg-ai-gradient {
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(124 58 237));
+}
+
+.text-ai-gradient {
+  background: linear-gradient(135deg, rgb(59 130 246), rgb(167 139 250));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* AI glass surface */
+.glass-ai {
+  background: rgba(124, 58, 237, 0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+}
+
+.dark .glass-ai {
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+/* Chat message bubbles */
+.chat-bubble-user {
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(29 78 216));
+  color: white;
+  border-radius: 18px 18px 4px 18px;
+}
+
+.chat-bubble-assistant {
+  background-color: rgb(255 255 255);
+  border: 1px solid rgb(226 232 240);
+  color: rgb(15 23 42);
+  border-radius: 4px 18px 18px 18px;
+}
+
+.dark .chat-bubble-assistant {
+  background-color: rgb(30 41 59);
+  border-color: rgb(51 65 85);
+  color: rgb(226 232 240);
+}
+
+/* Typing indicator */
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: rgb(148 163 184);
+  animation: typing-bounce 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.30s; }
+
+/* Command palette backdrop */
+.cmd-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.dark .cmd-backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Command palette container */
+.cmd-palette {
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgb(226 232 240);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+}
+
+.dark .cmd-palette {
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid rgb(51 65 85);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+/* Sidebar section labels */
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(148 163 184);
+  padding: 12px 12px 4px;
+}
+
+.dark .sidebar-section-label {
+  color: rgb(71 85 105);
+}
+
+/* AI badge / "New" chip */
+.badge-new {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(124 58 237));
+  color: white;
+  letter-spacing: 0.04em;
+}
+
+/* Stat card shimmer skeleton */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgb(241 245 249) 25%, rgb(226 232 240) 50%, rgb(241 245 249) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, rgb(30 41 59) 25%, rgb(51 65 85) 50%, rgb(30 41 59) 75%);
+  background-size: 800px 100%;
+}
+
+/* Smooth page enter animation */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: page-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Notification pulse */
+@keyframes notif-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+
+.notif-pulse {
+  animation: notif-pulse 2s ease-in-out infinite;
+}
+
+/* Quick action hover glow */
+.quick-action-card {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.quick-action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.dark .quick-action-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Workspace right panel */
+.workspace-panel {
+  background-color: rgba(248, 250, 252, 0.8);
+  backdrop-filter: blur(8px);
+  border-right: 1px solid rgb(226 232 240);
+}
+
+.dark .workspace-panel {
+  background-color: rgba(15, 23, 42, 0.6);
+  border-right: 1px solid rgb(30 41 59);
+}
+
+/* Chat input area */
+.chat-input-container {
+  background: rgb(255 255 255);
+  border: 1px solid rgb(226 232 240);
+  border-radius: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dark .chat-input-container {
+  background: rgb(30 41 59);
+  border-color: rgb(51 65 85);
+}
+
+.chat-input-container:focus-within {
+  border-color: rgb(59 130 246);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.dark .chat-input-container:focus-within {
+  border-color: rgb(96 165 250);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
+/* Scrollbar hide utility */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
