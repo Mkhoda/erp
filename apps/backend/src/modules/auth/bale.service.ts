@@ -166,8 +166,16 @@ export class BaleService {
         );
       }
 
+      // Provide actionable guidance for common errors
+      let hint = '';
+      if (status === 403) {
+        hint = ' — The api-access-key may be incorrect. Get it from Bale Business Panel → Safir settings.';
+      } else if (status === 401) {
+        hint = ' — Authentication failed. Check BALE_SAFIR_API_KEY in .env.';
+      }
+
       throw new InternalServerErrorException(
-        `Failed to send OTP via Bale Safir: ${data?.error_data?.[0]?.description || err?.message || 'unknown error'}`,
+        `Failed to send OTP via Bale Safir: ${data?.error_data?.[0]?.description || err?.message || 'unknown error'}${hint}`,
       );
     }
   }

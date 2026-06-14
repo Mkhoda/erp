@@ -10,8 +10,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        'montserrat': ['var(--font-montserrat)', 'system-ui', 'sans-serif'],
-        'poppins': ['var(--font-poppins)', 'system-ui', 'sans-serif'],
+        'sans': ['IRANSans', 'Tahoma', 'Arial', 'sans-serif'],
+        'montserrat': ['IRANSans', 'Tahoma', 'Arial', 'sans-serif'],
+        'poppins': ['IRANSans', 'Tahoma', 'Arial', 'sans-serif'],
       },
       animation: {
         'fadeFloat': 'fadeFloat 8s ease-in-out infinite',

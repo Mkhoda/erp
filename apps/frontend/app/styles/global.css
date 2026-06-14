@@ -1,5 +1,11 @@
-/* Tailwind base + project global rules. Public CSS is loaded via <link> tags in layout.tsx */
+/* Tailwind base + project global rules */
 @import "tailwindcss";
+@import url('/css/fontiran.css');
+
+/* ── IRANSans font — global default ─────────────────────────── */
+html, body, h1, h2, h3, h4, h5, h6, input, textarea, select, button, p, span, div, a, li, td, th {
+  font-family: IRANSans, Tahoma, Arial, sans-serif !important;
+}
 
 html, body { 
   min-height: 100%; 

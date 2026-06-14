@@ -63,13 +63,6 @@ const colorVariants: Record<string, { bg: string; icon: string; border: string }
   },
 };
 
-const ACTIVITY_ITEMS = [
-  { text: "علی رضایی یک دارایی جدید ثبت کرد", time: "۵ دقیقه پیش", color: "bg-blue-500" },
-  { text: "سارا احمدی — تایم‌شیت تأیید شد", time: "۱۲ دقیقه پیش", color: "bg-green-500" },
-  { text: "تخصیص LP-2024-003 به رضا موسوی", time: "۳۰ دقیقه پیش", color: "bg-amber-500" },
-  { text: "کاربر جدید پریسا کریمی اضافه شد", time: "۱ ساعت پیش", color: "bg-purple-500" },
-];
-
 function greeting() {
   const h = new Date().getHours();
   if (h < 12) return "صبح بخیر";
@@ -410,19 +403,13 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        {/* Team Activity */}
+        {/* Team Activity — empty state */}
         <div className="card-theme p-4">
           <h3 className="text-xs font-bold text-theme-muted uppercase tracking-wider mb-3">فعالیت تیم</h3>
-          <div className="space-y-3">
-            {ACTIVITY_ITEMS.map((item, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${item.color}`} />
-                <div>
-                  <p className="text-xs text-theme-secondary leading-relaxed">{item.text}</p>
-                  <p className="text-[10px] text-theme-muted mt-0.5">{item.time}</p>
-                </div>
-              </div>
-            ))}
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <Activity className="w-8 h-8 text-theme-muted/40 mb-2" />
+            <p className="text-xs text-theme-muted">هنوز فعالیتی ثبت نشده است</p>
+            <p className="text-[10px] text-theme-muted/60 mt-1">فعالیت‌های تیم اینجا نمایش داده می‌شوند</p>
           </div>
         </div>
       </motion.div>

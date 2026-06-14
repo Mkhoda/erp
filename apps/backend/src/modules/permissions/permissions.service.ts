@@ -47,12 +47,16 @@ export class PermissionsService {
     return this.prisma.page.update({ where: { id }, data: { isActive } });
   }
 
-  /** Returns the set of currently active page paths (empty set = no DB rows yet → treat all as active). */
+  /** Returns the set of currently active page paths (empty set = no DB rows yet → treat all as active).
+   *  BASE_PAGES are always included regardless of the Page table state. */
   private async activePagePaths(): Promise<Set<string> | null> {
     const count = await this.prisma.page.count();
     if (count === 0) return null; // table not yet seeded — skip filter
     const rows = await this.prisma.page.findMany({ where: { isActive: true }, select: { path: true } });
-    return new Set(rows.map(r => r.path));
+    const active = new Set(rows.map(r => r.path));
+    // Always ensure base pages are included (they may not be in the Page table yet)
+    for (const p of BASE_PAGES) active.add(p);
+    return active;
   }
 
   /** List all permission rows for a department (optionally filtered by role). */

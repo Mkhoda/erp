@@ -1,21 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Montserrat, Poppins } from "next/font/google";
 import "@/styles/global.css";
 import React from "react";
-
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  variable: '--font-montserrat',
-  display: 'swap',
-  weight: ['400', '500', '600', '700', '800']
-});
-
-const poppins = Poppins({
-  subsets: ['latin'],
-  variable: '--font-poppins',
-  display: 'swap',
-  weight: ['400', '500', '600', '700']
-});
 
 export const viewport: Viewport = {
   themeColor: '#0B5ED7',
@@ -49,7 +34,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <body className={`${montserrat.variable} ${poppins.variable} font-montserrat antialiased bg-theme-secondary text-theme-primary`}>
+      <body className="antialiased bg-theme-secondary text-theme-primary">
         {children}
       </body>
     </html>

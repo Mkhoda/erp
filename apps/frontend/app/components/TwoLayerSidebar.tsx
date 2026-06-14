@@ -21,9 +21,20 @@ function isAllowed(page: string | undefined, allowedPages: string[] | null): boo
 
 /** Check if item is allowed based on its roles constraint. */
 function isRoleAllowed(itemRoles: Role[] | undefined, userRole: Role | null): boolean {
-  if (!itemRoles || itemRoles.length === 0) return true; // no restriction
+  if (!itemRoles || itemRoles.length === 0) return true; // no restriction = visible to all
   if (!userRole) return false;
   return itemRoles.includes(userRole);
+}
+
+/**
+ * Should this item be shown?
+ * - Items WITHOUT `roles` (universal pages like AI workspace, profile) → always visible
+ * - Items WITH `roles` → visible only if role matches AND page is in allowedPages
+ */
+function shouldShow(item: MenuItem, allowedPages: string[] | null, userRole: Role | null): boolean {
+  const hasRoles = item.roles && item.roles.length > 0;
+  if (!hasRoles) return true; // universal — always show
+  return isRoleAllowed(item.roles, userRole) && isAllowed(item.page, allowedPages);
 }
 
 function SidebarItem({
@@ -73,10 +84,10 @@ function SidebarItem({
 
   // Group with children
   if (item.children && item.children.length > 0) {
-    // Check roles first — if parent item is not allowed for this role, hide entirely
+    // If parent has roles and user doesn't match, hide entirely
     if (!isRoleAllowed(item.roles, role)) return null;
 
-    const visibleChildren = item.children.filter(c => isAllowed(c.page, allowedPages) && isRoleAllowed(c.roles, role));
+    const visibleChildren = item.children.filter(c => shouldShow(c, allowedPages, role));
     if (visibleChildren.length === 0) return null;
 
     // Collapsed: show icon-only button with tooltip
@@ -161,8 +172,8 @@ function SidebarItem({
     );
   }
 
-  // Leaf item — check permission (page + role)
-  if (!isAllowed(item.page, allowedPages) || !isRoleAllowed(item.roles, role)) return null;
+  // Leaf item — check visibility
+  if (!shouldShow(item, allowedPages, role)) return null;
   const active = isActive(item.page);
 
   // Collapsed leaf
@@ -215,7 +226,7 @@ export default function TwoLayerSidebar({ allowedPages, role, collapsed, onNavig
     <nav className="space-y-0.5" aria-label="ناوبری">
       {MENU.map(item => {
         // Skip items not allowed for the user's role
-        if (!isRoleAllowed(item.roles, role)) return null;
+        if (!shouldShow(item, allowedPages, role)) return null;
 
         const showSection = item.section && !renderedSections.has(item.section);
         if (item.section) renderedSections.add(item.section);
