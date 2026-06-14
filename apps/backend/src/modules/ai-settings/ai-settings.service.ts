@@ -235,6 +235,159 @@ export class AiSettingsService {
     return { message: 'Connected successfully', response: JSON.stringify(data).substring(0, 200) };
   }
 
+  /** Return only active providers (safe for all authenticated users — no API keys). */
+  async getActiveProviders() {
+    return this.prisma.aiProvider.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, type: true, model: true, isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /** Toggle isActive for a provider (admin only). */
+  async toggleProvider(type: string) {
+    const provider = await this.prisma.aiProvider.findUnique({ where: { type } });
+    if (!provider) throw new NotFoundException('Provider not found');
+    return this.prisma.aiProvider.update({
+      where: { type },
+      data: { isActive: !provider.isActive },
+      select: { id: true, type: true, isActive: true },
+    });
+  }
+
+  /** Send a chat message to the selected provider and log usage. */
+  async chat(
+    userId: string,
+    providerType: string,
+    messages: Array<{ role: string; content: string }>,
+    safeMode = false,
+  ) {
+    const provider = await this.prisma.aiProvider.findUnique({ where: { type: providerType } });
+    if (!provider) throw new NotFoundException('Provider not found');
+    if (!provider.isActive) throw new BadRequestException('این مدل هوش مصنوعی غیرفعال است');
+
+    const startTime = Date.now();
+    let content = '';
+    let promptTokens = 0;
+    let completionTokens = 0;
+    let totalTokens = 0;
+    let success = true;
+    let errorMsg: string | undefined;
+
+    try {
+      const result = await this.callChat(provider, messages, safeMode);
+      content = result.content;
+      promptTokens = result.promptTokens;
+      completionTokens = result.completionTokens;
+      totalTokens = result.totalTokens || (promptTokens + completionTokens);
+    } catch (err: any) {
+      success = false;
+      errorMsg = err?.response?.data?.error?.message || err?.message || 'خطای ناشناخته';
+      content = `⚠️ خطا در دریافت پاسخ از ${provider.name}: ${errorMsg}`;
+    }
+
+    const latencyMs = Date.now() - startTime;
+    const lastPrompt = [...messages].reverse().find((m: { role: string; content: string }) => m.role === 'user')?.content || '';
+
+    await this.prisma.aiUsage.create({
+      data: {
+        userId,
+        providerType,
+        model: provider.model || undefined,
+        prompt: lastPrompt.substring(0, 1000),
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        latencyMs,
+        success,
+        errorMsg,
+      },
+    });
+
+    return { content, providerType, model: provider.model, latencyMs, success, errorMsg };
+  }
+
+  // ── Chat adapters ────────────────────────────────────────────────────────────
+
+  private async callChat(provider: any, messages: Array<{ role: string; content: string }>, safeMode: boolean) {
+    const baseUrl = provider.apiUrl || DEFAULT_URLS[provider.type] || '';
+    switch (provider.type) {
+      case 'anthropic':
+        return this.chatAnthropic(baseUrl, provider.apiKey, provider.model, messages, safeMode);
+      case 'gemini':
+        return this.chatGemini(baseUrl, provider.apiKey, provider.model, messages, safeMode);
+      default:
+        return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, messages, safeMode);
+    }
+  }
+
+  private async chatOpenAI(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean) {
+    const sys = safeMode
+      ? [{ role: 'system', content: 'You are a helpful, safe, and professional assistant. Respond in the same language as the user. Avoid harmful content.' }]
+      : [];
+    const { data } = await firstValueFrom(
+      this.http.post(
+        `${baseUrl}/chat/completions`,
+        { model: model || 'gpt-4o-mini', messages: [...sys, ...messages], temperature: safeMode ? 0.3 : 0.7, max_tokens: 2048 },
+        { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } },
+      ),
+    );
+    return {
+      content: data.choices?.[0]?.message?.content || '',
+      promptTokens: data.usage?.prompt_tokens || 0,
+      completionTokens: data.usage?.completion_tokens || 0,
+      totalTokens: data.usage?.total_tokens || 0,
+    };
+  }
+
+  private async chatAnthropic(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean) {
+    const sysPrompt = safeMode ? 'You are a helpful, safe, and professional assistant. Respond in the same language as the user. Avoid harmful content.' : '';
+    const { data } = await firstValueFrom(
+      this.http.post(
+        `${baseUrl}/messages`,
+        {
+          model: model || 'claude-sonnet-4-20250514',
+          max_tokens: 2048,
+          ...(sysPrompt ? { system: sysPrompt } : {}),
+          messages: messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
+        },
+        { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' } },
+      ),
+    );
+    return {
+      content: data.content?.[0]?.text || '',
+      promptTokens: data.usage?.input_tokens || 0,
+      completionTokens: data.usage?.output_tokens || 0,
+      totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+    };
+  }
+
+  private async chatGemini(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean) {
+    const m = model || 'gemini-pro';
+    const contents = messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }],
+    }));
+    const safetySetting = safeMode
+      ? ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT'].map(c => ({
+          category: c, threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+        }))
+      : [];
+    const { data } = await firstValueFrom(
+      this.http.post(
+        `${baseUrl}/models/${m}:generateContent?key=${apiKey}`,
+        { contents, generationConfig: { temperature: safeMode ? 0.3 : 0.7, maxOutputTokens: 2048 }, safetySettings: safetySetting },
+      ),
+    );
+    const usage = data.usageMetadata;
+    return {
+      content: data.candidates?.[0]?.content?.parts?.[0]?.text || '',
+      promptTokens: usage?.promptTokenCount || 0,
+      completionTokens: usage?.candidatesTokenCount || 0,
+      totalTokens: usage?.totalTokenCount || 0,
+    };
+  }
+
   /** Raw usage logs with optional filters. */
   async getUsage(userId?: string, providerType?: string, days: number = 30) {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);

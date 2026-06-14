@@ -144,6 +144,18 @@ export default function AiSettingsPage() {
     }
   };
 
+  // Toggle active
+  const handleToggle = async (type: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API}/ai-settings/providers/${type}/toggle`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) await fetchProviders();
+    } catch (err) { console.error("Toggle failed:", err); }
+  };
+
   // Delete provider
   const handleDelete = async (type: string) => {
     if (!confirm(`آیا از حذف ${PROVIDER_INFO[type]?.label || type} اطمینان دارید؟`)) return;
@@ -213,15 +225,20 @@ export default function AiSettingsPage() {
                   </div>
                 </div>
 
-                {/* Status badge */}
+                {/* Toggle active/inactive */}
                 {provider && (
-                  <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                    provider.isActive
-                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                      : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                  }`}>
+                  <button
+                    onClick={() => handleToggle(type)}
+                    title={provider.isActive ? "غیرفعال کردن" : "فعال کردن"}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                      provider.isActive
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-200 dark:hover:bg-green-900/50"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${provider.isActive ? "bg-green-500" : "bg-gray-400"}`} />
                     {provider.isActive ? "فعال" : "غیرفعال"}
-                  </div>
+                  </button>
                 )}
               </div>
 
