@@ -21,6 +21,7 @@ import {
   Shield,
   BarChart3,
   Cpu,
+  ScrollText,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -119,9 +120,10 @@ export const MENU: MenuItem[] = [
     roles: ['ADMIN'],
     children: [
       { id: 'admin.aiSettings', title: 'تنظیمات AI',      page: '/dashboard/ai-settings', icon: Cpu },
-      { id: 'admin.aiUsage',    title: 'مصرف AI',          page: '/dashboard/ai-usage',    icon: BarChart3 },
-      { id: 'access',           title: 'دسترسی صفحات',    page: '/dashboard/access',       icon: FileText },
-      { id: 'admin.roles',      title: 'نقش‌ها',           page: '/dashboard/roles',        icon: Shield },
+      { id: 'admin.aiUsage',   title: 'مصرف AI',          page: '/dashboard/ai-usage',    icon: BarChart3 },
+      { id: 'admin.logs',      title: 'لاگ سیستم',        page: '/dashboard/logs',         icon: ScrollText },
+      { id: 'access',          title: 'دسترسی صفحات',    page: '/dashboard/access',       icon: FileText },
+      { id: 'admin.roles',     title: 'نقش‌ها',           page: '/dashboard/roles',        icon: Shield },
     ],
   },
   {

@@ -38,6 +38,7 @@ export default function WorkspacePage() {
   const [me, setMe] = React.useState<any>(null);
   const [stats, setStats] = React.useState<Stats>({ totalAssets: 0, totalUsers: 0, activeAssignments: 0, totalDepartments: 0 });
   const [statsLoading, setStatsLoading] = React.useState(true);
+  const [allProviders, setAllProviders] = React.useState<Provider[]>([]);
   const [provider, setProvider] = React.useState<Provider | null>(null);
 
   const [messages, setMessages] = React.useState<Message[]>([]);
@@ -69,6 +70,7 @@ export default function WorkspacePage() {
         totalDepartments: Array.isArray(depts) ? depts.length : 0,
       });
       if (Array.isArray(providers) && providers.length > 0) {
+        setAllProviders(providers);
         setProvider(providers[0]);
         setMessages([{ id: "welcome", role: "assistant", content: `سلام! می‌توانم با **${providers[0].name}** به شما کمک کنم. چه می‌خواهید؟` }]);
       } else {
@@ -168,22 +170,33 @@ export default function WorkspacePage() {
           {/* Chat header */}
           <div className="flex justify-between items-center px-4 py-3 border-theme border-b">
             <div className="flex items-center gap-2.5">
-              <div className="flex justify-center items-center bg-ai-gradient shadow rounded-lg w-7 h-7">
+              <div className="flex justify-center items-center bg-ai-gradient shadow rounded-lg w-7 h-7 shrink-0">
                 <Sparkles className="w-3.5 h-3.5 text-white" />
               </div>
-              <div>
-                <div className="font-semibold text-theme-primary text-sm">
-                  {provider ? provider.name : "دستیار هوشمند"}
+              {allProviders.length > 1 ? (
+                <select
+                  value={provider?.type || ""}
+                  onChange={e => {
+                    const p = allProviders.find(x => x.type === e.target.value);
+                    if (p) { setProvider(p); setMessages([{ id: "welcome", role: "assistant", content: `مدل تغییر یافت به **${p.name}**. چه می‌خواهید؟` }]); }
+                  }}
+                  className="bg-transparent text-theme-primary text-sm font-semibold outline-none border-none cursor-pointer"
+                >
+                  {allProviders.map(p => <option key={p.type} value={p.type}>{p.name}</option>)}
+                </select>
+              ) : (
+                <div>
+                  <div className="font-semibold text-theme-primary text-sm">{provider ? provider.name : "دستیار هوشمند"}</div>
+                  {provider && (
+                    <div className="flex items-center gap-1 text-green-500 text-xs">
+                      <span className="inline-block bg-green-500 rounded-full w-1.5 h-1.5" />
+                      {provider.model || provider.type}
+                    </div>
+                  )}
                 </div>
-                {provider && (
-                  <div className="flex items-center gap-1 text-green-500 text-xs">
-                    <span className="inline-block bg-green-500 rounded-full w-1.5 h-1.5" />
-                    {provider.model || provider.type}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-            <Link href="/dashboard/chat" className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 text-xs hover:underline">
+            <Link href="/dashboard/chat" className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 text-xs hover:underline shrink-0">
               چت کامل <ArrowLeft className="w-3 h-3" />
             </Link>
           </div>

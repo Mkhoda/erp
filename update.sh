@@ -10,151 +10,225 @@ if [ "$(id -u)" -eq 0 ]; then
     exit 1
 fi
 
-# Lightweight update script: pulls latest from git, installs, builds, migrates, restarts
 # Usage: ./update.sh [--docker] [--no-install] [--no-build]
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$REPO_ROOT"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# ── Colors ─────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; BLUE='\033[0;34m'
+YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
-info(){ echo -e "${BLUE}$1${NC}"; }
-success(){ echo -e "${GREEN}$1${NC}"; }
-error(){ echo -e "${RED}$1${NC}"; }
+info()   { echo -e "${BLUE}▸ $1${NC}"; }
+success(){ echo -e "${GREEN}✓ $1${NC}"; }
+warn()   { echo -e "${YELLOW}⚠ $1${NC}"; }
+error()  { echo -e "${RED}✗ $1${NC}"; }
+header() { echo -e "\n${BOLD}${CYAN}══ $1 ══${NC}"; }
 
-USE_DOCKER=0
-DO_INSTALL=1
-DO_BUILD=1
+# ── Step tracking ──────────────────────────────────────────────
+STEP_LABELS=()
+STEP_STATUS=()
+STEP_TIMES=()
+
+step_start() {
+  _STEP_NAME="$1"
+  _STEP_START=$(date +%s)
+  info "$1..."
+}
+step_done() {
+  local elapsed=$(( $(date +%s) - _STEP_START ))
+  STEP_LABELS+=("$_STEP_NAME")
+  STEP_STATUS+=("ok")
+  STEP_TIMES+=("${elapsed}s")
+  success "$_STEP_NAME (${elapsed}s)"
+}
+step_skip() {
+  STEP_LABELS+=("$_STEP_NAME (skip)")
+  STEP_STATUS+=("skip")
+  STEP_TIMES+=("-")
+}
+step_fail() {
+  local elapsed=$(( $(date +%s) - _STEP_START ))
+  STEP_LABELS+=("$_STEP_NAME")
+  STEP_STATUS+=("fail")
+  STEP_TIMES+=("${elapsed}s")
+  error "$_STEP_NAME ناموفق بود"
+}
+
+SCRIPT_START=$(date +%s)
+
+# ── Flags ──────────────────────────────────────────────────────
+USE_DOCKER=0; DO_INSTALL=1; DO_BUILD=1
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --docker) USE_DOCKER=1; shift ;;
+    --docker)     USE_DOCKER=1; shift ;;
     --no-install) DO_INSTALL=0; shift ;;
-    --no-build) DO_BUILD=0; shift ;;
-    -h|--help) echo "Usage: ./update.sh [--docker] [--no-install] [--no-build]"; exit 0 ;;
+    --no-build)   DO_BUILD=0; shift ;;
+    -h|--help)    echo "Usage: ./update.sh [--docker] [--no-install] [--no-build]"; exit 0 ;;
     *) echo "Unknown flag: $1"; exit 1 ;;
   esac
 done
 
-info "Pulling latest from Git..."
+# ── 1. Git pull ────────────────────────────────────────────────
+header "Git"
+step_start "دریافت آخرین تغییرات"
+
 git fetch --all --prune
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+GIT_BEFORE=$(git rev-parse HEAD)
 
-# If there are local changes, stash them so pull/rebase succeeds
 STASHED=0
 if [ -n "$(git status --porcelain)" ]; then
-  info "Local changes detected — stashing before update..."
+  warn "تغییرات محلی موجود — stash می‌شوند"
   git add -A
   git stash push -u -m "auto-update-$(date +%s)" || true
   STASHED=1
 fi
 
 if git pull --rebase origin "$BRANCH"; then
-  success "Updated to latest $BRANCH"
+  GIT_AFTER=$(git rev-parse HEAD)
+  step_done
 else
-  error "git pull failed"
-  if [ "$STASHED" -eq 1 ]; then
-    info "Attempting to reapply stashed changes (stash left if conflicts)..."
-    git stash pop || true
-  fi
+  step_fail
+  [ "$STASHED" -eq 1 ] && { warn "بازگردانی stash..."; git stash pop || true; }
   exit 1
 fi
 
-# If we stashed earlier, try to reapply now
-if [ "$STASHED" -eq 1 ]; then
-  info "Reapplying stashed changes..."
-  if git stash pop; then
-    success "Stash reapplied"
-  else
-    error "Failed to pop stash cleanly — stash preserved. Run 'git stash list' and resolve conflicts manually."
-  fi
+[ "$STASHED" -eq 1 ] && { info "بازگردانی تغییرات stash..."; git stash pop && success "Stash بازگردانده شد" || warn "Stash نیاز به resolve دستی دارد"; }
+
+# Show what changed
+if [ "$GIT_BEFORE" != "$GIT_AFTER" ]; then
+  COMMIT_COUNT=$(git rev-list --count "$GIT_BEFORE".."$GIT_AFTER" 2>/dev/null || echo "?")
+  echo -e "  ${CYAN}$COMMIT_COUNT commit(s) جدید روی branch $BRANCH${NC}"
+  git log --oneline "$GIT_BEFORE".."$GIT_AFTER" | sed 's/^/  /'
+  echo ""
+  CHANGED_FILES=$(git diff --name-only "$GIT_BEFORE" "$GIT_AFTER" 2>/dev/null | wc -l | tr -d ' ')
+  echo -e "  ${CYAN}$CHANGED_FILES فایل تغییر کرده${NC}"
+else
+  echo -e "  ${YELLOW}هیچ تغییری از git نبود — ادامه با build محلی${NC}"
 fi
 
+# ── Docker shortcut ────────────────────────────────────────────
 if [ "$USE_DOCKER" -eq 1 ]; then
-  info "Using Docker flow: pulling images and restarting compose"
+  header "Docker"
+  step_start "به‌روزرسانی Docker"
   docker-compose -f docker-compose.prod.yml pull --quiet
   docker-compose -f docker-compose.prod.yml up -d --remove-orphans
-  success "Docker services updated"
+  step_done
+  echo -e "\n${GREEN}${BOLD}✓ آپدیت Docker کامل شد${NC}"
   exit 0
 fi
 
+# ── 2. Install ─────────────────────────────────────────────────
 if [ "$DO_INSTALL" -eq 1 ]; then
-  info "Installing workspace dependencies (root + apps)..."
-  # Clean lockfile/node_modules only when necessary; prefer incremental install
-  npm install --no-audit --legacy-peer-deps || {
-    error "npm install failed; try running: npm install --legacy-peer-deps"
+  header "Dependencies"
+  step_start "نصب پکیج‌ها"
+  npm install --no-audit --legacy-peer-deps 2>&1 | tail -3 || {
+    step_fail
+    error "npm install ناموفق بود. دستور زیر را اجرا کنید: npm install --legacy-peer-deps"
     exit 1
   }
-  success "Dependencies installed"
+  step_done
+else
+  _STEP_NAME="نصب پکیج‌ها"; step_skip
 fi
 
+# ── 3. Build ───────────────────────────────────────────────────
 if [ "$DO_BUILD" -eq 1 ]; then
-  info "Building backend..."
-  npm --prefix apps/backend run build
-  success "Backend built"
+  header "Build"
 
-  info "Running Prisma migrations (deploy)..."
-  (cd apps/backend && npx prisma migrate deploy) || error "Prisma migrate failed (check DB)"
+  step_start "Backend build"
+  npm --prefix apps/backend run build 2>&1 | grep -E '(error TS|Error|✓|warning)' | head -20 || true
+  step_done
 
-  info "Building frontend..."
-  npm --prefix apps/frontend run build
-  success "Frontend built"
+  step_start "Prisma migrate"
+  (cd apps/backend && npx prisma migrate deploy 2>&1 | grep -E '(Applying|already applied|error|Error|No pending)' | head -10 || true) \
+    && step_done || { step_fail; warn "Migration ناموفق — بررسی کنید"; }
+
+  step_start "Frontend build"
+  npm --prefix apps/frontend run build 2>&1 | grep -E '(error|Error|Route|✓|warn|⚠)' | grep -v "^$" | head -30 || true
+  step_done
+else
+  _STEP_NAME="Backend build"; step_skip
+  _STEP_NAME="Prisma migrate"; step_skip
+  _STEP_NAME="Frontend build"; step_skip
 fi
 
-info "Restarting services with PM2 (if available)..."
-if command -v pm2 >/dev/null 2>&1; then
-  # Delete all frontend/backend entries first to avoid duplicate-process port conflicts,
-  # then start fresh. This handles the EADDRINUSE crash-loop caused by stale entries.
+# ── 4. PM2 restart ─────────────────────────────────────────────
+header "PM2"
 
-  # Kill anything holding port 3001 or 3000 (includes root-owned processes from prior sudo deploys)
+if ! command -v pm2 >/dev/null 2>&1; then
+  warn "pm2 یافت نشد — سرویس‌ها را دستی ریستارت کنید"
+else
+  step_start "آزادسازی پورت‌ها"
   fuser -k 3001/tcp 2>/dev/null || true
   sudo lsof -ti :3001 2>/dev/null | xargs -r sudo kill -9 2>/dev/null || true
-
   fuser -k 3000/tcp 2>/dev/null || true
   sudo lsof -ti :3000 2>/dev/null | xargs -r sudo kill -9 2>/dev/null || true
   sleep 1
+  step_done
 
-  # Backend: delete all instances, start fresh
-  pm2 delete arzesh-backend 2>/dev/null || true
+  step_start "راه‌اندازی Backend"
+  pm2 delete arzesh-backend >/dev/null 2>&1 || true
   pm2 start apps/backend/dist/main.js \
     --name arzesh-backend \
     --max-memory-restart 4G \
-    --node-args="--max-old-space-size=4096"
+    --node-args="--max-old-space-size=4096" >/dev/null 2>&1
+  step_done
 
-  # Frontend: prefer standalone server.js (built with output:'standalone'),
-  # fall back to npm start
-  pm2 delete arzesh-frontend 2>/dev/null || true
+  step_start "راه‌اندازی Frontend"
+  pm2 delete arzesh-frontend >/dev/null 2>&1 || true
   FRONTEND_DIR="apps/frontend"
   STANDALONE_SERVER="$FRONTEND_DIR/.next/standalone/server.js"
 
-  # HOSTNAME=0.0.0.0 is required so the server binds on all interfaces
-  # (by default standalone binds only IPv6 ::1 which nginx can't reach via 127.0.0.1)
-
   if [ -f "$STANDALONE_SERVER" ]; then
-    info "Using standalone server (output: standalone)..."
+    info "Standalone mode (output: standalone)..."
     cp -r "$FRONTEND_DIR/public" "$FRONTEND_DIR/.next/standalone/public" 2>/dev/null || true
     mkdir -p "$FRONTEND_DIR/.next/standalone/.next/static"
     cp -r "$FRONTEND_DIR/.next/static/." "$FRONTEND_DIR/.next/standalone/.next/static/" 2>/dev/null || true
     PORT=3000 HOSTNAME=0.0.0.0 pm2 start "$STANDALONE_SERVER" \
       --name arzesh-frontend \
       --max-memory-restart 4G \
-      --node-args="--max-old-space-size=4096"
+      --node-args="--max-old-space-size=4096" >/dev/null 2>&1
   else
-    info "Using npm start..."
     (cd "$FRONTEND_DIR" && PORT=3000 HOSTNAME=0.0.0.0 pm2 start npm \
       --name arzesh-frontend \
       --max-memory-restart 4G \
       --node-args="--max-old-space-size=4096" \
-      -- start)
+      -- start >/dev/null 2>&1)
   fi
+  step_done
 
-  pm2 save || true
-  success "PM2 services restarted"
-else
-  info "pm2 not found — to apply changes manually restart your services (pm2 start/stop)"
+  pm2 save >/dev/null 2>&1 || true
 fi
 
-success "Update completed"
+# ── Summary ────────────────────────────────────────────────────
+TOTAL_TIME=$(( $(date +%s) - SCRIPT_START ))
+
+echo ""
+echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}${CYAN}║           خلاصه اجرای update.sh                ║${NC}"
+echo -e "${BOLD}${CYAN}╠══════════════════════════════════════════════════╣${NC}"
+for i in "${!STEP_LABELS[@]}"; do
+  label="${STEP_LABELS[$i]}"
+  status="${STEP_STATUS[$i]}"
+  time="${STEP_TIMES[$i]}"
+  if [ "$status" = "ok" ]; then
+    icon="${GREEN}✓${NC}"
+  elif [ "$status" = "skip" ]; then
+    icon="${YELLOW}−${NC}"
+  else
+    icon="${RED}✗${NC}"
+  fi
+  printf "${BOLD}${CYAN}║${NC}  %b  %-32s %6s  ${BOLD}${CYAN}║${NC}\n" "$icon" "$label" "$time"
+done
+echo -e "${BOLD}${CYAN}╠══════════════════════════════════════════════════╣${NC}"
+echo -e "${BOLD}${CYAN}║${NC}  ${GREEN}زمان کل: ${TOTAL_TIME}s${NC}$(printf '%*s' $((31 - ${#TOTAL_TIME})) '')${BOLD}${CYAN}       ║${NC}"
+echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+echo ""
+
+if command -v pm2 >/dev/null 2>&1; then
+  echo -e "${BOLD}وضعیت سرویس‌ها:${NC}"
+  pm2 list --no-color 2>/dev/null | grep -E '(arzesh|name|─)' || pm2 list
+fi

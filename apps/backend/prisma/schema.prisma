@@ -320,9 +320,29 @@ model AiUsage {
   latencyMs       Int   @default(0)
   success         Boolean @default(true)
   errorMsg        String?
+  rawResponse     String?  // Raw API response for debugging (truncated)
   createdAt   DateTime @default(now())
 
   @@index([userId])
   @@index([providerType])
   @@index([createdAt])
+}
+
+// HTTP request/response logs for admin debugging
+model RequestLog {
+  id         String   @id @default(cuid())
+  method     String
+  path       String
+  statusCode Int?
+  userId     String?
+  body       String?     // Truncated request body JSON
+  response   String?     // Truncated response JSON
+  latencyMs  Int?
+  errorMsg   String?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([path])
+  @@index([statusCode])
 }

@@ -273,6 +273,7 @@ export class AiSettingsService {
     let totalTokens = 0;
     let success = true;
     let errorMsg: string | undefined;
+    let rawResponse: string | undefined;
 
     try {
       const result = await this.callChat(provider, messages, safeMode);
@@ -280,9 +281,11 @@ export class AiSettingsService {
       promptTokens = result.promptTokens;
       completionTokens = result.completionTokens;
       totalTokens = result.totalTokens || (promptTokens + completionTokens);
+      if ((result as any).rawResponse) rawResponse = (result as any).rawResponse;
     } catch (err: any) {
       success = false;
       errorMsg = err?.response?.data?.error?.message || err?.message || 'خطای ناشناخته';
+      rawResponse = JSON.stringify(err?.response?.data || err?.message || '').substring(0, 1000);
       content = `⚠️ خطا در دریافت پاسخ از ${provider.name}: ${errorMsg}`;
     }
 
@@ -301,6 +304,7 @@ export class AiSettingsService {
         latencyMs,
         success,
         errorMsg,
+        rawResponse,
       },
     });
 
@@ -345,11 +349,17 @@ export class AiSettingsService {
     } else if (data.choices?.[0]?.text) {
       content = data.choices[0].text;
     }
+    // Log raw response for debugging when content extraction fails
+    const rawResponse = content ? null : JSON.stringify(data).substring(0, 1000);
+    if (!content) {
+      console.warn('[AI Chat] Empty content from OpenAI-compatible provider. Raw response:', JSON.stringify(data).substring(0, 500));
+    }
     return {
       content,
       promptTokens: data.usage?.prompt_tokens || 0,
       completionTokens: data.usage?.completion_tokens || 0,
       totalTokens: data.usage?.total_tokens || 0,
+      rawResponse,
     };
   }
 
