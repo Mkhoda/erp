@@ -21,6 +21,7 @@ import {
   Sparkles,
   Shield,
   BarChart3,
+  Cpu,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -73,12 +74,13 @@ export const MENU: MenuItem[] = [
     isNew: true,
   },
 
-  // ── ERP SUITE ─────────────────────────────────────────────
+  // ── ERP SUITE (restricted: ADMIN / MANAGER / EXPERT) ────────────────
   {
     id: 'assets',
     title: 'مدیریت دارایی',
     icon: Boxes,
     section: 'ERP',
+    roles: ['ADMIN', 'MANAGER', 'EXPERT'],
     children: [
       { id: 'assets.list', title: 'دارایی‌ها', page: '/dashboard/assets', icon: Boxes },
       { id: 'assets.types', title: 'انواع دارایی', page: '/dashboard/assets/types', icon: Layers },
@@ -97,6 +99,7 @@ export const MENU: MenuItem[] = [
     id: 'org',
     title: 'مدیریت سازمان',
     icon: MapPin,
+    roles: ['ADMIN', 'MANAGER'],
     children: [
       { id: 'departments', title: 'دپارتمان‌ها', page: '/dashboard/departments', icon: MapPin },
       { id: 'buildings', title: 'ساختمان‌ها', page: '/dashboard/buildings', icon: Building },
@@ -119,9 +122,18 @@ export const MENU: MenuItem[] = [
     page: '/dashboard/reports',
     icon: BarChart3,
     section: 'تحلیل',
+    roles: ['ADMIN', 'MANAGER', 'EXPERT'],
   },
 
   // ── ADMIN ─────────────────────────────────────────────────
+  {
+    id: 'admin.aiSettings',
+    title: 'تنظیمات هوش مصنوعی',
+    page: '/dashboard/ai-settings',
+    icon: Cpu,
+    roles: ['ADMIN'],
+    section: 'مدیریت',
+  },
   {
     id: 'access',
     title: 'دسترسی صفحات',

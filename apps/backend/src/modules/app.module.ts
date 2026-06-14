@@ -6,6 +6,7 @@ import { HrmModule } from './hrm/hrm.module';
 import { ReportsController } from './reports.controller';
 import { AssetsModule } from './assets/assets.module';
 import { PermissionsModule } from './permissions/permissions.module';
+import { AiSettingsModule } from './ai-settings/ai-settings.module';
 
 @Module({
   imports: [
@@ -18,8 +19,9 @@ import { PermissionsModule } from './permissions/permissions.module';
     }),
     AuthModule,
     HrmModule,
-  AssetsModule,
-  PermissionsModule,
+    AssetsModule,
+    PermissionsModule,
+    AiSettingsModule,
   ],
   controllers: [ReportsController],
   providers: [PrismaService],

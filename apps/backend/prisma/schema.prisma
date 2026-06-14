@@ -286,3 +286,19 @@ model Otp {
 
   @@index([phone, createdAt])
 }
+
+// AI provider configurations — managed via admin panel
+model AiProvider {
+  id        String   @id @default(cuid())
+  name      String                  // Display name e.g. "OpenAI GPT-4o"
+  type      String                  // "openai" | "anthropic" | "gemini" | "deepseek" | "custom"
+  apiKey    String                  // API key (stored as-is; use env-var or vault in production)
+  apiUrl    String?                 // Custom API base URL (optional, has sensible default)
+  model     String?                 // Model identifier e.g. "gpt-4o"
+  isActive  Boolean  @default(true)
+  config    Json?                   // Additional provider-specific config
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type])
+}

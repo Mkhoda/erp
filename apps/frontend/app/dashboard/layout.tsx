@@ -7,7 +7,7 @@ import {
   ChevronLeft, LayoutDashboard, Boxes, Layers, Tag,
   Handshake, UserCog, Building, MapPin, Home,
   CircleDollarSign, Users, Shield, FileText, Settings,
-  BookOpen, Bell, Search, ChevronDown, Sparkles,
+  BookOpen, Bell, Search, ChevronDown, Sparkles, Cpu,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import TwoLayerSidebar from "../components/TwoLayerSidebar";
@@ -29,6 +29,7 @@ const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard/users": { label: "کاربران", Icon: Users },
   "/dashboard/roles": { label: "نقش‌ها", Icon: Shield },
   "/dashboard/access": { label: "دسترسی صفحات", Icon: FileText },
+  "/dashboard/ai-settings": { label: "تنظیمات هوش مصنوعی", Icon: Cpu },
   "/dashboard/settings": { label: "تنظیمات", Icon: Settings },
   "/dashboard/accounting": { label: "حسابداری دارایی", Icon: CircleDollarSign },
   "/dashboard/buildings": { label: "ساختمان‌ها", Icon: Building },
@@ -206,13 +207,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           p-3
         `}
       >
-        <div className="flex flex-col flex-1 bg-theme-card backdrop-blur-xl border border-theme rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex flex-col flex-1 bg-theme-card shadow-2xl backdrop-blur-xl border border-theme rounded-2xl overflow-hidden">
 
           {/* Brand */}
           <div className={`flex items-center border-theme border-b px-3 py-3.5 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
             <div className="flex items-center gap-2.5 min-w-0">
               {/* Logo mark */}
-              <div className="flex justify-center items-center bg-ai-gradient rounded-xl w-8 h-8 shrink-0 shadow-md shadow-blue-500/30">
+              <div className="flex justify-center items-center bg-ai-gradient shadow-blue-500/30 shadow-md rounded-xl w-8 h-8 shrink-0">
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               {!sidebarCollapsed && (
@@ -225,7 +226,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Collapse toggle — desktop only */}
             <button
-              className="hidden md:flex items-center justify-center hover:bg-theme-hover p-1 rounded-lg transition-colors shrink-0"
+              className="hidden md:flex justify-center items-center hover:bg-theme-hover p-1 rounded-lg transition-colors shrink-0"
               onClick={() => setSidebarCollapsed(v => !v)}
               title={sidebarCollapsed ? "باز کردن منو" : "بستن منو"}
             >
@@ -243,9 +244,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* User card */}
           {me && !sidebarCollapsed && (
-            <div className="mx-3 mt-3 bg-gradient-to-r from-blue-600/10 to-purple-600/10 dark:from-blue-950/50 dark:to-purple-950/50 p-3 border border-blue-200/50 dark:border-blue-800/50 rounded-xl">
+            <div className="bg-gradient-to-r from-blue-600/10 dark:from-blue-950/50 to-purple-600/10 dark:to-purple-950/50 mx-3 mt-3 p-3 border border-blue-200/50 dark:border-blue-800/50 rounded-xl">
               <div className="flex items-center gap-2.5">
-                <div className="flex justify-center items-center bg-ai-gradient rounded-full w-8 h-8 font-bold text-white text-sm shrink-0 shadow">
+                <div className="flex justify-center items-center bg-ai-gradient shadow rounded-full w-8 h-8 font-bold text-white text-sm shrink-0">
                   {initial}
                 </div>
                 <div className="min-w-0">
@@ -259,7 +260,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Collapsed avatar */}
           {me && sidebarCollapsed && (
             <div className="flex justify-center mt-3">
-              <div className="flex justify-center items-center bg-ai-gradient rounded-full w-8 h-8 font-bold text-white text-sm shadow">
+              <div className="flex justify-center items-center bg-ai-gradient shadow rounded-full w-8 h-8 font-bold text-white text-sm">
                 {initial}
               </div>
             </div>
@@ -298,7 +299,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {!sidebarCollapsed ? (
               <button
                 onClick={logout}
-                className="flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-950/40 px-3 py-2.5 rounded-xl w-full text-red-600 dark:text-red-400 text-sm font-medium transition-all"
+                className="flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-950/40 px-3 py-2.5 rounded-xl w-full font-medium text-red-600 dark:text-red-400 text-sm transition-all"
               >
                 <LogOut className="w-4 h-4" />
                 خروج از سیستم
@@ -307,7 +308,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 onClick={logout}
                 title="خروج"
-                className="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/40 text-red-500 transition-colors"
+                className="hover:bg-red-50 dark:hover:bg-red-950/40 p-2 rounded-xl text-red-500 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -320,7 +321,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex flex-col flex-1 min-w-0">
         {/* Floating header */}
         <header className="top-0 z-30 sticky p-3">
-          <div className="flex items-center gap-3 bg-theme-card backdrop-blur-xl border border-theme rounded-2xl shadow-sm px-4 py-2.5">
+          <div className="flex items-center gap-3 bg-theme-card shadow-sm backdrop-blur-xl px-4 py-2.5 border border-theme rounded-2xl">
             {/* Mobile menu */}
             <button
               className="md:hidden flex-shrink-0 hover:bg-theme-hover p-2 border border-theme rounded-xl transition-all"
@@ -334,7 +335,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <nav aria-label="breadcrumb" className="flex items-center gap-0.5 min-w-0 text-sm truncate">
               {breadcrumbs.map((c, idx) => (
                 <React.Fragment key={c.href}>
-                  {idx > 0 && <ChevronLeft className="mx-0.5 opacity-40 w-3.5 h-3.5 text-theme-muted shrink-0" />}
+                  {idx > 0 && <ChevronLeft className="opacity-40 mx-0.5 w-3.5 h-3.5 text-theme-muted shrink-0" />}
                   <Link
                     href={c.href}
                     className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors shrink-0
@@ -344,7 +345,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       }`}
                   >
                     <c.Icon className="w-3.5 h-3.5" />
-                    <span className="max-w-[8rem] truncate text-xs sm:text-sm">{c.label}</span>
+                    <span className="max-w-[8rem] text-xs sm:text-sm truncate">{c.label}</span>
                   </Link>
                 </React.Fragment>
               ))}
@@ -353,11 +354,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Search bar — opens command palette */}
             <button
               onClick={() => setCmdOpen(true)}
-              className="hidden sm:flex items-center gap-2 ms-auto flex-1 max-w-xs bg-theme-secondary border border-theme rounded-xl px-3 py-1.5 text-sm text-theme-muted hover:bg-theme-hover hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
+              className="group hidden sm:flex flex-1 items-center gap-2 bg-theme-secondary hover:bg-theme-hover ms-auto px-3 py-1.5 border border-theme hover:border-blue-300 dark:hover:border-blue-700 rounded-xl max-w-xs text-theme-muted text-sm transition-all"
             >
               <Search className="w-3.5 h-3.5 shrink-0" />
-              <span className="flex-1 text-right text-xs">جستجو...</span>
-              <kbd className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono bg-theme-card border border-theme rounded group-hover:border-blue-300 dark:group-hover:border-blue-700 transition-colors">
+              <span className="flex-1 text-xs text-right">جستجو...</span>
+              <kbd className="flex items-center gap-0.5 bg-theme-card px-1.5 py-0.5 border border-theme dark:group-hover:border-blue-700 group-hover:border-blue-300 rounded font-mono text-[10px] transition-colors">
                 ⌘K
               </kbd>
             </button>
@@ -366,7 +367,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-1.5 ms-auto sm:ms-0 shrink-0">
               {/* Mobile search */}
               <button
-                className="sm:hidden flex items-center justify-center hover:bg-theme-hover p-2 border border-theme rounded-xl text-theme-secondary transition-all"
+                className="sm:hidden flex justify-center items-center hover:bg-theme-hover p-2 border border-theme rounded-xl text-theme-secondary transition-all"
                 onClick={() => setCmdOpen(true)}
               >
                 <Search className="w-4 h-4" />
@@ -375,7 +376,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Theme toggle */}
               <button
                 onClick={cycleTheme}
-                className="flex items-center justify-center hover:bg-theme-hover p-2 border border-theme rounded-xl text-theme-secondary transition-all"
+                className="flex justify-center items-center hover:bg-theme-hover p-2 border border-theme rounded-xl text-theme-secondary transition-all"
                 title={`تم: ${themeLabel}`}
               >
                 <ThemeIcon className={`w-4 h-4 ${theme === "dark" ? "text-amber-400" : theme === "light" ? "text-amber-500" : ""}`} />
@@ -406,10 +407,10 @@ function NotificationBell() {
   const [count] = React.useState(3);
   return (
     <div className="relative">
-      <button className="flex items-center justify-center hover:bg-theme-hover p-2 border border-theme rounded-xl text-theme-secondary transition-all">
+      <button className="flex justify-center items-center hover:bg-theme-hover p-2 border border-theme rounded-xl text-theme-secondary transition-all">
         <Bell className="w-4 h-4" />
         {count > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-500 notif-pulse" />
+          <span className="top-1.5 right-1.5 absolute bg-blue-500 rounded-full w-2 h-2 notif-pulse" />
         )}
       </button>
     </div>
@@ -438,10 +439,10 @@ function HeaderUserMenu({ me, role, onLogout }: { me: any; role: Role | null; on
         onClick={() => setOpen(v => !v)}
         className="flex items-center gap-2 hover:bg-theme-hover px-2 py-1.5 border border-transparent hover:border-theme rounded-xl transition-all"
       >
-        <div className="flex justify-center items-center bg-ai-gradient rounded-full w-7 h-7 font-semibold text-white text-xs shadow">
+        <div className="flex justify-center items-center bg-ai-gradient shadow rounded-full w-7 h-7 font-semibold text-white text-xs">
           {initial}
         </div>
-        <span className="hidden sm:block font-medium text-theme-primary text-sm max-w-[7rem] truncate">{fullName}</span>
+        <span className="hidden sm:block max-w-[7rem] font-medium text-theme-primary text-sm truncate">{fullName}</span>
       </button>
 
       <AnimatePresence>
@@ -451,13 +452,13 @@ function HeaderUserMenu({ me, role, onLogout }: { me: any; role: Role | null; on
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="left-0 absolute bg-theme-card shadow-2xl backdrop-blur-xl mt-2 border border-theme rounded-2xl w-52 overflow-hidden z-50"
+            className="left-0 z-50 absolute bg-theme-card shadow-2xl backdrop-blur-xl mt-2 border border-theme rounded-2xl w-52 overflow-hidden"
           >
             <div className="px-4 py-3 border-theme border-b">
               <div className="font-semibold text-theme-primary text-sm truncate">{fullName}</div>
-              {me?.phone && <div className="text-theme-muted text-xs mt-0.5 dir-ltr">{me.phone}</div>}
+              {me?.phone && <div className="mt-0.5 text-theme-muted text-xs dir-ltr">{me.phone}</div>}
               {role && (
-                <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-full text-[11px] font-medium">
+                <span className="inline-block bg-blue-100 dark:bg-blue-950/50 mt-1 px-2 py-0.5 rounded-full font-medium text-[11px] text-blue-700 dark:text-blue-300">
                   {ROLE_LABELS[role] || role}
                 </span>
               )}

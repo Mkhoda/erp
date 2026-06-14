@@ -2,6 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { KNOWN_PAGES } from './pages.constant';
 
+/** Pages that ALL authenticated users can access, regardless of department or role. */
+const BASE_PAGES = [
+  '/dashboard',
+  '/dashboard/profile',
+  '/dashboard/change-password',
+  '/dashboard/chat',
+  '/dashboard/knowledge',
+  '/dashboard/workflows',
+  '/dashboard/agents',
+];
+
 @Injectable()
 export class PermissionsService {
   constructor(private prisma: PrismaService) {}
@@ -137,7 +148,15 @@ export class PermissionsService {
     memberships.forEach(m => deptIds.add(m.departmentId));
 
     if (deptIds.size === 0) {
-      return { departments: [], permissions: [], menuPages: [] };
+      // No departments → still return base pages so the user can see AI workspace, profile, etc.
+      const baseVisible = activePaths
+        ? BASE_PAGES.filter(p => activePaths.has(p))
+        : BASE_PAGES;
+      return {
+        departments: [],
+        permissions: baseVisible.map(p => ({ page: p, canRead: true, canWrite: false })),
+        menuPages: baseVisible,
+      };
     }
 
     const deptArray = Array.from(deptIds);
@@ -157,6 +176,19 @@ export class PermissionsService {
 
     const permissions = Array.from(pageMap.entries()).map(([page, v]) => ({ page, canRead: v.canRead, canWrite: v.canWrite }));
     const menuPages = permissions.filter(p => p.canRead).map(p => p.page);
-    return { departments: depts, permissions, menuPages };
+
+    // Always include base pages (AI, profile, etc.) even if user has no dept-level permission
+    const baseVisible = activePaths
+      ? BASE_PAGES.filter(p => activePaths.has(p))
+      : BASE_PAGES;
+    const mergedMenuPages = Array.from(new Set([...menuPages, ...baseVisible]));
+    const mergedPermissions = [...permissions];
+    for (const bp of baseVisible) {
+      if (!mergedPermissions.find(p => p.page === bp)) {
+        mergedPermissions.push({ page: bp, canRead: true, canWrite: false });
+      }
+    }
+
+    return { departments: depts, permissions: mergedPermissions, menuPages: mergedMenuPages };
   }
 }

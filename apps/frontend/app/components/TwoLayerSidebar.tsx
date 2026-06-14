@@ -19,6 +19,13 @@ function isAllowed(page: string | undefined, allowedPages: string[] | null): boo
   return allowedPages.includes(page);
 }
 
+/** Check if item is allowed based on its roles constraint. */
+function isRoleAllowed(itemRoles: Role[] | undefined, userRole: Role | null): boolean {
+  if (!itemRoles || itemRoles.length === 0) return true; // no restriction
+  if (!userRole) return false;
+  return itemRoles.includes(userRole);
+}
+
 function SidebarItem({
   item,
   allowedPages,
@@ -66,13 +73,16 @@ function SidebarItem({
 
   // Group with children
   if (item.children && item.children.length > 0) {
-    const visibleChildren = item.children.filter(c => isAllowed(c.page, allowedPages));
+    // Check roles first — if parent item is not allowed for this role, hide entirely
+    if (!isRoleAllowed(item.roles, role)) return null;
+
+    const visibleChildren = item.children.filter(c => isAllowed(c.page, allowedPages) && isRoleAllowed(c.roles, role));
     if (visibleChildren.length === 0) return null;
 
     // Collapsed: show icon-only button with tooltip
     if (collapsed) {
       return (
-        <div className="relative group">
+        <div className="group relative">
           <button
             title={item.title}
             className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200
@@ -81,8 +91,8 @@ function SidebarItem({
             {item.icon && <item.icon className="w-4 h-4" />}
           </button>
           {/* Tooltip */}
-          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-2 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-            <div className="bg-theme-primary text-white text-xs px-2 py-1 rounded-lg whitespace-nowrap shadow-lg">
+          <div className="top-1/2 right-full z-50 absolute opacity-0 group-hover:opacity-100 mr-2 transition-opacity -translate-y-1/2 pointer-events-none">
+            <div className="bg-theme-primary shadow-lg px-2 py-1 rounded-lg text-white text-xs whitespace-nowrap">
               {item.title}
             </div>
           </div>
@@ -123,8 +133,8 @@ function SidebarItem({
               transition={{ duration: 0.2, ease: "easeInOut" }}
               className="overflow-hidden"
             >
-              <div className="relative mt-0.5 mb-1 pr-5 space-y-0.5">
-                <div className="top-1 bottom-1 right-[18px] absolute bg-theme-secondary/50 w-px" />
+              <div className="relative space-y-0.5 mt-0.5 mb-1 pr-5">
+                <div className="top-1 right-[18px] bottom-1 absolute bg-theme-secondary/50 w-px" />
                 {visibleChildren.map(child => {
                   const active = isActive(child.page);
                   return (
@@ -151,14 +161,14 @@ function SidebarItem({
     );
   }
 
-  // Leaf item — check permission
-  if (!isAllowed(item.page, allowedPages)) return null;
+  // Leaf item — check permission (page + role)
+  if (!isAllowed(item.page, allowedPages) || !isRoleAllowed(item.roles, role)) return null;
   const active = isActive(item.page);
 
   // Collapsed leaf
   if (collapsed) {
     return (
-      <div className="relative group">
+      <div className="group relative">
         <Link
           href={item.page || "#"}
           onClick={onNavigate}
@@ -168,8 +178,8 @@ function SidebarItem({
         >
           {item.icon && <item.icon className="w-4 h-4" />}
         </Link>
-        <div className="absolute right-full top-1/2 -translate-y-1/2 mr-2 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-          <div className="bg-theme-primary text-white text-xs px-2 py-1 rounded-lg whitespace-nowrap shadow-lg flex items-center gap-1.5">
+        <div className="top-1/2 right-full z-50 absolute opacity-0 group-hover:opacity-100 mr-2 transition-opacity -translate-y-1/2 pointer-events-none">
+          <div className="flex items-center gap-1.5 bg-theme-primary shadow-lg px-2 py-1 rounded-lg text-white text-xs whitespace-nowrap">
             {item.title}
             {item.isNew && <span className="badge-new">جدید</span>}
           </div>
@@ -204,6 +214,9 @@ export default function TwoLayerSidebar({ allowedPages, role, collapsed, onNavig
   return (
     <nav className="space-y-0.5" aria-label="ناوبری">
       {MENU.map(item => {
+        // Skip items not allowed for the user's role
+        if (!isRoleAllowed(item.roles, role)) return null;
+
         const showSection = item.section && !renderedSections.has(item.section);
         if (item.section) renderedSections.add(item.section);
 
@@ -213,7 +226,7 @@ export default function TwoLayerSidebar({ allowedPages, role, collapsed, onNavig
               <div className="sidebar-section-label">{item.section}</div>
             )}
             {showSection && collapsed && (
-              <div className="my-1 mx-2 border-t border-theme opacity-50" />
+              <div className="opacity-50 mx-2 my-1 border-theme border-t" />
             )}
             <SidebarItem
               item={item}
