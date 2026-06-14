@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { Prisma } from '@prisma/client';
 
 /** Well-known default base URLs for each provider type. */
 const DEFAULT_URLS: Record<string, string> = {
@@ -232,6 +233,67 @@ export class AiSettingsService {
       }),
     );
     return { message: 'Connected successfully', response: JSON.stringify(data).substring(0, 200) };
+  }
+
+  /** Raw usage logs with optional filters. */
+  async getUsage(userId?: string, providerType?: string, days: number = 30) {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    return this.prisma.aiUsage.findMany({
+      where: {
+        ...(userId ? { userId } : {}),
+        ...(providerType ? { providerType } : {}),
+        createdAt: { gte: since },
+      },
+      include: { user: { select: { firstName: true, lastName: true, phone: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+  }
+
+  /** Aggregated per-user token usage breakdown. */
+  async getUserUsageBreakdown(days: number = 30) {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await this.prisma.aiUsage.findMany({
+      where: { createdAt: { gte: since } },
+      include: { user: { select: { firstName: true, lastName: true, phone: true, email: true } } },
+    });
+
+    const map = new Map<string, {
+      userId: string;
+      user: any;
+      totalTokens: number;
+      promptTokens: number;
+      completionTokens: number;
+      totalRequests: number;
+      successCount: number;
+      providers: Set<string>;
+    }>();
+
+    for (const r of rows) {
+      if (!map.has(r.userId)) {
+        map.set(r.userId, {
+          userId: r.userId,
+          user: r.user,
+          totalTokens: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalRequests: 0,
+          successCount: 0,
+          providers: new Set(),
+        });
+      }
+      const entry = map.get(r.userId)!;
+      entry.totalTokens += r.totalTokens;
+      entry.promptTokens += r.promptTokens;
+      entry.completionTokens += r.completionTokens;
+      entry.totalRequests += 1;
+      if (r.success) entry.successCount += 1;
+      entry.providers.add(r.providerType);
+    }
+
+    return Array.from(map.values())
+      .map(e => ({ ...e, providers: Array.from(e.providers) }))
+      .sort((a, b) => b.totalTokens - a.totalTokens);
   }
 
   private maskKey(key: string): string {

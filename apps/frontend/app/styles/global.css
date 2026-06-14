@@ -241,6 +241,158 @@ html:not(.dark) body {
   border-color: rgb(96 165 250);
 }
 
+/* =================================================================
+   🏷️ BADGE SYSTEM - Consistent Status Badges
+   ================================================================= */
+
+/* Base badge style */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  border: 1px solid transparent;
+}
+
+/* Role badges */
+.badge-admin {
+  background-color: rgb(254 226 226);
+  color: rgb(185 28 28);
+  border-color: rgb(252 165 165);
+}
+.dark .badge-admin {
+  background-color: rgba(127 29 29 / 0.3);
+  color: rgb(252 165 165);
+  border-color: rgba(185 28 28 / 0.4);
+}
+
+.badge-manager {
+  background-color: rgb(243 232 255);
+  color: rgb(126 34 206);
+  border-color: rgb(221 214 254);
+}
+.dark .badge-manager {
+  background-color: rgba(88 28 135 / 0.3);
+  color: rgb(216 180 254);
+  border-color: rgba(147 51 234 / 0.4);
+}
+
+.badge-expert {
+  background-color: rgb(219 234 254);
+  color: rgb(29 78 216);
+  border-color: rgb(191 219 254);
+}
+.dark .badge-expert {
+  background-color: rgba(30 64 175 / 0.3);
+  color: rgb(147 197 253);
+  border-color: rgba(59 130 246 / 0.4);
+}
+
+.badge-user {
+  background-color: rgb(241 245 249);
+  color: rgb(71 85 105);
+  border-color: rgb(226 232 240);
+}
+.dark .badge-user {
+  background-color: rgba(51 65 85 / 0.3);
+  color: rgb(203 213 225);
+  border-color: rgba(71 85 105 / 0.4);
+}
+
+/* Status badges */
+.badge-success {
+  background-color: rgb(220 252 231);
+  color: rgb(22 163 74);
+  border-color: rgb(187 247 208);
+}
+.dark .badge-success {
+  background-color: rgba(22 101 52 / 0.3);
+  color: rgb(134 239 172);
+  border-color: rgba(34 197 94 / 0.4);
+}
+
+.badge-warning {
+  background-color: rgb(254 249 195);
+  color: rgb(180 83 9);
+  border-color: rgb(253 230 138);
+}
+.dark .badge-warning {
+  background-color: rgba(161 98 7 / 0.3);
+  color: rgb(253 224 71);
+  border-color: rgb(234 179 8 / 0.4);
+}
+
+.badge-danger {
+  background-color: rgb(254 226 226);
+  color: rgb(185 28 28);
+  border-color: rgb(252 165 165);
+}
+.dark .badge-danger {
+  background-color: rgba(127 29 29 / 0.3);
+  color: rgb(252 165 165);
+  border-color: rgba(185 28 28 / 0.4);
+}
+
+.badge-disabled {
+  background-color: rgb(241 245 249);
+  color: rgb(100 116 139);
+  border-color: rgb(226 232 240);
+}
+.dark .badge-disabled {
+  background-color: rgba(30 41 59 / 0.5);
+  color: rgb(148 163 184);
+  border-color: rgba(71 85 105 / 0.4);
+}
+
+/* Extended semantic badges */
+.badge-info {
+  background-color: rgb(219 234 254);
+  color: rgb(29 78 216);
+  border-color: rgb(191 219 254);
+}
+.dark .badge-info {
+  background-color: rgba(30 64 175 / 0.3);
+  color: rgb(147 197 253);
+  border-color: rgba(59 130 246 / 0.4);
+}
+
+.badge-neutral {
+  background-color: rgb(241 245 249);
+  color: rgb(71 85 105);
+  border-color: rgb(226 232 240);
+}
+.dark .badge-neutral {
+  background-color: rgba(51 65 85 / 0.3);
+  color: rgb(203 213 225);
+  border-color: rgba(71 85 105 / 0.4);
+}
+
+.badge-purple {
+  background-color: rgb(243 232 255);
+  color: rgb(126 34 206);
+  border-color: rgb(221 214 254);
+}
+.dark .badge-purple {
+  background-color: rgba(88 28 135 / 0.3);
+  color: rgb(216 180 254);
+  border-color: rgba(147 51 234 / 0.4);
+}
+
+.badge-teal {
+  background-color: rgb(204 251 241);
+  color: rgb(15 118 110);
+  border-color: rgb(153 246 228);
+}
+.dark .badge-teal {
+  background-color: rgba(19 78 74 / 0.3);
+  color: rgb(94 234 212);
+  border-color: rgba(20 184 166 / 0.4);
+}
+
 .border-theme-light {
   border-color: rgb(241 245 249);
 }

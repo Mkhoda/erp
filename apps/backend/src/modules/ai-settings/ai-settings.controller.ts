@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -46,5 +46,21 @@ export class AiSettingsController {
   @Post('providers/:type/test')
   testConnection(@Param('type') type: string) {
     return this.service.testConnection(type);
+  }
+
+  /** Get usage statistics for all providers. */
+  @Get('usage')
+  getUsage(
+    @Query('userId') userId?: string,
+    @Query('providerType') providerType?: string,
+    @Query('days') days?: string,
+  ) {
+    return this.service.getUsage(userId, providerType, days ? parseInt(days) : 30);
+  }
+
+  /** Get per-user usage breakdown. */
+  @Get('usage/users')
+  getUserUsageBreakdown(@Query('days') days?: string) {
+    return this.service.getUserUsageBreakdown(days ? parseInt(days) : 30);
   }
 }

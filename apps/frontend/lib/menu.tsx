@@ -135,6 +135,14 @@ export const MENU: MenuItem[] = [
     section: 'مدیریت',
   },
   {
+    id: 'admin.aiUsage',
+    title: 'مصرف هوش مصنوعی',
+    page: '/dashboard/ai-usage',
+    icon: BarChart3,
+    roles: ['ADMIN'],
+    section: 'مدیریت',
+  },
+  {
     id: 'access',
     title: 'دسترسی صفحات',
     page: '/dashboard/access',

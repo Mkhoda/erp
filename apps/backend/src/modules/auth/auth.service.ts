@@ -48,6 +48,7 @@ export class AuthService {
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (user.disabled) throw new UnauthorizedException('حساب کاربری غیرفعال است');
     if (!user.password) throw new UnauthorizedException('Password not set');
     const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
@@ -58,6 +59,7 @@ export class AuthService {
     const phone = this.normalizePhone(dto.phone);
     const user = await this.prisma.user.findFirst({ where: { phone } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (user.disabled) throw new UnauthorizedException('حساب کاربری غیرفعال است');
     if (!user.password) throw new UnauthorizedException('Password not set');
     const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
@@ -151,6 +153,7 @@ export class AuthService {
     // Find user by phone (must exist due to sendOtp check)
     const user = await this.prisma.user.findFirst({ where: { phone } });
     if (!user) throw new UnauthorizedException('Invalid OTP');
+    if (user.disabled) throw new UnauthorizedException('حساب کاربری غیرفعال است');
 
     // Optionally clean used OTPs
     await this.prisma.otp.deleteMany({ where: { phone } });
@@ -194,7 +197,7 @@ export class AuthService {
     return { ok: true };
   }
 
-  private async signUser(sub: string, email: string, role: string) {
+  private async signUser(sub: string, email: string | null, role: string) {
     const token = await this.jwt.signAsync({ sub, email, role });
     return { access_token: token };
   }

@@ -66,16 +66,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [theme, setTheme] = React.useState<Theme>("system");
   const [cmdOpen, setCmdOpen] = React.useState(false);
+  const [authReady, setAuthReady] = React.useState(false);
 
   // Auth
   React.useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) { router.replace("/signin"); return; }
+    if (!token) {
+      document.cookie = "token=; path=/; max-age=0";
+      router.replace("/signin");
+      return;
+    }
     const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
     fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { setMe(data); setRole(data?.role ?? null); })
-      .catch(() => setRole(null));
+      .then(r => {
+        if (!r.ok) throw new Error("Unauthorized");
+        return r.json();
+      })
+      .then(data => {
+        setMe(data);
+        setRole(data?.role ?? null);
+        setAuthReady(true);
+      })
+      .catch(() => {
+        localStorage.removeItem("token");
+        document.cookie = "token=; path=/; max-age=0";
+        router.replace("/signin");
+      });
   }, [router]);
 
   // Permissions
@@ -169,6 +185,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const logout = () => {
     localStorage.removeItem("token");
+    document.cookie = "token=; path=/; max-age=0";
     router.replace("/signin");
   };
 
@@ -176,6 +193,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ? `${me.firstName || ""} ${me.lastName || ""}`.trim() || me.phone || "کاربر"
     : "";
   const initial = (me?.firstName?.[0] || me?.phone?.[0] || "U").toUpperCase();
+
+  // Don't render dashboard at all until we confirm auth — prevents flash
+  if (!authReady) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-dvh bg-theme-base gap-6" dir="rtl">
+        <div className="flex justify-center items-center bg-ai-gradient shadow-lg shadow-blue-500/30 rounded-2xl w-14 h-14">
+          <Sparkles className="w-7 h-7 text-white" />
+        </div>
+        <div className="flex gap-2">
+          {[0, 150, 300].map(delay => (
+            <span key={delay} className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+          ))}
+        </div>
+        <p className="text-theme-muted text-sm">در حال بارگذاری پلتفرم...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex bg-theme-base min-h-dvh" dir="rtl">

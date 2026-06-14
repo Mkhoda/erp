@@ -10,7 +10,7 @@ datasource db {
 
 model User {
   id        String    @id @default(cuid())
-  email     String    @unique
+  email     String?   @unique
   // Phone number used for OTP-based auth. Optional for legacy users; unique when present.
   phone     String?   @unique
   // Password is optional when users sign up via OTP and haven't set a password yet.
@@ -18,6 +18,8 @@ model User {
   firstName String
   lastName  String
   role      Role      @default(USER)
+  // When true, user cannot log in (soft-disable instead of hard delete)
+  disabled  Boolean   @default(false)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
   // Many-to-many memberships in departments (additional to primary departmentId)
@@ -27,6 +29,7 @@ model User {
   assignedByAssignments AssetAssignment[]   @relation("AssetAssignmentAssignedBy")
   assetCostsCreated AssetCost[] @relation("AssetCostCreatedBy")
   assetsCreated Asset[]
+  aiUsage       AiUsage[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -291,7 +294,7 @@ model Otp {
 model AiProvider {
   id        String   @id @default(cuid())
   name      String                  // Display name e.g. "OpenAI GPT-4o"
-  type      String                  // "openai" | "anthropic" | "gemini" | "deepseek" | "custom"
+  type      String                  // "openai" | "anthropic" | "gemini" | "deepseek" | "agnes" | "custom"
   apiKey    String                  // API key (stored as-is; use env-var or vault in production)
   apiUrl    String?                 // Custom API base URL (optional, has sensible default)
   model     String?                 // Model identifier e.g. "gpt-4o"
@@ -301,4 +304,25 @@ model AiProvider {
   updatedAt DateTime @updatedAt
 
   @@unique([type])
+}
+
+// AI usage tracking — records each API call for token consumption analytics
+model AiUsage {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  providerType String                  // "openai" | "anthropic" | "gemini" | "deepseek" | "agnes" | "custom"
+  model       String?                  // Model used e.g. "gpt-4o"
+  prompt      String                   // User's input/prompt (truncated)
+  promptTokens   Int    @default(0)
+  completionTokens Int  @default(0)
+  totalTokens     Int   @default(0)
+  latencyMs       Int   @default(0)
+  success         Boolean @default(true)
+  errorMsg        String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([providerType])
+  @@index([createdAt])
 }

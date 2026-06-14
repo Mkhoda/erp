@@ -12,17 +12,22 @@ export class UsersService {
       : undefined;
     return this.prisma.user.findMany({
       where,
-      select: { id: true, email: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, userDepartments: { select: { departmentId: true, department: true } } },
+      select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, userDepartments: { select: { departmentId: true, department: true } } },
     });
   }
   findOne(id: string) {
-    return this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, userDepartments: { select: { departmentId: true, department: true } } } });
+    return this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, userDepartments: { select: { departmentId: true, department: true } } } });
   }
   async create(data: any) {
     const payload = { ...data };
     if (payload.password) {
       payload.password = await bcrypt.hash(payload.password, 10);
     }
+    // Normalize email — empty string becomes null
+    if (!payload.email || payload.email.trim() === '') payload.email = null;
+    else payload.email = payload.email.trim().toLowerCase();
+    // Normalize phone
+    if (!payload.phone || payload.phone.trim() === '') payload.phone = null;
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
     const created = await this.prisma.user.create({ data: payload, select: { id: true, email: true, firstName: true, lastName: true, role: true, departmentId: true } });
@@ -74,12 +79,24 @@ export class UsersService {
   }
   async update(id: string, data: any) {
     const payload = { ...data };
+    // Hash password if provided (for create or password reset)
     if (payload.password) {
       payload.password = await bcrypt.hash(payload.password, 10);
+    } else {
+      delete payload.password;
+    }
+    // Normalize email
+    if ('email' in payload) {
+      if (!payload.email || payload.email.trim() === '') payload.email = null;
+      else payload.email = payload.email.trim().toLowerCase();
+    }
+    // Normalize phone
+    if ('phone' in payload && (!payload.phone || payload.phone.trim() === '')) {
+      payload.phone = null;
     }
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
-    const updated = await this.prisma.user.update({ where: { id }, data: payload, select: { id: true, email: true, firstName: true, lastName: true, role: true, departmentId: true } });
+    const updated = await this.prisma.user.update({ where: { id }, data: payload, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, disabled: true } });
     if (departmentIds) {
       // reset memberships
       await this.prisma.userDepartment.deleteMany({ where: { userId: id } });

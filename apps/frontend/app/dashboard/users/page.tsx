@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { List, LayoutGrid, Plus, Pencil, Trash2, X, Users as UsersIcon, Upload, Phone } from "lucide-react";
+import { List, LayoutGrid, Plus, Pencil, Users as UsersIcon, Upload, Phone, Ban, CheckCircle, KeyRound, Eye, EyeOff, UserX } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader";
 import SearchBar from "../../components/ui/SearchBar";
 import SkeletonTable, { SkeletonCards } from "../../components/ui/SkeletonTable";
@@ -16,20 +16,25 @@ type User = {
   firstName: string;
   lastName: string;
   role: "ADMIN" | "MANAGER" | "USER" | "EXPERT";
+  disabled?: boolean;
   userDepartments?: Array<{ departmentId: string; department?: { id: string; name: string } }>;
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
-const ROLE_COLORS: Record<string, string> = {
-  ADMIN: "bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800",
-  MANAGER: "bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
-  EXPERT: "bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-  USER: "bg-theme-secondary text-theme-secondary border-theme",
-};
 const ROLE_LABELS: Record<string, string> = { ADMIN: "مدیر ارشد", MANAGER: "مدیر", EXPERT: "کارشناس", USER: "کاربر" };
 const AVATAR_COLORS = ["from-blue-500 to-blue-600","from-purple-500 to-purple-600","from-green-500 to-green-600","from-amber-500 to-amber-600","from-pink-500 to-pink-600","from-teal-500 to-teal-600"];
 const avatarColor = (u: User) => AVATAR_COLORS[(u.firstName?.charCodeAt(0) || 0) % AVATAR_COLORS.length];
+
+function RoleBadge({ role }: { role: string }) {
+  const map: Record<string, string> = {
+    ADMIN: "badge badge-danger",
+    MANAGER: "badge badge-purple",
+    EXPERT: "badge badge-info",
+    USER: "badge badge-neutral",
+  };
+  return <span className={map[role] || "badge badge-neutral"}>{ROLE_LABELS[role] || role}</span>;
+}
 
 export default function UsersPage() {
   React.useEffect(() => { document.title = "مدیریت کاربران | Arzesh AI"; }, []);
@@ -43,12 +48,15 @@ export default function UsersPage() {
   const [query, setQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState("ALL");
   const [departmentFilter, setDepartmentFilter] = React.useState("");
+  const [showDisabled, setShowDisabled] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [open, setOpen] = React.useState(false);
   const [bulkOpen, setBulkOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<any | null>(null);
   const [deptSearch, setDeptSearch] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  const [showNewPwd, setShowNewPwd] = React.useState(false);
+  const [showPwdField, setShowPwdField] = React.useState(false);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   async function load() {
@@ -63,13 +71,15 @@ export default function UsersPage() {
   async function loadDeps() {
     try {
       const r = await fetch(`${API}/departments`, { headers: { Authorization: `Bearer ${token}` } });
-      setDepartments(await r.json());
+      const data = await r.json();
+      setDepartments(Array.isArray(data) ? data : []);
     } catch { setDepartments([]); }
   }
 
   React.useEffect(() => { load(); loadDeps(); }, []);
 
   const filtered = users.filter(u => {
+    if (!showDisabled && u.disabled) return false;
     const name = `${u.firstName || ""} ${u.lastName || ""}`.toLowerCase();
     const matchQ = name.includes(query.toLowerCase()) || (u.phone || "").includes(query) || (u.email || "").toLowerCase().includes(query.toLowerCase());
     const matchRole = roleFilter === "ALL" || u.role === roleFilter;
@@ -77,30 +87,79 @@ export default function UsersPage() {
     return matchQ && matchRole && matchDept;
   });
 
-  function onAdd() { setEditing({ firstName: "", lastName: "", phone: "", email: "", role: "USER", departmentIds: [] }); setOpen(true); }
-  function onEdit(u: User) { setEditing({ ...u, departmentIds: (u.userDepartments || []).map(x => x.departmentId) }); setOpen(true); }
+  function onAdd() {
+    setEditing({ firstName: "", lastName: "", phone: "", email: "", password: "", role: "USER", departmentIds: [] });
+    setShowPwdField(false); setShowNewPwd(false);
+    setOpen(true);
+  }
+  function onEdit(u: User) {
+    setEditing({ ...u, departmentIds: (u.userDepartments || []).map(x => x.departmentId), newPassword: "" });
+    setShowPwdField(false); setShowNewPwd(false);
+    setOpen(true);
+  }
 
-  async function onDelete(id: string, name: string) {
-    const ok = await confirm("حذف کاربر", `آیا از حذف "${name}" اطمینان دارید؟`);
+  async function onToggleDisable(u: User) {
+    const action = u.disabled ? "فعال‌سازی" : "غیرفعال‌سازی";
+    const ok = await confirm(`${action} کاربر`, `آیا از ${action} کاربر "${u.firstName} ${u.lastName}" اطمینان دارید؟`);
     if (!ok) return;
-    await fetch(`${API}/users/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    toast.success("کاربر حذف شد");
-    await load();
+    const res = await fetch(`${API}/users/${u.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ disabled: !u.disabled }),
+    });
+    if (res.ok) {
+      toast.success(u.disabled ? "کاربر فعال شد" : "کاربر غیرفعال شد");
+      await load();
+    } else {
+      toast.error("خطا در عملیات");
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!editing) return;
+    const isNew = !editing.id;
+
+    if (isNew && !editing.phone?.trim()) {
+      toast.warning("شماره موبایل برای کاربر جدید الزامی است");
+      return;
+    }
+    if (isNew && !editing.password?.trim()) {
+      toast.warning("رمز عبور برای کاربر جدید الزامی است");
+      return;
+    }
+
     setSaving(true);
     try {
-      const isNew = !editing.id;
+      const payload: any = {
+        firstName: editing.firstName,
+        lastName: editing.lastName,
+        phone: editing.phone || null,
+        email: editing.email || null,
+        role: editing.role,
+        departmentIds: editing.departmentIds,
+      };
+      if (isNew) payload.password = editing.password;
+      if (!isNew && editing.newPassword?.trim()) payload.password = editing.newPassword;
+
       const url = isNew ? `${API}/users` : `${API}/users/${editing.id}`;
-      const res = await fetch(url, { method: isNew ? "POST" : "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(editing) });
-      if (!res.ok) throw new Error();
+      const res = await fetch(url, {
+        method: isNew ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "خطا در ذخیره");
+      }
       toast.success(isNew ? "کاربر اضافه شد" : "کاربر ویرایش شد");
       setOpen(false); setEditing(null); await load();
-    } catch { toast.error("خطا در ذخیره کاربر"); } finally { setSaving(false); }
+    } catch (err: any) {
+      toast.error(err.message || "خطا در ذخیره کاربر");
+    } finally { setSaving(false); }
   }
+
+  const disabledCount = users.filter(u => u.disabled).length;
 
   const ViewToggle = (
     <div className="flex bg-theme-secondary border border-theme p-1 rounded-xl">
@@ -118,7 +177,7 @@ export default function UsersPage() {
 
       <PageHeader
         title="مدیریت کاربران"
-        subtitle={loading ? undefined : `${users.length.toLocaleString("fa-IR")} کاربر در سیستم`}
+        subtitle={loading ? undefined : `${users.length.toLocaleString("fa-IR")} کاربر${disabledCount ? ` (${disabledCount.toLocaleString("fa-IR")} غیرفعال)` : ""}`}
         icon={UsersIcon}
         iconColor="from-emerald-500 to-emerald-600"
         extra={ViewToggle}
@@ -140,6 +199,10 @@ export default function UsersPage() {
           <option value="">همه دپارتمان‌ها</option>
           {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
+        <label className="flex items-center gap-1.5 text-sm text-theme-secondary cursor-pointer whitespace-nowrap">
+          <input type="checkbox" checked={showDisabled} onChange={e => setShowDisabled(e.target.checked)} className="rounded accent-blue-600" />
+          نمایش غیرفعال {disabledCount > 0 && <span className="badge badge-warning text-[10px]">{disabledCount}</span>}
+        </label>
       </SearchBar>
 
       {view === "list" ? (
@@ -147,20 +210,20 @@ export default function UsersPage() {
           <div className="overflow-x-auto">
             <table className="table-theme">
               <thead>
-                <tr><th>کاربر</th><th>موبایل</th><th>نقش</th><th>دپارتمان</th><th>اقدامات</th></tr>
+                <tr><th>کاربر</th><th>موبایل</th><th>نقش</th><th>دپارتمان</th><th>وضعیت</th><th>اقدامات</th></tr>
               </thead>
               {loading ? (
-                <SkeletonTable cols={5} rows={6} />
+                <SkeletonTable cols={6} rows={6} />
               ) : (
                 <tbody>
                   {filtered.length === 0 ? (
-                    <EmptyStateRow icon={UsersIcon} title="کاربری یافت نشد" description={query ? "عبارت جستجو را تغییر دهید" : undefined} actionLabel={!query ? "افزودن کاربر" : undefined} onAction={!query ? onAdd : undefined} colSpan={5} />
+                    <EmptyStateRow icon={UsersIcon} title="کاربری یافت نشد" description={query ? "عبارت جستجو را تغییر دهید" : undefined} actionLabel={!query ? "افزودن کاربر" : undefined} onAction={!query ? onAdd : undefined} colSpan={6} />
                   ) : filtered.map(u => (
-                    <tr key={u.id}>
+                    <tr key={u.id} className={u.disabled ? "opacity-55" : ""}>
                       <td>
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarColor(u)} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
-                            {(u.firstName?.[0] || u.phone?.[0] || "U").toUpperCase()}
+                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${u.disabled ? "from-slate-400 to-slate-500" : avatarColor(u)} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
+                            {u.disabled ? <UserX className="w-3.5 h-3.5" /> : (u.firstName?.[0] || u.phone?.[0] || "U").toUpperCase()}
                           </div>
                           <div>
                             <div className="font-medium text-theme-primary text-sm">{u.firstName} {u.lastName}</div>
@@ -173,22 +236,30 @@ export default function UsersPage() {
                           {u.phone ? <><Phone className="w-3 h-3 text-theme-muted" />{u.phone}</> : <span className="text-theme-muted">-</span>}
                         </div>
                       </td>
-                      <td>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[u.role]}`}>{ROLE_LABELS[u.role] || u.role}</span>
-                      </td>
+                      <td><RoleBadge role={u.role} /></td>
                       <td>
                         <div className="flex flex-wrap gap-1">
                           {u.userDepartments?.length ? u.userDepartments.map(x => (
-                            <span key={x.departmentId} className="inline-flex items-center bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs">
-                              {x.department?.name || x.departmentId}
-                            </span>
+                            <span key={x.departmentId} className="badge badge-teal">{x.department?.name || x.departmentId}</span>
                           )) : <span className="text-theme-muted text-sm">-</span>}
                         </div>
                       </td>
                       <td>
-                        <div className="flex gap-2">
+                        {u.disabled
+                          ? <span className="badge badge-warning"><Ban className="w-3 h-3 me-0.5" />غیرفعال</span>
+                          : <span className="badge badge-success"><CheckCircle className="w-3 h-3 me-0.5" />فعال</span>
+                        }
+                      </td>
+                      <td>
+                        <div className="flex gap-1.5">
                           <button onClick={() => onEdit(u)} className="btn-theme-secondary text-xs py-1 px-2.5 gap-1"><Pencil className="w-3 h-3" />ویرایش</button>
-                          <button onClick={() => onDelete(u.id, `${u.firstName} ${u.lastName}`)} className="btn-theme-danger text-xs py-1 px-2.5"><Trash2 className="w-3 h-3" /></button>
+                          <button
+                            onClick={() => onToggleDisable(u)}
+                            title={u.disabled ? "فعال‌سازی" : "غیرفعال‌سازی"}
+                            className={`text-xs py-1 px-2.5 rounded-lg border transition-all ${u.disabled ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-950/60" : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-950/60"}`}
+                          >
+                            {u.disabled ? <CheckCircle className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -205,30 +276,31 @@ export default function UsersPage() {
           ) : filtered.length === 0 ? (
             <EmptyStateBox icon={UsersIcon} title="کاربری یافت نشد" actionLabel={!query ? "افزودن کاربر" : undefined} onAction={!query ? onAdd : undefined} />
           ) : filtered.map(u => (
-            <div key={u.id} className="card-theme">
+            <div key={u.id} className={`card-theme ${u.disabled ? "opacity-60" : ""}`}>
               <div className="card-theme-body">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${avatarColor(u)} flex items-center justify-center text-white font-semibold shrink-0`}>
-                      {(u.firstName?.[0] || "?").toUpperCase()}
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${u.disabled ? "from-slate-400 to-slate-500" : avatarColor(u)} flex items-center justify-center text-white font-semibold shrink-0`}>
+                      {u.disabled ? <UserX className="w-4 h-4" /> : (u.firstName?.[0] || "?").toUpperCase()}
                     </div>
                     <div>
                       <div className="font-semibold text-theme-primary text-sm">{u.firstName} {u.lastName}</div>
                       {u.phone && <div className="text-theme-muted text-xs" dir="ltr">{u.phone}</div>}
                     </div>
                   </div>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[u.role]}`}>{ROLE_LABELS[u.role] || u.role}</span>
+                  <RoleBadge role={u.role} />
                 </div>
-                <div className="flex flex-wrap gap-1 mb-4">
+                <div className="flex flex-wrap gap-1 mb-1">
                   {u.userDepartments?.length ? u.userDepartments.map(x => (
-                    <span key={x.departmentId} className="inline-flex items-center bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs">
-                      {x.department?.name || x.departmentId}
-                    </span>
-                  )) : <span className="text-theme-muted text-xs">دپارتمان تعیین نشده</span>}
+                    <span key={x.departmentId} className="badge badge-teal">{x.department?.name || x.departmentId}</span>
+                  )) : null}
                 </div>
-                <div className="flex gap-2">
+                {u.disabled && <div className="mb-3"><span className="badge badge-warning"><Ban className="w-3 h-3 me-0.5" />غیرفعال</span></div>}
+                <div className="flex gap-2 mt-3">
                   <button onClick={() => onEdit(u)} className="btn-theme-secondary flex-1 justify-center text-xs py-1.5 gap-1"><Pencil className="w-3 h-3" />ویرایش</button>
-                  <button onClick={() => onDelete(u.id, `${u.firstName} ${u.lastName}`)} className="btn-theme-danger py-1.5 px-3"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={() => onToggleDisable(u)} className={`text-xs py-1.5 px-3 rounded-lg border transition-all ${u.disabled ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200" : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200"}`}>
+                    {u.disabled ? <CheckCircle className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
+                  </button>
                 </div>
               </div>
             </div>
@@ -246,28 +318,62 @@ export default function UsersPage() {
         <form id="user-form" onSubmit={onSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نام</label>
+              <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نام *</label>
               <input required value={editing?.firstName || ""} onChange={e => setEditing((s: any) => ({ ...s, firstName: e.target.value }))} className="input-theme text-sm" placeholder="نام" />
             </div>
             <div>
-              <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نام خانوادگی</label>
+              <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نام خانوادگی *</label>
               <input required value={editing?.lastName || ""} onChange={e => setEditing((s: any) => ({ ...s, lastName: e.target.value }))} className="input-theme text-sm" placeholder="نام خانوادگی" />
             </div>
           </div>
+
           <div>
-            <label className="block mb-1.5 font-medium text-theme-secondary text-xs">شماره موبایل</label>
-            <input type="tel" dir="ltr" value={editing?.phone || ""} onChange={e => setEditing((s: any) => ({ ...s, phone: e.target.value }))} className="input-theme text-sm" placeholder="09123456789" />
+            <label className="block mb-1.5 font-medium text-theme-secondary text-xs">
+              شماره موبایل {!editing?.id && <span className="text-red-500">*</span>}
+            </label>
+            <div className="relative">
+              <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
+              <input type="tel" dir="ltr" value={editing?.phone || ""} onChange={e => setEditing((s: any) => ({ ...s, phone: e.target.value }))} className="input-theme text-sm pr-10" placeholder="09123456789" />
+            </div>
           </div>
+
           <div>
             <label className="block mb-1.5 font-medium text-theme-secondary text-xs">ایمیل (اختیاری)</label>
             <input type="email" dir="ltr" value={editing?.email || ""} onChange={e => setEditing((s: any) => ({ ...s, email: e.target.value }))} className="input-theme text-sm" placeholder="email@example.com" />
           </div>
-          {!editing?.id && (
+
+          {/* Password — required for new, optional reset for existing */}
+          {!editing?.id ? (
             <div>
-              <label className="block mb-1.5 font-medium text-theme-secondary text-xs">رمز عبور</label>
-              <input type="password" value={editing?.password || ""} onChange={e => setEditing((s: any) => ({ ...s, password: e.target.value }))} required className="input-theme text-sm" />
+              <label className="block mb-1.5 font-medium text-theme-secondary text-xs">رمز عبور <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <input type={showNewPwd ? "text" : "password"} value={editing?.password || ""} onChange={e => setEditing((s: any) => ({ ...s, password: e.target.value }))} required className="input-theme text-sm pl-10" placeholder="حداقل ۶ کاراکتر" />
+                <button type="button" onClick={() => setShowNewPwd(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-secondary">
+                  {showNewPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {!showPwdField ? (
+                <button type="button" onClick={() => setShowPwdField(true)} className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm hover:underline">
+                  <KeyRound className="w-4 h-4" />تغییر رمز عبور
+                </button>
+              ) : (
+                <div>
+                  <label className="block mb-1.5 font-medium text-theme-secondary text-xs">رمز عبور جدید (خالی = بدون تغییر)</label>
+                  <div className="relative">
+                    <input type={showNewPwd ? "text" : "password"} value={editing?.newPassword || ""} onChange={e => setEditing((s: any) => ({ ...s, newPassword: e.target.value }))} className="input-theme text-sm pl-10" placeholder="رمز جدید..." />
+                    <button type="button" onClick={() => setShowNewPwd(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-secondary">
+                      {showNewPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <button type="button" onClick={() => { setShowPwdField(false); setEditing((s: any) => ({ ...s, newPassword: "" })); }} className="mt-1 text-theme-muted text-xs hover:underline">لغو تغییر رمز</button>
+                </div>
+              )}
             </div>
           )}
+
           <div>
             <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نقش</label>
             <select value={editing?.role || "USER"} onChange={e => setEditing((s: any) => ({ ...s, role: e.target.value }))} className="select-theme text-sm">
@@ -277,17 +383,18 @@ export default function UsersPage() {
               <option value="ADMIN">مدیر ارشد</option>
             </select>
           </div>
+
           <div>
             <label className="block mb-1.5 font-medium text-theme-secondary text-xs">دپارتمان‌ها</label>
             <div className="bg-theme-secondary border border-theme rounded-xl p-3">
-              <div className="flex flex-wrap gap-1 mb-2">
+              <div className="flex flex-wrap gap-1 mb-2 min-h-[24px]">
                 {(editing?.departmentIds || []).map((id: string) => {
                   const d = departments.find(x => x.id === id);
                   if (!d) return null;
                   return (
-                    <span key={id} className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs">
+                    <span key={id} className="badge badge-teal gap-1">
                       {d.name}
-                      <button type="button" onClick={() => setEditing((s: any) => ({ ...s, departmentIds: s.departmentIds.filter((x: string) => x !== id) }))}><X className="w-2.5 h-2.5" /></button>
+                      <button type="button" onClick={() => setEditing((s: any) => ({ ...s, departmentIds: s.departmentIds.filter((x: string) => x !== id) }))} className="hover:opacity-70">×</button>
                     </span>
                   );
                 })}
@@ -312,7 +419,6 @@ export default function UsersPage() {
         </form>
       </Modal>
 
-      {/* Bulk Import Modal */}
       {bulkOpen && (
         <BulkImportModal departments={departments} onClose={() => setBulkOpen(false)} onImported={async () => { setBulkOpen(false); await load(); }} />
       )}
@@ -391,10 +497,7 @@ function BulkImportModal({ onClose, onImported, departments }: { onClose: () => 
 
   return (
     <Modal open onClose={onClose} title="وارد کردن دسته‌ای کاربران (CSV)" size="xl"
-      footer={<>
-        <button onClick={onClose} className="btn-theme-secondary text-sm">انصراف</button>
-        <button onClick={importNow} disabled={!preview?.length} className="btn-theme-primary text-sm disabled:opacity-50 gap-1.5"><Upload className="w-4 h-4" />وارد کن</button>
-      </>}
+      footer={<><button onClick={onClose} className="btn-theme-secondary text-sm">انصراف</button><button onClick={importNow} disabled={!preview?.length} className="btn-theme-primary text-sm disabled:opacity-50 gap-1.5"><Upload className="w-4 h-4" />وارد کن</button></>}
     >
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
@@ -411,7 +514,6 @@ function BulkImportModal({ onClose, onImported, departments }: { onClose: () => 
             <textarea rows={8} value={text} onChange={e => process(e.target.value)} className="input-theme text-xs resize-none font-mono" placeholder="firstName,lastName,phone,role" dir="ltr" />
           </div>
         </div>
-
         {headers && headers.length > 0 && (
           <div className="bg-theme-secondary border border-theme rounded-xl p-4">
             <div className="mb-2 font-medium text-theme-primary text-xs">نقشه‌بندی ستون‌ها</div>
@@ -428,7 +530,6 @@ function BulkImportModal({ onClose, onImported, departments }: { onClose: () => 
             </div>
           </div>
         )}
-
         {preview && preview.length > 0 && (
           <div>
             <div className="mb-1.5 font-medium text-theme-secondary text-xs">پیش‌نمایش ({preview.length} ردیف)</div>

@@ -70,6 +70,8 @@ export default function SignInPage() {
       }
       const data = await res.json();
       localStorage.setItem('token', data.access_token);
+      // Also set cookie for middleware auth check
+      document.cookie = `token=${data.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message);
