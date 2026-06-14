@@ -300,8 +300,9 @@ model Conversation {
   title      String?
   provider   String
   model      String?
-  summary    String?  // compact summary replacing older messages
-  isArchived Boolean  @default(false)
+  summary        String?  // compact summary replacing older messages
+  rollingContext String?  // auto-updated context after each exchange
+  isArchived     Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   messages   ConversationMessage[]
@@ -327,6 +328,7 @@ model UserMemory {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   content   String
+  isPinned  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

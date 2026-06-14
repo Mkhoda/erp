@@ -239,7 +239,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           md:relative md:translate-x-0 md:inset-auto
           transition-all duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"}
-          ${sidebarCollapsed ? "md:w-[68px]" : "w-64 md:w-64"}
+          ${sidebarCollapsed ? "md:w-[80px]" : "w-64 md:w-64"}
           p-3
         `}
       >

@@ -39,7 +39,6 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         >
           <motion.div
             key="modal-panel"

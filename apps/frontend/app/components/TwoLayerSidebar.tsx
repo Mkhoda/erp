@@ -96,10 +96,10 @@ function SidebarItem({
         <div className="group relative">
           <button
             title={item.title}
-            className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200
+            className={`w-full flex items-center justify-center p-3 rounded-xl transition-all duration-200
               ${hasActiveChild ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300" : "text-theme-muted hover:bg-theme-hover"}`}
           >
-            {item.icon && <item.icon className="w-4 h-4" />}
+            {item.icon && <item.icon className="w-5 h-5" />}
           </button>
           {/* Tooltip */}
           <div className="top-1/2 right-full z-50 absolute opacity-0 group-hover:opacity-100 mr-2 transition-opacity -translate-y-1/2 pointer-events-none">
@@ -184,10 +184,10 @@ function SidebarItem({
           href={item.page || "#"}
           onClick={onNavigate}
           title={item.title}
-          className={`flex items-center justify-center p-2.5 rounded-xl transition-all duration-200
+          className={`flex items-center justify-center p-3 rounded-xl transition-all duration-200
             ${active ? "bg-blue-600 text-white shadow-md shadow-blue-500/30" : "text-theme-muted hover:bg-theme-hover"}`}
         >
-          {item.icon && <item.icon className="w-4 h-4" />}
+          {item.icon && <item.icon className="w-5 h-5" />}
         </Link>
         <div className="top-1/2 right-full z-50 absolute opacity-0 group-hover:opacity-100 mr-2 transition-opacity -translate-y-1/2 pointer-events-none">
           <div className="flex items-center gap-1.5 bg-theme-primary shadow-lg px-2 py-1 rounded-lg text-white text-xs whitespace-nowrap">

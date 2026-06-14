@@ -873,18 +873,20 @@ html:not(.dark) body {
   border: 1px solid rgba(124, 58, 237, 0.2);
 }
 
-/* Chat message bubbles */
+/* Chat message bubbles — RTL layout (user=right, AI=left) */
 .chat-bubble-user {
   background: linear-gradient(135deg, rgb(37 99 235), rgb(29 78 216));
   color: white;
-  border-radius: 18px 18px 4px 18px;
+  padding: 10px 14px;
+  border-radius: 18px 18px 4px 18px; /* tail on bottom-left (RTL: bottom-right of bubble) */
 }
 
 .chat-bubble-assistant {
   background-color: rgb(255 255 255);
   border: 1px solid rgb(226 232 240);
   color: rgb(15 23 42);
-  border-radius: 4px 18px 18px 18px;
+  padding: 10px 14px;
+  border-radius: 18px 18px 18px 4px; /* tail on bottom-right (RTL: bottom-left of bubble) */
 }
 
 .dark .chat-bubble-assistant {
