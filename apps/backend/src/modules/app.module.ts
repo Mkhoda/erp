@@ -9,6 +9,7 @@ import { AssetsModule } from './assets/assets.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { AiSettingsModule } from './ai-settings/ai-settings.module';
 import { RequestLogsModule } from './request-logs/request-logs.module';
+import { ChatHistoryModule } from './chat-history/chat-history.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
@@ -26,6 +27,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     PermissionsModule,
     AiSettingsModule,
     RequestLogsModule,
+    ChatHistoryModule,
   ],
   controllers: [ReportsController],
   providers: [

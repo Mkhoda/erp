@@ -6,7 +6,7 @@ import {
   Sparkles, Send, ArrowLeft,
   Boxes, Users, Handshake, Building, BarChart3,
   MessageSquare, Plus, Activity, ArrowUpRight,
-  Loader2, AlertCircle,
+  Loader2, AlertCircle, Clock, Brain,
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -26,6 +26,7 @@ type Message = {
 };
 
 type Provider = { id: string; name: string; type: string; model: string | null };
+type RecentConvo = { id: string; title: string | null; provider: string; updatedAt: string; messages: Array<{ content: string; role: string }> };
 
 const statColor: Record<string, string> = {
   blue: "text-blue-600 dark:text-blue-400",
@@ -40,6 +41,7 @@ export default function WorkspacePage() {
   const [statsLoading, setStatsLoading] = React.useState(true);
   const [allProviders, setAllProviders] = React.useState<Provider[]>([]);
   const [provider, setProvider] = React.useState<Provider | null>(null);
+  const [recentConvos, setRecentConvos] = React.useState<RecentConvo[]>([]);
 
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [inputValue, setInputValue] = React.useState("");
@@ -61,7 +63,8 @@ export default function WorkspacePage() {
       fetch(`${API}/asset-assignments`, { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/ai-settings/providers/active`, { headers: h }).then(r => r.ok ? r.json() : []),
-    ]).then(([meData, assets, users, assignments, depts, providers]) => {
+      fetch(`${API}/chat-history/conversations/recent?limit=4`, { headers: h }).then(r => r.ok ? r.json() : []),
+    ]).then(([meData, assets, users, assignments, depts, providers, recent]) => {
       setMe(meData);
       setStats({
         totalAssets: Array.isArray(assets) ? assets.length : 0,
@@ -69,6 +72,7 @@ export default function WorkspacePage() {
         activeAssignments: Array.isArray(assignments) ? assignments.filter((a: any) => !a.returnedAt).length : 0,
         totalDepartments: Array.isArray(depts) ? depts.length : 0,
       });
+      if (Array.isArray(recent)) setRecentConvos(recent);
       if (Array.isArray(providers) && providers.length > 0) {
         setAllProviders(providers);
         setProvider(providers[0]);
@@ -95,7 +99,10 @@ export default function WorkspacePage() {
 
     try {
       const token = localStorage.getItem("token");
-      const history = newMessages.map(m => ({ role: m.role, content: m.content }));
+      // Filter out synthetic welcome messages (id="welcome") before sending to API
+      const history = newMessages
+        .filter(m => m.id !== "welcome")
+        .map(m => ({ role: m.role, content: m.content }));
       const res = await fetch(`${API}/ai-settings/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -281,32 +288,55 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        {/* Chat history shortcut */}
+        {/* Recent conversations */}
         <div className="p-4 card-theme">
-          <h3 className="mb-3 font-bold text-theme-muted text-xs uppercase tracking-wider">دسترسی سریع</h3>
-          <div className="space-y-2">
-            {[
-              { icon: MessageSquare, label: "چت کامل", href: "/dashboard/chat", color: "text-blue-500" },
-              isAdminOrManager && { icon: BarChart3, label: "گزارش‌ها", href: "/dashboard/reports", color: "text-purple-500" },
-              isAdminOrManager && { icon: Boxes, label: "دارایی‌ها", href: "/dashboard/assets", color: "text-green-500" },
-            ].filter(Boolean).map((item: any) => (
-              <Link key={item.href} href={item.href}
-                className="flex items-center gap-2.5 hover:bg-theme-hover px-3 py-2 rounded-xl transition-colors"
-              >
-                <item.icon className={`w-4 h-4 ${item.color}`} />
-                <span className="text-theme-secondary text-sm">{item.label}</span>
-                <ArrowUpRight className="w-3 h-3 text-theme-muted me-auto" />
-              </Link>
-            ))}
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-theme-muted text-xs uppercase tracking-wider">گفتگوهای اخیر</h3>
+            <Link href="/dashboard/chat" className="text-blue-500 text-[10px] hover:underline flex items-center gap-0.5">
+              همه <ArrowLeft className="w-2.5 h-2.5" />
+            </Link>
           </div>
+          {recentConvos.length === 0 ? (
+            <div className="flex flex-col items-center py-4 text-center">
+              <MessageSquare className="w-6 h-6 text-theme-muted/30 mb-1" />
+              <p className="text-theme-muted text-xs">هنوز گفتگویی ندارید</p>
+              <Link href="/dashboard/chat" className="btn-primary text-xs px-3 py-1.5 mt-2 flex items-center gap-1">
+                <Plus className="w-3 h-3" /> شروع گفتگو
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {recentConvos.map(c => (
+                <Link key={c.id} href={`/dashboard/chat?id=${c.id}`}
+                  className="flex items-start gap-2 p-2 rounded-xl hover:bg-theme-hover transition-colors group">
+                  <MessageSquare className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-theme-secondary text-xs font-medium truncate">{c.title || "گفتگوی جدید"}</div>
+                    <div className="text-theme-muted text-[10px] truncate">{c.messages[0]?.content?.substring(0, 40) || "..."}</div>
+                  </div>
+                  <ArrowUpRight className="w-3 h-3 text-theme-muted opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" />
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Team Activity */}
+        {/* Quick links */}
         <div className="p-4 card-theme">
-          <h3 className="mb-3 font-bold text-theme-muted text-xs uppercase tracking-wider">فعالیت اخیر</h3>
-          <div className="flex flex-col justify-center items-center py-6 text-center">
-            <Activity className="mb-2 w-8 h-8 text-theme-muted/40" />
-            <p className="text-theme-muted text-xs">فعالیتی ثبت نشده</p>
+          <h3 className="mb-3 font-bold text-theme-muted text-xs uppercase tracking-wider">دسترسی سریع</h3>
+          <div className="space-y-1">
+            {[
+              { icon: Brain, label: "حافظه AI", href: "/dashboard/chat", color: "text-purple-500" },
+              isAdminOrManager && { icon: BarChart3, label: "گزارش‌ها", href: "/dashboard/reports", color: "text-blue-500" },
+              isAdminOrManager && { icon: Boxes, label: "دارایی‌ها", href: "/dashboard/assets", color: "text-green-500" },
+            ].filter(Boolean).map((item: any) => (
+              <Link key={item.href + item.label} href={item.href}
+                className="flex items-center gap-2.5 hover:bg-theme-hover px-3 py-2 rounded-xl transition-colors">
+                <item.icon className={`w-4 h-4 ${item.color}`} />
+                <span className="text-theme-secondary text-sm">{item.label}</span>
+                <ArrowUpRight className="w-3 h-3 text-theme-muted ms-auto" />
+              </Link>
+            ))}
           </div>
         </div>
       </motion.div>

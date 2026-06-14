@@ -30,6 +30,8 @@ model User {
   assetCostsCreated AssetCost[] @relation("AssetCostCreatedBy")
   assetsCreated Asset[]
   aiUsage       AiUsage[]
+  conversations Conversation[]
+  memories      UserMemory[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -288,6 +290,47 @@ model Otp {
   createdAt DateTime @default(now())
 
   @@index([phone, createdAt])
+}
+
+// Persistent chat conversations per user
+model Conversation {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  title      String?
+  provider   String
+  model      String?
+  summary    String?  // compact summary replacing older messages
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  messages   ConversationMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model ConversationMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String       // "user" | "assistant"
+  content        String
+  latencyMs      Int?
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// User memory: facts the AI should remember across conversations
+model UserMemory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 // AI provider configurations — managed via admin panel

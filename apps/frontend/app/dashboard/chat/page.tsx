@@ -1,436 +1,536 @@
 "use client";
 import React from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles, Send, Plus, Search, MessageSquare, Trash2,
-  ChevronDown, Copy, ThumbsUp, ThumbsDown, Shield, ShieldOff,
-  AlertCircle, Loader2, Bot,
+  Sparkles, Send, Plus, Trash2, Archive, Edit2, Check, X,
+  ChevronLeft, ChevronRight, Brain, Zap, Settings,
+  MoreHorizontal, Clock, MessageSquare, Loader2, AlertCircle,
+  BookMarked, RefreshCw, Download,
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-  model?: string;
-  providerType?: string;
-  latencyMs?: number;
-  error?: boolean;
-};
+// ── Types ──────────────────────────────────────────────────────
+type Provider = { id: string; name: string; type: string; model: string | null };
+type Message  = { id: string; role: "user" | "assistant"; content: string; latencyMs?: number; error?: boolean };
+type Convo    = { id: string; title: string | null; provider: string; model: string | null; updatedAt: string; messages: Array<{ content: string; role: string }> };
+type Memory   = { id: string; content: string; updatedAt: string };
 
-type Provider = {
-  id: string;
-  name: string;
-  type: string;
-  model: string | null;
-  isActive: boolean;
-};
+// ── Markdown renderer (minimal) ────────────────────────────────
+function renderMd(text: string) {
+  return text
+    .replace(/```([\s\S]*?)```/g, '<pre class="bg-slate-900 text-green-400 rounded-lg p-3 text-xs overflow-x-auto my-2 font-mono">$1</pre>')
+    .replace(/`([^`]+)`/g, '<code class="bg-black/20 rounded px-1 text-xs font-mono">$1</code>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^### (.+)$/gm, '<h3 class="font-bold text-sm mt-3 mb-1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="font-bold mt-3 mb-1">$1</h2>')
+    .replace(/^- (.+)$/gm, '<li class="ms-4 list-disc">$1</li>')
+    .replace(/\n/g, '<br/>');
+}
 
-const PROVIDER_COLORS: Record<string, string> = {
-  openai: "bg-emerald-500",
-  anthropic: "bg-orange-500",
-  gemini: "bg-blue-500",
-  deepseek: "bg-indigo-500",
-  agnes: "bg-violet-500",
-  custom: "bg-gray-500",
-};
-
-const SUGGESTIONS = [
-  "دارایی‌های تخصیص‌نیافته را نشان بده",
-  "کاربران فعال این ماه چه کسانی هستند؟",
-  "گزارش کاملی از دارایی‌های ساختمان مرکزی بده",
-  "آخرین واگذاری‌ها را لیست کن",
-];
-
-function MarkdownText({ content }: { content: string }) {
-  const lines = content.split("\n");
-  return (
-    <div className="space-y-1.5 text-sm leading-relaxed">
-      {lines.map((line, i) => {
-        if (line.startsWith("- ") || line.startsWith("• ")) {
-          return (
-            <div key={i} className="flex items-start gap-2">
-              <span className="mt-2 w-1.5 h-1.5 rounded-full bg-current shrink-0 opacity-60" />
-              <span dangerouslySetInnerHTML={{ __html: line.slice(2).replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/`(.*?)`/g, "<code class='bg-black/10 dark:bg-white/10 px-1 rounded text-xs font-mono'>$1</code>") }} />
-            </div>
-          );
-        }
-        if (line.startsWith("# ")) return <h3 key={i} className="font-bold text-base mt-2">{line.slice(2)}</h3>;
-        if (line.startsWith("## ")) return <h4 key={i} className="font-semibold mt-2">{line.slice(3)}</h4>;
-        if (!line.trim()) return <div key={i} className="h-1" />;
-        return (
-          <p key={i} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/`(.*?)`/g, "<code class='bg-black/10 dark:bg-white/10 px-1 rounded text-xs font-mono'>$1</code>") }} />
-        );
-      })}
-    </div>
-  );
+function groupByDate(convos: Convo[]): Record<string, Convo[]> {
+  const now = new Date();
+  const today = now.toDateString();
+  const yesterday = new Date(now.getTime() - 86400000).toDateString();
+  const groups: Record<string, Convo[]> = {};
+  for (const c of convos) {
+    const d = new Date(c.updatedAt).toDateString();
+    const label = d === today ? "امروز" : d === yesterday ? "دیروز" : new Date(c.updatedAt).toLocaleDateString("fa-IR", { month: "long", day: "numeric" });
+    (groups[label] ??= []).push(c);
+  }
+  return groups;
 }
 
 export default function ChatPage() {
-  React.useEffect(() => { document.title = "گفتگو با AI | Arzesh AI"; }, []);
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-  const [me, setMe] = React.useState<any>(null);
   const [providers, setProviders] = React.useState<Provider[]>([]);
-  const [selectedProvider, setSelectedProvider] = React.useState<string>("");
-  const [providerOpen, setProviderOpen] = React.useState(false);
-  const [safeMode, setSafeMode] = React.useState(true);
+  const [selectedProvider, setSelectedProvider] = React.useState<Provider | null>(null);
+  const [convos, setConvos] = React.useState<Convo[]>([]);
+  const [activeId, setActiveId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
-  const [conversations, setConversations] = React.useState<Array<{ id: string; title: string; messages: Message[] }>>([
-    { id: "1", title: "گفتگوی جدید", messages: [] },
-  ]);
-  const [activeConvId, setActiveConvId] = React.useState("1");
-  const [convQuery, setConvQuery] = React.useState("");
-
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const [safeMode, setSafeMode] = React.useState(true);
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [memoryOpen, setMemoryOpen] = React.useState(false);
+  const [memories, setMemories] = React.useState<Memory[]>([]);
+  const [memInput, setMemInput] = React.useState("");
+  const [editMemId, setEditMemId] = React.useState<string | null>(null);
+  const [editMemVal, setEditMemVal] = React.useState("");
+  const [renameId, setRenameId] = React.useState<string | null>(null);
+  const [renameVal, setRenameVal] = React.useState("");
+  const [compacting, setCompacting] = React.useState(false);
+  const [extracting, setExtracting] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+  const endRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
 
-  // Load me + active providers
+  const searchParams = useSearchParams();
+
+  React.useEffect(() => { document.title = "گفتگو با AI | Arzesh"; }, []);
+
+  const token = () => localStorage.getItem("token") || "";
+  const auth = () => ({ Authorization: `Bearer ${token()}` });
+  const json = () => ({ "Content-Type": "application/json", ...auth() });
+
+  // Initial load
   React.useEffect(() => {
-    if (!token) return;
-    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null).then(setMe).catch(() => {});
-    fetch(`${API}/ai-settings/providers/active`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : [])
-      .then((data: Provider[]) => {
-        setProviders(Array.isArray(data) ? data : []);
-        if (data.length > 0 && !selectedProvider) setSelectedProvider(data[0].type);
-      }).catch(() => {});
-  }, [token]);
+    const startId = searchParams.get("id");
+    Promise.all([
+      fetch(`${API}/ai-settings/providers/active`, { headers: auth() }).then(r => r.ok ? r.json() : []),
+      fetch(`${API}/chat-history/conversations`, { headers: auth() }).then(r => r.ok ? r.json() : []),
+      fetch(`${API}/chat-history/memory`, { headers: auth() }).then(r => r.ok ? r.json() : []),
+    ]).then(([provs, convList, mems]) => {
+      setProviders(provs);
+      if (provs.length > 0) setSelectedProvider(provs[0]);
+      setConvos(convList);
+      setMemories(mems);
+      // Auto-open conversation from URL param
+      if (startId) loadConvo(startId);
+    }).finally(() => setLoading(false));
+  }, []);
 
   React.useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
 
-  const currentProvider = providers.find(p => p.type === selectedProvider);
-  const initial = (me?.firstName?.[0] || "م").toUpperCase();
-
-  const welcomeMessage: Message = {
-    id: "welcome",
-    role: "assistant",
-    content: `سلام! من **دستیار هوشمند Arzesh AI** هستم 🤖\n\n${
-      providers.length === 0
-        ? "⚠️ هیچ مدل هوش مصنوعی فعالی پیکربندی نشده است.\n\nلطفاً از تنظیمات هوش مصنوعی یک مدل فعال کنید."
-        : `می‌توانم با **${providers.length} مدل** به شما کمک کنم:\n${providers.map(p => `- ${p.name} (${p.model || p.type})`).join("\n")}\n\n**چه کمکی می‌توانم بکنم؟**`
-    }`,
-    timestamp: new Date(),
+  // Load conversation messages
+  const loadConvo = async (id: string) => {
+    setActiveId(id);
+    const res = await fetch(`${API}/chat-history/conversations/${id}`, { headers: auth() });
+    if (!res.ok) return;
+    const data = await res.json();
+    setMessages(data.messages.map((m: any) => ({
+      id: m.id, role: m.role, content: m.content, latencyMs: m.latencyMs,
+    })));
+    // Add summary as first synthetic message if exists
+    if (data.summary) {
+      setMessages(prev => [
+        { id: "__summary__", role: "assistant" as const, content: `📝 **خلاصه مکالمات قبلی:**\n\n${data.summary}` },
+        ...prev,
+      ]);
+    }
   };
 
-  const displayMessages = messages.length === 0 ? [welcomeMessage] : messages;
+  const newConvo = async () => {
+    if (!selectedProvider) return;
+    const res = await fetch(`${API}/chat-history/conversations`, {
+      method: "POST",
+      headers: json(),
+      body: JSON.stringify({ provider: selectedProvider.type, model: selectedProvider.model }),
+    });
+    if (!res.ok) return;
+    const c = await res.json();
+    setConvos(prev => [{ ...c, messages: [] }, ...prev]);
+    setActiveId(c.id);
+    setMessages([]);
+    inputRef.current?.focus();
+  };
 
-  async function sendMessage(text?: string) {
-    const content = (text ?? input).trim();
-    if (!content || sending) return;
-    if (!selectedProvider) {
-      return;
-    }
-
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content, timestamp: new Date() };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+  const sendMessage = async () => {
+    const content = input.trim();
+    if (!content || sending || !activeId) return;
     setInput("");
+
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content };
+    setMessages(prev => [...prev, userMsg]);
     setSending(true);
 
-    // Update conversation title from first message
-    if (messages.length === 0) {
-      setConversations(cs => cs.map(c => c.id === activeConvId ? { ...c, title: content.slice(0, 40) } : c));
-    }
-
     try {
-      const historyForApi = newMessages.map(m => ({ role: m.role, content: m.content }));
-      const res = await fetch(`${API}/ai-settings/chat`, {
+      const res = await fetch(`${API}/chat-history/conversations/${activeId}/send`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ providerType: selectedProvider, messages: historyForApi, safeMode }),
+        headers: json(),
+        body: JSON.stringify({ content, safeMode }),
       });
       const data = await res.json();
-      const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
+      setMessages(prev => [...prev, {
+        id: data.messageId || (Date.now() + 1).toString(),
         role: "assistant",
         content: data.content || "پاسخی دریافت نشد.",
-        timestamp: new Date(),
-        model: data.model || selectedProvider,
-        providerType: data.providerType,
         latencyMs: data.latencyMs,
         error: !data.success,
-      };
-      setMessages(prev => [...prev, assistantMsg]);
-      setConversations(cs => cs.map(c => c.id === activeConvId ? { ...c, messages: [...newMessages, assistantMsg] } : c));
-    } catch (err: any) {
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `⚠️ خطا در ارتباط با سرور: ${err.message}`,
-        timestamp: new Date(),
-        error: true,
       }]);
+      // Update convo list preview
+      setConvos(prev => prev.map(c => c.id === activeId
+        ? { ...c, updatedAt: new Date().toISOString(), title: c.title || content.substring(0, 50), messages: [{ content: data.content, role: "assistant" }] }
+        : c
+      ).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+    } catch {
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: "خطا در اتصال.", error: true }]);
     } finally {
       setSending(false);
     }
-  }
+  };
 
-  function newConversation() {
-    const id = Date.now().toString();
-    setConversations(cs => [...cs, { id, title: "گفتگوی جدید", messages: [] }]);
-    setActiveConvId(id);
-    setMessages([]);
-  }
+  const deleteConvo = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("این مکالمه حذف شود؟")) return;
+    await fetch(`${API}/chat-history/conversations/${id}`, { method: "DELETE", headers: auth() });
+    setConvos(prev => prev.filter(c => c.id !== id));
+    if (activeId === id) { setActiveId(null); setMessages([]); }
+  };
 
-  function switchConversation(id: string) {
-    const conv = conversations.find(c => c.id === id);
-    if (!conv) return;
-    setActiveConvId(id);
-    setMessages(conv.messages);
-  }
+  const compact = async () => {
+    if (!activeId) return;
+    setCompacting(true);
+    try {
+      const res = await fetch(`${API}/chat-history/conversations/${activeId}/compact`, { method: "POST", headers: auth() });
+      const data = await res.json();
+      if (data.ok && data.summary) {
+        await loadConvo(activeId);
+        alert(`✓ ${data.compacted} پیام قدیمی فشرده شدند.`);
+      } else {
+        alert("پیام‌های کافی برای فشرده‌سازی وجود ندارد (حداقل ۱۰ پیام).");
+      }
+    } finally { setCompacting(false); }
+  };
 
-  function deleteConversation(id: string) {
-    if (conversations.length === 1) return;
-    setConversations(cs => cs.filter(c => c.id !== id));
-    if (activeConvId === id) {
-      const remaining = conversations.filter(c => c.id !== id);
-      switchConversation(remaining[0].id);
-    }
-  }
+  const extractMemories = async () => {
+    if (!activeId) return;
+    setExtracting(true);
+    try {
+      const res = await fetch(`${API}/chat-history/conversations/${activeId}/extract-memories`, { method: "POST", headers: auth() });
+      const data = await res.json();
+      if (data.extracted > 0) {
+        setMemories(prev => [...data.memories, ...prev]);
+        alert(`✓ ${data.extracted} حافظه جدید استخراج شد.`);
+      } else {
+        alert("حافظه‌ای برای استخراج یافت نشد.");
+      }
+    } finally { setExtracting(false); }
+  };
 
-  function copyMessage(content: string) {
-    navigator.clipboard.writeText(content).catch(() => {});
-  }
+  const addMemory = async () => {
+    if (!memInput.trim()) return;
+    const res = await fetch(`${API}/chat-history/memory`, { method: "POST", headers: json(), body: JSON.stringify({ content: memInput.trim() }) });
+    if (res.ok) { const m = await res.json(); setMemories(prev => [m, ...prev]); setMemInput(""); }
+  };
 
-  const handleKey = (e: React.KeyboardEvent) => {
+  const saveMemory = async (id: string) => {
+    const res = await fetch(`${API}/chat-history/memory/${id}`, { method: "PATCH", headers: json(), body: JSON.stringify({ content: editMemVal }) });
+    if (res.ok) { setMemories(prev => prev.map(m => m.id === id ? { ...m, content: editMemVal } : m)); setEditMemId(null); }
+  };
+
+  const deleteMemory = async (id: string) => {
+    await fetch(`${API}/chat-history/memory/${id}`, { method: "DELETE", headers: auth() });
+    setMemories(prev => prev.filter(m => m.id !== id));
+  };
+
+  const renameConvo = async (id: string) => {
+    const res = await fetch(`${API}/chat-history/conversations/${id}/rename`, { method: "PATCH", headers: json(), body: JSON.stringify({ title: renameVal }) });
+    if (res.ok) { setConvos(prev => prev.map(c => c.id === id ? { ...c, title: renameVal } : c)); setRenameId(null); }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
-  const filteredConvs = conversations.filter(c => c.title.includes(convQuery));
+  const activeConvo = convos.find(c => c.id === activeId);
+  const grouped = groupByDate(convos);
 
   return (
-    <div className="flex h-[calc(100vh-88px)] gap-0 rounded-2xl overflow-hidden border border-theme bg-theme-card" dir="rtl">
+    <div className="flex h-[calc(100vh-88px)] overflow-hidden" dir="rtl">
 
       {/* ── Sidebar ── */}
-      <div className="w-64 shrink-0 border-l border-theme flex flex-col bg-theme-secondary">
-        <div className="p-3 border-b border-theme">
-          <button onClick={newConversation} className="w-full flex items-center gap-2 btn-theme-primary py-2.5 px-3 text-sm justify-center rounded-xl">
-            <Plus className="w-4 h-4" />
-            گفتگوی جدید
-          </button>
-        </div>
-        <div className="px-3 py-2 border-b border-theme">
-          <div className="flex items-center gap-2 bg-theme-card border border-theme rounded-lg px-3 py-1.5">
-            <Search className="w-3.5 h-3.5 text-theme-muted shrink-0" />
-            <input value={convQuery} onChange={e => setConvQuery(e.target.value)} placeholder="جستجو..." className="flex-1 bg-transparent text-sm text-theme-primary placeholder:text-theme-muted outline-none text-right" />
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto py-1">
-          {filteredConvs.map(conv => (
-            <button key={conv.id} onClick={() => switchConversation(conv.id)}
-              className={`w-full text-right px-3 py-2.5 flex items-start gap-2.5 hover:bg-theme-hover transition-colors group ${conv.id === activeConvId ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
-            >
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${conv.id === activeConvId ? "bg-blue-100 dark:bg-blue-900/60" : "bg-theme-hover"}`}>
-                <MessageSquare className={`w-3.5 h-3.5 ${conv.id === activeConvId ? "text-blue-600 dark:text-blue-400" : "text-theme-muted"}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium truncate ${conv.id === activeConvId ? "text-blue-700 dark:text-blue-300" : "text-theme-primary"}`}>{conv.title}</div>
-                <div className="text-xs text-theme-muted mt-0.5">{conv.messages.length} پیام</div>
-              </div>
-              <button onClick={e => { e.stopPropagation(); deleteConversation(conv.id); }} className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-950/30 hover:text-red-500 text-theme-muted transition-all">
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </button>
-          ))}
-        </div>
-
-        {/* Safe mode + model info at bottom */}
-        <div className="p-3 border-t border-theme space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={safeMode} onChange={e => setSafeMode(e.target.checked)} className="rounded accent-blue-600" />
-            <span className="text-xs text-theme-secondary flex items-center gap-1">
-              {safeMode ? <Shield className="w-3.5 h-3.5 text-green-500" /> : <ShieldOff className="w-3.5 h-3.5 text-amber-500" />}
-              حالت ایمن
-            </span>
-          </label>
-          <div className="text-[10px] text-theme-muted">
-            {safeMode ? "محتوای مضر فیلتر می‌شود" : "بدون فیلتر محتوا"}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Chat area ── */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-theme">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-ai-gradient flex items-center justify-center shadow-md shadow-blue-500/20">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <div className="font-semibold text-theme-primary text-sm">دستیار هوشمند Arzesh AI</div>
-              <div className="text-xs text-theme-muted">
-                {providers.length === 0 ? "مدل فعالی وجود ندارد" : `${providers.length} مدل در دسترس`}
-              </div>
-            </div>
-          </div>
-
-          {/* Model selector */}
-          {providers.length > 0 && (
-            <div className="relative">
+      <AnimatePresence initial={false}>
+        {sidebarOpen && (
+          <motion.aside
+            initial={{ width: 0, opacity: 0 }} animate={{ width: 260, opacity: 1 }} exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-col border-l border-theme bg-theme-secondary overflow-hidden shrink-0"
+          >
+            {/* Sidebar header */}
+            <div className="flex items-center gap-2 p-3 border-b border-theme">
               <button
-                onClick={() => setProviderOpen(v => !v)}
-                className="flex items-center gap-2 bg-theme-secondary border border-theme hover:bg-theme-hover px-3 py-1.5 rounded-xl text-sm text-theme-secondary transition-colors"
+                onClick={newConvo}
+                disabled={!selectedProvider}
+                className="flex flex-1 items-center gap-2 bg-ai-gradient hover:opacity-90 disabled:opacity-40 px-3 py-2 rounded-xl text-white text-sm font-medium transition-opacity"
               >
-                {currentProvider && (
-                  <span className={`w-2 h-2 rounded-full ${PROVIDER_COLORS[currentProvider.type] || "bg-gray-500"}`} />
-                )}
-                <span className="font-medium">{currentProvider?.name || "انتخاب مدل"}</span>
-                {currentProvider?.model && <span className="text-theme-muted text-xs font-mono hidden sm:inline">{currentProvider.model}</span>}
-                <ChevronDown className={`w-3.5 h-3.5 text-theme-muted transition-transform ${providerOpen ? "rotate-180" : ""}`} />
+                <Plus className="w-4 h-4" /> گفتگوی جدید
               </button>
+              <button onClick={() => setMemoryOpen(!memoryOpen)} title="حافظه"
+                className={`p-2 rounded-xl border transition-colors ${memoryOpen ? "border-blue-500 text-blue-500" : "border-theme text-theme-muted hover:text-theme-primary"}`}>
+                <Brain className="w-4 h-4" />
+              </button>
+            </div>
 
-              <AnimatePresence>
-                {providerOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                    transition={{ duration: 0.12 }}
-                    className="absolute left-0 top-full mt-1 w-64 bg-theme-card border border-theme rounded-xl shadow-xl z-50 overflow-hidden"
-                  >
-                    <div className="p-1">
-                      {providers.map(p => (
-                        <button key={p.type} onClick={() => { setSelectedProvider(p.type); setProviderOpen(false); }}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-right transition-colors hover:bg-theme-hover ${selectedProvider === p.type ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
-                        >
-                          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${PROVIDER_COLORS[p.type] || "bg-gray-500"}`} />
-                          <div className="flex-1 min-w-0">
-                            <div className={`text-sm font-medium ${selectedProvider === p.type ? "text-blue-700 dark:text-blue-300" : "text-theme-primary"}`}>{p.name}</div>
-                            {p.model && <div className="text-[11px] text-theme-muted font-mono truncate">{p.model}</div>}
+            {/* Provider selector */}
+            {providers.length > 0 && (
+              <div className="px-3 py-2 border-b border-theme">
+                <select
+                  value={selectedProvider?.type || ""}
+                  onChange={e => setSelectedProvider(providers.find(p => p.type === e.target.value) || null)}
+                  className="w-full bg-transparent text-theme-secondary text-xs outline-none border border-theme rounded-lg px-2 py-1.5"
+                >
+                  {providers.map(p => <option key={p.type} value={p.type}>{p.name} — {p.model || p.type}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Conversation list */}
+            <div className="flex-1 overflow-y-auto py-2">
+              {loading && <div className="text-center text-theme-muted text-xs py-8">در حال بارگذاری...</div>}
+              {!loading && convos.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                  <MessageSquare className="w-8 h-8 text-theme-muted/40 mb-2" />
+                  <p className="text-theme-muted text-xs">هنوز گفتگویی ندارید</p>
+                  <p className="text-theme-muted/60 text-xs mt-1">روی «گفتگوی جدید» کلیک کنید</p>
+                </div>
+              )}
+              {Object.entries(grouped).map(([label, group]) => (
+                <div key={label}>
+                  <div className="px-3 py-1 text-theme-muted text-[10px] font-semibold uppercase tracking-wider">{label}</div>
+                  {group.map(c => (
+                    <div key={c.id}
+                      onClick={() => loadConvo(c.id)}
+                      className={`group relative flex items-start gap-2 px-3 py-2 cursor-pointer transition-colors mx-1 rounded-xl ${activeId === c.id ? "bg-theme-hover" : "hover:bg-theme-hover/50"}`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-theme-muted mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        {renameId === c.id ? (
+                          <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                            <input autoFocus value={renameVal} onChange={e => setRenameVal(e.target.value)}
+                              onKeyDown={e => e.key === "Enter" && renameConvo(c.id)}
+                              className="flex-1 bg-transparent border-b border-blue-500 text-xs outline-none text-theme-primary" />
+                            <button onClick={() => renameConvo(c.id)} className="text-green-500"><Check className="w-3 h-3" /></button>
+                            <button onClick={() => setRenameId(null)} className="text-red-400"><X className="w-3 h-3" /></button>
                           </div>
-                          {selectedProvider === p.type && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
-                        </button>
-                      ))}
+                        ) : (
+                          <div className="text-theme-secondary text-xs font-medium truncate">
+                            {c.title || "گفتگوی جدید"}
+                          </div>
+                        )}
+                        <div className="text-theme-muted text-[10px] truncate mt-0.5">
+                          {c.messages[0]?.content?.substring(0, 50) || "..."}
+                        </div>
+                      </div>
+                      {/* Actions */}
+                      <div className="hidden group-hover:flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => { setRenameId(c.id); setRenameVal(c.title || ""); }}
+                          className="p-1 rounded text-theme-muted hover:text-theme-primary"><Edit2 className="w-3 h-3" /></button>
+                        <button onClick={e => deleteConvo(c.id, e)}
+                          className="p-1 rounded text-theme-muted hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                      </div>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  ))}
+                </div>
+              ))}
+            </div>
 
-              {providerOpen && <div className="fixed inset-0 z-40" onClick={() => setProviderOpen(false)} />}
+            {/* Safe mode toggle */}
+            <div className="px-3 py-3 border-t border-theme">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <div onClick={() => setSafeMode(!safeMode)}
+                  className={`relative w-8 h-4 rounded-full transition-colors ${safeMode ? "bg-green-500" : "bg-theme-muted/30"}`}>
+                  <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${safeMode ? "right-0.5" : "left-0.5"}`} />
+                </div>
+                <span className="text-xs text-theme-muted">حالت ایمن</span>
+              </label>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* ── Main chat area ── */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-theme bg-theme-secondary shrink-0">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted transition-colors">
+            {sidebarOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="flex justify-center items-center bg-ai-gradient shadow rounded-lg w-7 h-7 shrink-0">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-theme-primary text-sm truncate">
+                {activeConvo?.title || (activeId ? "گفتگوی جدید" : "دستیار هوشمند")}
+              </div>
+              {selectedProvider && (
+                <div className="flex items-center gap-1 text-green-500 text-xs">
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                  {selectedProvider.name} · {selectedProvider.model || selectedProvider.type}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Toolbar */}
+          {activeId && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={extractMemories} disabled={extracting} title="استخراج حافظه از این مکالمه"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-theme-muted hover:bg-theme-hover transition-colors disabled:opacity-50">
+                {extracting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookMarked className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">حافظه</span>
+              </button>
+              <button onClick={compact} disabled={compacting} title="فشرده‌سازی مکالمه"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-theme-muted hover:bg-theme-hover transition-colors disabled:opacity-50">
+                {compacting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">فشرده</span>
+              </button>
             </div>
           )}
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-          <AnimatePresence initial={false}>
-            {displayMessages.map(msg => (
-              <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
-                className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
-              >
-                {msg.role === "assistant" ? (
-                  <div className="w-8 h-8 rounded-full bg-ai-gradient flex items-center justify-center shrink-0 shadow mt-0.5">
-                    <Sparkles className="w-4 h-4 text-white" />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-theme-secondary border border-theme flex items-center justify-center shrink-0 text-xs font-bold text-theme-secondary mt-0.5">
-                    {initial}
-                  </div>
-                )}
-
-                <div className="max-w-[72%] space-y-1 group">
-                  <div className={`${msg.role === "user" ? "chat-bubble-user" : msg.error ? "chat-bubble-assistant border border-red-200 dark:border-red-800" : "chat-bubble-assistant"} px-4 py-3`}>
-                    {msg.error && <AlertCircle className="w-3.5 h-3.5 text-red-500 mb-1.5" />}
-                    {msg.role === "assistant"
-                      ? <MarkdownText content={msg.content} />
-                      : <p className="text-sm leading-relaxed">{msg.content}</p>
-                    }
-                  </div>
-
-                  {/* Message meta */}
-                  {msg.role === "assistant" && msg.id !== "welcome" && (
-                    <div className="flex items-center gap-2 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => copyMessage(msg.content)} className="p-1 rounded hover:bg-theme-hover text-theme-muted" title="کپی">
-                        <Copy className="w-3 h-3" />
-                      </button>
-                      <button className="p-1 rounded hover:bg-theme-hover text-theme-muted" title="مفید بود"><ThumbsUp className="w-3 h-3" /></button>
-                      <button className="p-1 rounded hover:bg-theme-hover text-theme-muted" title="مفید نبود"><ThumbsDown className="w-3 h-3" /></button>
-                      {msg.model && (
-                        <span className="text-[10px] text-theme-muted font-mono mr-auto">{msg.model} {msg.latencyMs ? `· ${msg.latencyMs}ms` : ""}</span>
+        {/* Memory panel (overlay) */}
+        <AnimatePresence>
+          {memoryOpen && (
+            <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
+              className="overflow-hidden border-b border-theme bg-blue-50/50 dark:bg-blue-900/10">
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Brain className="w-4 h-4 text-blue-500" />
+                  <span className="font-semibold text-theme-primary text-sm">حافظه شخصی ({memories.length})</span>
+                  <span className="text-theme-muted text-xs mr-auto">مواردی که AI در تمام گفتگوها به یاد می‌آورد</span>
+                </div>
+                <div className="flex gap-2 mb-3">
+                  <input value={memInput} onChange={e => setMemInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && addMemory()}
+                    placeholder="افزودن حافظه جدید (مثلاً: نام من مهدیه)"
+                    className="flex-1 input-theme text-sm py-1.5 px-3" />
+                  <button onClick={addMemory} className="btn-primary text-xs px-3 py-1.5">افزودن</button>
+                </div>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {memories.length === 0 && <p className="text-theme-muted text-xs text-center py-2">هنوز حافظه‌ای ندارید. از دکمه «حافظه» در toolbar استخراج کنید.</p>}
+                  {memories.map(m => (
+                    <div key={m.id} className="flex items-start gap-2 bg-white dark:bg-white/5 rounded-lg px-3 py-2 border border-theme">
+                      {editMemId === m.id ? (
+                        <>
+                          <input autoFocus value={editMemVal} onChange={e => setEditMemVal(e.target.value)}
+                            className="flex-1 bg-transparent outline-none text-xs text-theme-primary border-b border-blue-500" />
+                          <button onClick={() => saveMemory(m.id)} className="text-green-500"><Check className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => setEditMemId(null)} className="text-red-400"><X className="w-3.5 h-3.5" /></button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex-1 text-xs text-theme-secondary">{m.content}</span>
+                          <button onClick={() => { setEditMemId(m.id); setEditMemVal(m.content); }}
+                            className="text-theme-muted hover:text-theme-primary"><Edit2 className="w-3 h-3" /></button>
+                          <button onClick={() => deleteMemory(m.id)} className="text-theme-muted hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                        </>
                       )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {/* Typing indicator */}
-          {sending && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 items-start">
-              <div className="w-8 h-8 rounded-full bg-ai-gradient flex items-center justify-center shrink-0 shadow">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <div className="chat-bubble-assistant px-4 py-3 flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
-                <span className="text-sm text-theme-muted">در حال فکر کردن...</span>
               </div>
             </motion.div>
           )}
+        </AnimatePresence>
 
-          {/* Suggestion chips */}
-          {messages.length === 0 && providers.length > 0 && (
-            <div className="flex flex-wrap gap-2 justify-center pt-4">
-              {SUGGESTIONS.map(s => (
-                <button key={s} onClick={() => sendMessage(s)}
-                  className="px-3 py-2 text-sm rounded-xl bg-theme-secondary border border-theme text-theme-secondary hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 dark:hover:bg-blue-950/30 dark:hover:border-blue-800 dark:hover:text-blue-400 transition-all"
-                >{s}</button>
-              ))}
-            </div>
-          )}
-
-          {/* No provider warning */}
-          {providers.length === 0 && (
-            <div className="flex flex-col items-center gap-3 py-8 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/30 flex items-center justify-center">
-                <Bot className="w-7 h-7 text-amber-500" />
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+          {!activeId && (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="w-16 h-16 bg-ai-gradient rounded-2xl flex items-center justify-center shadow-lg mb-4">
+                <Sparkles className="w-8 h-8 text-white" />
               </div>
-              <p className="text-theme-secondary text-sm">هیچ مدل هوش مصنوعی فعالی پیکربندی نشده</p>
-              <p className="text-theme-muted text-xs">از منوی تنظیمات هوش مصنوعی یک مدل فعال کنید</p>
+              <h2 className="text-xl font-bold text-theme-primary mb-2">دستیار هوشمند Arzesh</h2>
+              <p className="text-theme-muted text-sm max-w-sm mb-6">
+                {providers.length === 0 ? "هیچ مدل AI فعالی تنظیم نشده. از تنظیمات AI یک مدل اضافه کنید." : "یک گفتگوی جدید شروع کنید یا از تاریخچه انتخاب کنید."}
+              </p>
+              {providers.length > 0 && (
+                <button onClick={newConvo} className="btn-primary flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> شروع گفتگو
+                </button>
+              )}
             </div>
           )}
 
-          <div ref={messagesEndRef} />
+          {activeId && messages.length === 0 && !sending && (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <MessageSquare className="w-10 h-10 text-theme-muted/30 mb-3" />
+              <p className="text-theme-muted text-sm">پیام اول را بنویسید...</p>
+              {memories.length > 0 && (
+                <p className="text-blue-500 text-xs mt-2 flex items-center gap-1">
+                  <Brain className="w-3 h-3" /> {memories.length} حافظه فعال
+                </p>
+              )}
+            </div>
+          )}
+
+          {messages.map((msg, i) => (
+            <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+            >
+              {msg.role === "assistant" && (
+                <div className="w-8 h-8 bg-ai-gradient rounded-full flex items-center justify-center shrink-0 mt-0.5 shadow">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+              )}
+              <div className={`max-w-[75%] ${msg.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"} ${msg.error ? "border border-red-300 dark:border-red-700" : ""}`}>
+                {msg.error && <AlertCircle className="inline w-3.5 h-3.5 text-red-500 me-1 mb-0.5" />}
+                <div className="text-sm leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: renderMd(msg.content) }} />
+                {msg.latencyMs && (
+                  <div className="flex items-center gap-1 mt-1 text-[10px] text-theme-muted/60">
+                    <Clock className="w-2.5 h-2.5" /> {msg.latencyMs}ms
+                  </div>
+                )}
+              </div>
+              {msg.role === "user" && (
+                <div className="w-8 h-8 bg-theme-secondary border border-theme rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold text-theme-secondary">
+                  م
+                </div>
+              )}
+            </motion.div>
+          ))}
+
+          {sending && (
+            <div className="flex gap-3">
+              <div className="w-8 h-8 bg-ai-gradient rounded-full flex items-center justify-center shrink-0 shadow">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div className="chat-bubble-assistant flex items-center gap-2">
+                <span className="flex gap-1">
+                  {[0,1,2].map(i => (
+                    <span key={i} className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </span>
+                <span className="text-xs text-theme-muted">در حال پاسخ...</span>
+              </div>
+            </div>
+          )}
+          <div ref={endRef} />
         </div>
 
         {/* Input */}
-        <div className="px-5 pb-5 pt-2">
-          {!selectedProvider && providers.length > 0 && (
-            <p className="text-center text-xs text-amber-500 mb-2">یک مدل انتخاب کنید</p>
-          )}
-          <div className={`chat-input-container flex items-end gap-3 px-4 py-3 ${!selectedProvider ? "opacity-60" : ""}`}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
-              onKeyDown={handleKey}
-              disabled={!selectedProvider || sending}
-              placeholder={!selectedProvider ? "ابتدا یک مدل انتخاب کنید..." : "پیام بنویس... (Enter برای ارسال، Shift+Enter برای خط جدید)"}
-              rows={1}
-              className="flex-1 bg-transparent text-sm text-theme-primary placeholder:text-theme-muted outline-none text-right resize-none max-h-40 overflow-y-auto leading-6 disabled:cursor-not-allowed"
-            />
-            <button
-              onClick={() => sendMessage()}
-              disabled={!input.trim() || sending || !selectedProvider}
-              className="w-9 h-9 rounded-xl bg-ai-gradient flex items-center justify-center text-white shadow-md shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity shrink-0"
-            >
-              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
+        {activeId && (
+          <div className="px-4 pb-4 pt-2 shrink-0">
+            <div className="flex gap-2 items-end bg-theme-secondary border border-theme rounded-2xl px-4 py-3 shadow-sm focus-within:border-blue-500/50 transition-colors">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={sending}
+                placeholder="پیام بنویس... (Enter برای ارسال، Shift+Enter برای خط جدید)"
+                rows={1}
+                style={{ resize: "none" }}
+                className="flex-1 bg-transparent outline-none text-theme-primary placeholder:text-theme-muted text-sm text-right leading-relaxed disabled:opacity-50"
+                onInput={e => {
+                  const t = e.currentTarget;
+                  t.style.height = "auto";
+                  t.style.height = Math.min(t.scrollHeight, 120) + "px";
+                }}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={!input.trim() || sending}
+                className="flex items-center justify-center w-9 h-9 bg-ai-gradient hover:opacity-90 disabled:opacity-40 rounded-xl text-white transition-opacity disabled:cursor-not-allowed shrink-0"
+              >
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="flex items-center justify-between mt-1.5 px-1">
+              <span className="text-[10px] text-theme-muted">{messages.filter(m => m.id !== "__summary__").length} پیام در این مکالمه</span>
+              {safeMode && <span className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full" />حالت ایمن فعال</span>}
+            </div>
           </div>
-          <p className="text-center text-[10px] text-theme-muted mt-2">
-            Arzesh AI می‌تواند اشتباه کند. اطلاعات مهم را تأیید کنید.
-          </p>
-        </div>
+        )}
       </div>
     </div>
   );
