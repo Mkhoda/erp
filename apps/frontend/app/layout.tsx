@@ -34,7 +34,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <body className="antialiased bg-theme-secondary text-theme-primary">
+      <body className="bg-theme-secondary text-theme-primary antialiased">
         {children}
       </body>
     </html>

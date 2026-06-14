@@ -29,12 +29,13 @@ type TestResult = {
   statusCode?: number;
 };
 
-const PROVIDER_INFO: Record<string, { label: string; color: string; defaultUrl: string; docUrl: string }> = {
-  openai:    { label: "OpenAI",       color: "#10a37f", defaultUrl: "https://api.openai.com/v1",           docUrl: "https://platform.openai.com/docs" },
-  anthropic: { label: "Anthropic",    color: "#d97757", defaultUrl: "https://api.anthropic.com/v1",        docUrl: "https://docs.anthropic.com" },
-  gemini:    { label: "Google Gemini", color: "#4285f4", defaultUrl: "https://generativelanguage.googleapis.com/v1beta", docUrl: "https://ai.google.dev/docs" },
-  deepseek:  { label: "DeepSeek",     color: "#4d6bfe", defaultUrl: "https://api.deepseek.com/v1",         docUrl: "https://platform.deepseek.com/api-docs" },
-  custom:    { label: "سفارشی",       color: "#6b7280", defaultUrl: "",                                     docUrl: "" },
+const PROVIDER_INFO: Record<string, { label: string; color: string; defaultUrl: string; docUrl: string; defaultModel: string }> = {
+  agnes:     { label: "Agnes AI",      color: "#6366f1", defaultUrl: "https://apihub.agnes-ai.com/v1",   docUrl: "https://agnes-ai.com/doc/overview", defaultModel: "agnes-2.0-flash" },
+  openai:    { label: "OpenAI",        color: "#10a37f", defaultUrl: "https://api.openai.com/v1",        docUrl: "https://platform.openai.com/docs", defaultModel: "gpt-4o" },
+  anthropic: { label: "Anthropic",     color: "#d97757", defaultUrl: "https://api.anthropic.com/v1",     docUrl: "https://docs.anthropic.com", defaultModel: "claude-sonnet-4-20250514" },
+  gemini:    { label: "Google Gemini", color: "#4285f4", defaultUrl: "https://generativelanguage.googleapis.com/v1beta", docUrl: "https://ai.google.dev/docs", defaultModel: "gemini-pro" },
+  deepseek:  { label: "DeepSeek",      color: "#4d6bfe", defaultUrl: "https://api.deepseek.com/v1",      docUrl: "https://platform.deepseek.com/api-docs", defaultModel: "deepseek-chat" },
+  custom:    { label: "سفارشی",        color: "#6b7280", defaultUrl: "",                                  docUrl: "", defaultModel: "" },
 };
 
 export default function AiSettingsPage() {
@@ -87,7 +88,7 @@ export default function AiSettingsPage() {
       type,
       apiKey: existing?.apiKey || "",
       apiUrl: existing?.apiUrl || PROVIDER_INFO[type]?.defaultUrl || "",
-      model: existing?.model || "",
+      model: existing?.model || PROVIDER_INFO[type]?.defaultModel || "",
     });
     setShowKey(false);
     setSaveMsg(null);
@@ -398,13 +399,7 @@ export default function AiSettingsPage() {
                     value={form.model}
                     onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
                     className="bg-theme-primary px-4 py-2.5 border border-theme focus:border-blue-500 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 w-full font-mono text-theme-primary text-sm transition-all"
-                    placeholder={
-                      editingType === "openai" ? "gpt-4o" :
-                      editingType === "anthropic" ? "claude-sonnet-4-20250514" :
-                      editingType === "gemini" ? "gemini-pro" :
-                      editingType === "deepseek" ? "deepseek-chat" :
-                      ""
-                    }
+                    placeholder={PROVIDER_INFO[editingType]?.defaultModel || ""}
                   />
                 </div>
               </div>

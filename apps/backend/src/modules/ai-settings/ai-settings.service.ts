@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 
 /** Well-known default base URLs for each provider type. */
 const DEFAULT_URLS: Record<string, string> = {
+  agnes: 'https://apihub.agnes-ai.com/v1',
   openai: 'https://api.openai.com/v1',
   anthropic: 'https://api.anthropic.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
@@ -49,7 +50,7 @@ export class AiSettingsService {
 
   /** Create or update a provider (upsert by type). */
   async upsert(dto: AiProviderDto) {
-    const validTypes = ['openai', 'anthropic', 'gemini', 'deepseek', 'custom'];
+    const validTypes = ['agnes', 'openai', 'anthropic', 'gemini', 'deepseek', 'custom'];
     if (!validTypes.includes(dto.type)) {
       throw new BadRequestException(`Invalid type. Must be one of: ${validTypes.join(', ')}`);
     }
@@ -123,6 +124,8 @@ export class AiSettingsService {
     const baseUrl = provider.apiUrl || DEFAULT_URLS[provider.type] || '';
 
     switch (provider.type) {
+      case 'agnes':
+        return this.testAgnes(baseUrl, provider.apiKey, provider.model);
       case 'openai':
         return this.testOpenAI(baseUrl, provider.apiKey, provider.model);
       case 'anthropic':
@@ -134,6 +137,22 @@ export class AiSettingsService {
       default:
         return this.testCustom(baseUrl, provider.apiKey);
     }
+  }
+
+  private async testAgnes(baseUrl: string, apiKey: string, model?: string) {
+    // Agnes is OpenAI-compatible — use /models endpoint
+    const { data } = await firstValueFrom(
+      this.http.get(`${baseUrl}/models`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }),
+    );
+    const models = data?.data?.map((m: any) => m.id) || [];
+    return {
+      message: 'Connected successfully to Agnes AI',
+      modelsAvailable: models.length,
+      currentModel: model || 'agnes-2.0-flash',
+      models: models.slice(0, 10),
+    };
   }
 
   private async testOpenAI(baseUrl: string, apiKey: string, model?: string) {
