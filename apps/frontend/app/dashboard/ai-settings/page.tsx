@@ -52,6 +52,8 @@ export default function AiSettingsPage() {
     apiKey: "",
     apiUrl: "",
     model: "",
+    isActive: true,
+    safeMode: false,
   });
   const [showKey, setShowKey] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -89,6 +91,8 @@ export default function AiSettingsPage() {
       apiKey: existing?.apiKey || "",
       apiUrl: existing?.apiUrl || PROVIDER_INFO[type]?.defaultUrl || "",
       model: existing?.model || PROVIDER_INFO[type]?.defaultModel || "",
+      isActive: existing?.isActive ?? true,
+      safeMode: (existing as any)?.config?.safeMode ?? false,
     });
     setShowKey(false);
     setSaveMsg(null);
@@ -106,7 +110,7 @@ export default function AiSettingsPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, config: { safeMode: form.safeMode } }),
       });
       if (res.ok) {
         setSaveMsg("ذخیره شد ✓");
@@ -257,6 +261,12 @@ export default function AiSettingsPage() {
                     <div className="flex justify-between">
                       <span>آدرس API:</span>
                       <span className="max-w-40 font-mono text-[10px] truncate">{provider.apiUrl}</span>
+                    </div>
+                  )}
+                  {(provider as any).config?.safeMode && (
+                    <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <span>حالت ایمن فعال</span>
                     </div>
                   )}
                 </div>
@@ -418,6 +428,20 @@ export default function AiSettingsPage() {
                     className="bg-theme-primary px-4 py-2.5 border border-theme focus:border-blue-500 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 w-full font-mono text-theme-primary text-sm transition-all"
                     placeholder={PROVIDER_INFO[editingType]?.defaultModel || ""}
                   />
+                </div>
+
+                {/* Toggles */}
+                <div className="flex gap-6 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded accent-blue-600 w-4 h-4" />
+                    <span className="text-sm text-theme-secondary">فعال (کاربران می‌توانند استفاده کنند)</span>
+                  </label>
+                </div>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.safeMode} onChange={e => setForm(f => ({ ...f, safeMode: e.target.checked }))} className="rounded accent-green-600 w-4 h-4" />
+                    <span className="text-sm text-theme-secondary">حالت ایمن (Safe Mode) — فیلتر محتوا</span>
+                  </label>
                 </div>
               </div>
 

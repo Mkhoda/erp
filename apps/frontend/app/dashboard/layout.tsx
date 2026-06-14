@@ -3,11 +3,11 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Menu, X, UserRound, LogOut, Moon, Sun, Monitor,
+  Menu, X, LogOut, Moon, Sun, Monitor,
   ChevronLeft, LayoutDashboard, Boxes, Layers, Tag,
   Handshake, UserCog, Building, MapPin, Home,
   CircleDollarSign, Users, Shield, FileText, Settings,
-  BookOpen, Bell, Search, ChevronDown, Sparkles, Cpu,
+  Bell, Sparkles, Cpu, Calendar,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import TwoLayerSidebar from "../components/TwoLayerSidebar";
@@ -18,7 +18,7 @@ import type { Role } from "../../lib/menu";
 const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard": { label: "فضای کاری", Icon: LayoutDashboard },
   "/dashboard/chat": { label: "گفتگو با AI", Icon: Sparkles },
-  "/dashboard/knowledge": { label: "پایگاه دانش", Icon: BookOpen },
+  "/dashboard/knowledge": { label: "پایگاه دانش", Icon: Sparkles },
   "/dashboard/workflows": { label: "گردش‌کارها", Icon: LayoutDashboard },
   "/dashboard/agents": { label: "عوامل هوشمند", Icon: Sparkles },
   "/dashboard/profile": { label: "پروفایل", Icon: UserCog },
@@ -385,27 +385,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               ))}
             </nav>
 
-            {/* Search bar — opens command palette */}
-            <button
-              onClick={() => setCmdOpen(true)}
-              className="group hidden sm:flex flex-1 items-center gap-2 bg-theme-secondary hover:bg-theme-hover ms-auto px-3 py-1.5 border border-theme hover:border-blue-300 dark:hover:border-blue-700 rounded-xl max-w-xs text-theme-muted text-sm transition-all"
-            >
-              <Search className="w-3.5 h-3.5 shrink-0" />
-              <span className="flex-1 text-xs text-right">جستجو...</span>
-              <kbd className="flex items-center gap-0.5 bg-theme-card px-1.5 py-0.5 border border-theme dark:group-hover:border-blue-700 group-hover:border-blue-300 rounded font-mono text-[10px] transition-colors">
-                ⌘K
-              </kbd>
-            </button>
+            {/* Date display */}
+            <div className="hidden sm:flex items-center gap-1.5 ms-auto text-theme-muted text-xs shrink-0">
+              <Calendar className="w-3.5 h-3.5" />
+              {new Date().toLocaleDateString("fa-IR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+            </div>
 
             {/* Right actions */}
-            <div className="flex items-center gap-1.5 ms-auto sm:ms-0 shrink-0">
-              {/* Mobile search */}
-              <button
-                className="sm:hidden flex justify-center items-center hover:bg-theme-hover p-2 border border-theme rounded-xl text-theme-secondary transition-all"
-                onClick={() => setCmdOpen(true)}
-              >
-                <Search className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-1.5 ms-auto sm:ms-3 shrink-0">
 
               {/* Theme toggle */}
               <button

@@ -17,7 +17,6 @@ import {
   Brain,
   Workflow,
   Bot,
-  BookOpen,
   Sparkles,
   Shield,
   BarChart3,
@@ -33,48 +32,34 @@ export type MenuItem = {
   icon?: LucideIcon;
   children?: MenuItem[];
   roles?: Role[];
-  section?: string; // section label shown above the item group
+  section?: string;
   badge?: string;
   isNew?: boolean;
 };
 
 export const MENU: MenuItem[] = [
-  // ── AI WORKSPACE ──────────────────────────────────────────
+  // ── فضای کاری — always visible ────────────────────────────
   {
     id: 'workspace',
     title: 'فضای کاری',
     page: '/dashboard',
     icon: LayoutDashboard,
-    section: 'هوش مصنوعی',
-  },
-  {
-    id: 'ai.chat',
-    title: 'گفتگو با AI',
-    page: '/dashboard/chat',
-    icon: MessageSquare,
-    isNew: true,
-  },
-  {
-    id: 'ai.knowledge',
-    title: 'پایگاه دانش',
-    page: '/dashboard/knowledge',
-    icon: Brain,
-  },
-  {
-    id: 'ai.workflows',
-    title: 'گردش‌کارها',
-    page: '/dashboard/workflows',
-    icon: Workflow,
-  },
-  {
-    id: 'ai.agents',
-    title: 'عوامل هوشمند',
-    page: '/dashboard/agents',
-    icon: Bot,
-    isNew: true,
   },
 
-  // ── ERP SUITE (restricted: ADMIN / MANAGER / EXPERT) ────────────────
+  // ── هوش مصنوعی (accordion) ────────────────────────────────
+  {
+    id: 'ai',
+    title: 'هوش مصنوعی',
+    icon: Sparkles,
+    children: [
+      { id: 'ai.chat',      title: 'گفتگو با AI',     page: '/dashboard/chat',       icon: MessageSquare, isNew: true },
+      { id: 'ai.knowledge', title: 'پایگاه دانش',    page: '/dashboard/knowledge',  icon: Brain },
+      { id: 'ai.workflows', title: 'گردش‌کارها',      page: '/dashboard/workflows',  icon: Workflow },
+      { id: 'ai.agents',    title: 'عوامل هوشمند',   page: '/dashboard/agents',     icon: Bot, isNew: true },
+    ],
+  },
+
+  // ── ERP ───────────────────────────────────────────────────
   {
     id: 'assets',
     title: 'مدیریت دارایی',
@@ -82,10 +67,10 @@ export const MENU: MenuItem[] = [
     section: 'ERP',
     roles: ['ADMIN', 'MANAGER', 'EXPERT'],
     children: [
-      { id: 'assets.list', title: 'دارایی‌ها', page: '/dashboard/assets', icon: Boxes },
-      { id: 'assets.types', title: 'انواع دارایی', page: '/dashboard/assets/types', icon: Layers },
-      { id: 'assets.categories', title: 'دسته‌بندی‌ها', page: '/dashboard/assets/categories', icon: Tag },
-      { id: 'assets.assignments', title: 'واگذاری‌ها', page: '/dashboard/assets/assignments', icon: Handshake },
+      { id: 'assets.list',        title: 'دارایی‌ها',      page: '/dashboard/assets',              icon: Boxes },
+      { id: 'assets.types',       title: 'انواع دارایی',   page: '/dashboard/assets/types',        icon: Layers },
+      { id: 'assets.categories',  title: 'دسته‌بندی‌ها',   page: '/dashboard/assets/categories',   icon: Tag },
+      { id: 'assets.assignments', title: 'واگذاری‌ها',     page: '/dashboard/assets/assignments',  icon: Handshake },
     ],
   },
   {
@@ -102,9 +87,9 @@ export const MENU: MenuItem[] = [
     roles: ['ADMIN', 'MANAGER'],
     children: [
       { id: 'departments', title: 'دپارتمان‌ها', page: '/dashboard/departments', icon: MapPin },
-      { id: 'buildings', title: 'ساختمان‌ها', page: '/dashboard/buildings', icon: Building },
-      { id: 'floors', title: 'طبقات', page: '/dashboard/floors', icon: Layers },
-      { id: 'rooms', title: 'اتاق‌ها', page: '/dashboard/rooms', icon: Home },
+      { id: 'buildings',   title: 'ساختمان‌ها',  page: '/dashboard/buildings',   icon: Building },
+      { id: 'floors',      title: 'طبقات',        page: '/dashboard/floors',      icon: Layers },
+      { id: 'rooms',       title: 'اتاق‌ها',      page: '/dashboard/rooms',       icon: Home },
     ],
   },
   {
@@ -115,7 +100,7 @@ export const MENU: MenuItem[] = [
     roles: ['ADMIN', 'MANAGER'],
   },
 
-  // ── ANALYTICS ─────────────────────────────────────────────
+  // ── تحلیل ─────────────────────────────────────────────────
   {
     id: 'reports',
     title: 'گزارش‌ها',
@@ -125,37 +110,19 @@ export const MENU: MenuItem[] = [
     roles: ['ADMIN', 'MANAGER', 'EXPERT'],
   },
 
-  // ── ADMIN ─────────────────────────────────────────────────
+  // ── مدیریت سیستم (accordion, ADMIN only) ──────────────────
   {
-    id: 'admin.aiSettings',
-    title: 'تنظیمات هوش مصنوعی',
-    page: '/dashboard/ai-settings',
-    icon: Cpu,
-    roles: ['ADMIN'],
-    section: 'مدیریت',
-  },
-  {
-    id: 'admin.aiUsage',
-    title: 'مصرف هوش مصنوعی',
-    page: '/dashboard/ai-usage',
-    icon: BarChart3,
-    roles: ['ADMIN'],
-    section: 'مدیریت',
-  },
-  {
-    id: 'access',
-    title: 'دسترسی صفحات',
-    page: '/dashboard/access',
-    icon: FileText,
-    roles: ['ADMIN'],
-    section: 'مدیریت',
-  },
-  {
-    id: 'admin.roles',
-    title: 'نقش‌ها',
-    page: '/dashboard/roles',
+    id: 'admin',
+    title: 'مدیریت سیستم',
     icon: Shield,
+    section: 'مدیریت',
     roles: ['ADMIN'],
+    children: [
+      { id: 'admin.aiSettings', title: 'تنظیمات AI',      page: '/dashboard/ai-settings', icon: Cpu },
+      { id: 'admin.aiUsage',    title: 'مصرف AI',          page: '/dashboard/ai-usage',    icon: BarChart3 },
+      { id: 'access',           title: 'دسترسی صفحات',    page: '/dashboard/access',       icon: FileText },
+      { id: 'admin.roles',      title: 'نقش‌ها',           page: '/dashboard/roles',        icon: Shield },
+    ],
   },
   {
     id: 'settings',

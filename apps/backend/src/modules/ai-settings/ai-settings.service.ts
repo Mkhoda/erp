@@ -332,8 +332,21 @@ export class AiSettingsService {
         { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } },
       ),
     );
+    // Handle both string content and array content (some providers return [{type:'text',text:'...'}])
+    const rawContent = data.choices?.[0]?.message?.content;
+    let content = '';
+    if (typeof rawContent === 'string') {
+      content = rawContent;
+    } else if (Array.isArray(rawContent)) {
+      content = rawContent
+        .filter((c: any) => c.type === 'text')
+        .map((c: any) => c.text || '')
+        .join('');
+    } else if (data.choices?.[0]?.text) {
+      content = data.choices[0].text;
+    }
     return {
-      content: data.choices?.[0]?.message?.content || '',
+      content,
       promptTokens: data.usage?.prompt_tokens || 0,
       completionTokens: data.usage?.completion_tokens || 0,
       totalTokens: data.usage?.total_tokens || 0,
