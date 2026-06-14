@@ -121,7 +121,7 @@ export const MENU: MenuItem[] = [
     children: [
       { id: 'admin.aiSettings', title: 'تنظیمات AI',      page: '/dashboard/ai-settings', icon: Cpu },
       { id: 'admin.aiUsage',   title: 'مصرف AI',          page: '/dashboard/ai-usage',    icon: BarChart3 },
-      { id: 'admin.logs',      title: 'لاگ سیستم',        page: '/dashboard/logs',         icon: ScrollText },
+      { id: 'admin.logs',      title: 'لاگ سیستم',        page: '/dashboard/system-logs',  icon: ScrollText },
       { id: 'access',          title: 'دسترسی صفحات',    page: '/dashboard/access',       icon: FileText },
       { id: 'admin.roles',     title: 'نقش‌ها',           page: '/dashboard/roles',        icon: Shield },
     ],

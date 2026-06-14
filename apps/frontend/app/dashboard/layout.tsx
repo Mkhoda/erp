@@ -38,6 +38,8 @@ const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard/departments": { label: "دپارتمان‌ها", Icon: MapPin },
   "/dashboard/reports": { label: "گزارش‌ها", Icon: LayoutDashboard },
   "/dashboard/change-password": { label: "تغییر رمز عبور", Icon: Shield },
+  "/dashboard/system-logs": { label: "لاگ سیستم", Icon: Bell },
+  "/dashboard/ai-usage": { label: "مصرف AI", Icon: Cpu },
 };
 
 const ROLE_LABELS: Record<string, string> = {

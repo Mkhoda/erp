@@ -34,6 +34,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
+      <head>
+        <link rel="stylesheet" href="/css/fontiran.css" />
+      </head>
       <body className="bg-theme-secondary text-theme-primary antialiased">
         {children}
       </body>

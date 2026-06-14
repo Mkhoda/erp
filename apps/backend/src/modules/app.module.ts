@@ -8,7 +8,7 @@ import { ReportsController } from './reports.controller';
 import { AssetsModule } from './assets/assets.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { AiSettingsModule } from './ai-settings/ai-settings.module';
-import { LogsModule } from './logs/logs.module';
+import { RequestLogsModule } from './request-logs/request-logs.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
@@ -25,7 +25,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     AssetsModule,
     PermissionsModule,
     AiSettingsModule,
-    LogsModule,
+    RequestLogsModule,
   ],
   controllers: [ReportsController],
   providers: [

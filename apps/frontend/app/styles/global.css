@@ -1,5 +1,4 @@
 /* Tailwind base + project global rules */
-@import url('/css/fontiran.css');
 @import "tailwindcss";
 
 /* ── IRANSans font — global default ─────────────────────────── */
