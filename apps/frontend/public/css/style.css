@@ -1,4 +1,7 @@
 ﻿@import url('/css/fontiran.css'); /* لینک فایلی که وظیفه بارگذاری فونت ها را برعهده دارد */
+:root, :host {
+    --font-sans: "iransans";
+}
 body {
 	font-family: IRANSans !important;
 	font-weight: 300;

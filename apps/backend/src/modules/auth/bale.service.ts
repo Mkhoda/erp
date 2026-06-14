@@ -1,172 +1,177 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
-import { AxiosResponse } from 'axios';
+import * as crypto from 'crypto';
 
-interface BaleTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in?: number;
-}
-
+/**
+ * Bale Safir v3 API service for sending OTP messages.
+ *
+ * Uses the Safir bulk-messaging API (v3) with simple api-access-key auth.
+ * Reference: https://docs.bale.ai/safir
+ *
+ * Required env vars:
+ *   BALE_BOT_ID        — numeric bot ID (e.g. "1016716104")
+ *   BALE_SAFIR_API_KEY — api-access-key from Bale business panel
+ *
+ * Optional:
+ *   BALE_MOCK          — "true" to skip real SMS (dev/testing)
+ *   LOG_BALE_VERBOSE   — "true" for verbose logging
+ */
 @Injectable()
 export class BaleService {
-  private cachedToken: { token: string; expiresAt: number } | null = null;
+  private readonly logger = new Logger(BaleService.name);
 
   constructor(
     private readonly http: HttpService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
   ) {}
 
-  private get verbose() {
+  // ─── Config helpers ────────────────────────────────────────────────
+
+  private get verbose(): boolean {
     const v = this.config.get<string>('LOG_BALE_VERBOSE') || '';
-    return v.toLowerCase() === 'true' || v === '1';
+    return v === 'true' || v === '1';
   }
 
-  private get isMock() {
+  private get isMock(): boolean {
     const v = this.config.get<string>('BALE_MOCK') || '';
-    return v.toLowerCase() === 'true' || v === '1';
+    return v === 'true' || v === '1';
   }
 
-  private maskPhone(p: string) {
+  /**
+   * Numeric bot ID required by Safir v3.
+   * Accepts BALE_BOT_ID, or falls back to extracting from BALE_API_KEY (format "botId:token").
+   */
+  private get botId(): number {
+    if (this.isMock) return 0;
+
+    // 1. Explicit BALE_BOT_ID
+    const explicit = this.config.get<string>('BALE_BOT_ID');
+    if (explicit) return Number(explicit);
+
+    // 2. Extract from BALE_API_KEY ("1016716104:abc123..." → 1016716104)
+    const apiKey = this.config.get<string>('BALE_API_KEY') || '';
+    if (apiKey.includes(':')) {
+      const id = Number(apiKey.split(':')[0]);
+      if (id > 0) return id;
+    }
+
+    throw new InternalServerErrorException(
+      'BALE_BOT_ID is not set and could not be extracted from BALE_API_KEY',
+    );
+  }
+
+  /**
+   * Safir v3 api-access-key.
+   * Accepts BALE_SAFIR_API_KEY or falls back to BALE_CLIENT_ID (may be the same value).
+   */
+  private get apiKey(): string {
+    if (this.isMock) return 'mock';
+
+    const v =
+      this.config.get<string>('BALE_SAFIR_API_KEY') ||
+      this.config.get<string>('BALE_API_KEY') ||       // full bot token as last resort
+      this.config.get<string>('BALE_CLIENT_ID') || '';
+    if (!v) throw new InternalServerErrorException('BALE_SAFIR_API_KEY is not set');
+    return v;
+  }
+
+  private maskPhone(p: string): string {
     if (!p) return p;
-    // keep prefix and last 2
-    return p.replace(/(\d{4})(\d+)(\d{2})/, (_, a: string, mid: string, c: string) => a + '*'.repeat(mid.length) + c);
+    return p.replace(/(\d{4})(\d+)(\d{2})/, (_, a: string, mid: string, c: string) =>
+      a + '*'.repeat(mid.length) + c,
+    );
   }
 
-  private get clientId() {
-    if (this.isMock) {
-      // In mock mode, bypass validation
-      return 'mock';
-    }
-    const v = this.config.get<string>('BALE_CLIENT_ID');
-    if (!v) throw new InternalServerErrorException('BALE_CLIENT_ID is not set');
-    return v;
-  }
-  private get clientSecret() {
-    if (this.isMock) {
-      return 'mock';
-    }
-    const v = this.config.get<string>('BALE_CLIENT_SECRET');
-    if (!v) throw new InternalServerErrorException('BALE_CLIENT_SECRET is not set');
-    return v;
+  private generateRequestId(): string {
+    return crypto.randomUUID();
   }
 
-  private now() {
-    return Math.floor(Date.now() / 1000);
-  }
+  // ─── Send OTP ──────────────────────────────────────────────────────
 
-  async getAccessToken(): Promise<string> {
-    if (
-      this.cachedToken &&
-      this.cachedToken.expiresAt - 30 > this.now() &&
-      this.cachedToken.token
-    ) {
-      if (this.verbose) {
-        // eslint-disable-next-line no-console
-        console.log('[BALE] Using cached access token');
-      }
-      return this.cachedToken.token;
-    }
-
-    try {
-      const params = new URLSearchParams();
-      params.append('grant_type', 'client_credentials');
-      params.append('client_id', this.clientId || '');
-      params.append('client_secret', this.clientSecret || '');
-  params.append('scope', 'read');
-
-      if (this.verbose) {
-        // eslint-disable-next-line no-console
-        console.log('[BALE] Requesting access token from https://safir.bale.ai/api/v2/auth/token');
-      }
-      const { data, status } = await firstValueFrom<AxiosResponse<BaleTokenResponse>>(
-        this.http.post<BaleTokenResponse>(
-          'https://safir.bale.ai/api/v2/auth/token',
-          params.toString(),
-          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        )
-      );
-      if (this.verbose) {
-        // eslint-disable-next-line no-console
-        console.log(`[BALE] Token response status: ${status}, expires_in: ${data?.expires_in ?? 'n/a'}`);
-      }
-
-      // Bale tokens typically last up to ~12 hours; honor API's expires_in, fallback to 12h
-      const ttl = data.expires_in ?? 12 * 60 * 60;
-      this.cachedToken = {
-        token: data.access_token,
-        expiresAt: this.now() + ttl,
-      };
-      return data.access_token;
-    } catch (e) {
-      // Try to surface HTTP error details if available
-      // eslint-disable-next-line no-console
-      console.error('[BALE] Failed to get access token', (e as any)?.response?.status, (e as any)?.response?.data ?? (e as any)?.message);
-      throw new InternalServerErrorException('Failed to get Bale access token');
-    }
-  }
-
+  /**
+   * Send a one-time password via Bale Safir v3 OTP message.
+   *
+   * Phone number MUST be in `98XXXXXXXXXX` format (the auth.service already
+   * normalizes it this way).
+   *
+   * @see https://docs.bale.ai/safir#ارسال-پیام-رمز-یکبار-مصرف
+   */
   async sendOtp(phone: string, otp: string): Promise<void> {
-    // In mock mode, skip external call (useful for local testing without Bale access)
     if (this.isMock) {
-      if (this.verbose) {
-        // eslint-disable-next-line no-console
-        console.log(`[BALE_MOCK] Skipping external send. Would send OTP ${otp} to ${this.maskPhone(phone)}`);
-      }
+      this.logger.log(
+        `[MOCK] Would send OTP ${otp} to ${this.maskPhone(phone)}`,
+      );
       return;
     }
-    let token = await this.getAccessToken();
-    const doSend = async (bearer: string) =>
-      firstValueFrom(
-        this.http.post(
-          'https://safir.bale.ai/api/v2/send_otp',
-          { phone, otp: Number(otp) },
-          { headers: { Authorization: `Bearer ${bearer}` } }
-        )
+
+    // Ensure phone is in correct Safir format (98XXXXXXXXXX)
+    const normalizedPhone = phone.replace(/\D/g, '');
+    if (!normalizedPhone.startsWith('98') || normalizedPhone.length !== 12) {
+      this.logger.warn(
+        `[BALE] Phone ${this.maskPhone(phone)} may not be in Safir format (expected 98XXXXXXXXXX)`,
       );
+    }
+
+    const requestId = this.generateRequestId();
+
+    const payload = {
+      request_id: requestId,
+      bot_id: this.botId,
+      phone_number: normalizedPhone,
+      message_data: {
+        otp_message: {
+          otp: otp,
+        },
+      },
+    };
+
+    if (this.verbose) {
+      this.logger.log(
+        `[BALE] Sending OTP via Safir v3 → ${SafirBase}/send_message`,
+      );
+      this.logger.log(`[BALE] bot_id=${this.botId}, phone=${this.maskPhone(normalizedPhone)}, request_id=${requestId}`);
+    }
 
     try {
-      const res = await doSend(token);
-      // eslint-disable-next-line no-console
-      console.log(`[BALE] OTP sent successfully to ${this.maskPhone(phone)} (status ${res.status})`);
+      const res = await firstValueFrom(
+        this.http.post(`${SafirBase}/send_message`, payload, {
+          headers: {
+            'api-access-key': this.apiKey,
+            'Content-Type': 'application/json',
+          },
+        }),
+      );
+
+      this.logger.log(
+        `[BALE] OTP sent to ${this.maskPhone(normalizedPhone)} (status ${res.status})`,
+      );
+
       if (this.verbose) {
-        try {
-          // The Bale API returns balance on success
-          const body = (res as any).data;
-          // eslint-disable-next-line no-console
-          console.log('[BALE] send_otp response body:', JSON.stringify(body));
-        } catch {}
-      }
-      if (this.verbose) {
-        // eslint-disable-next-line no-console
-        console.log('[BALE] Response headers:', JSON.stringify(res.headers || {}, null, 2));
+        this.logger.log(`[BALE] Response: ${JSON.stringify(res.data)}`);
       }
     } catch (err: any) {
       const status = err?.response?.status;
-      if (this.verbose) {
-        // eslint-disable-next-line no-console
-        console.error('[BALE] send_otp failed', status, err?.response?.data || err?.message);
+      const data = err?.response?.data;
+      this.logger.error(
+        `[BALE] Safir v3 send_message failed (HTTP ${status}): ${JSON.stringify(data || err?.message)}`,
+      );
+
+      // Surface meaningful error details
+      if (data?.error_data?.length) {
+        const firstErr = data.error_data[0];
+        this.logger.error(
+          `[BALE] Error code ${firstErr.code}: ${firstErr.description} (phone: ${firstErr.phone_number})`,
+        );
       }
-      // If token expired/invalid (401/403), refresh and retry once
-      if (status === 401 || status === 403) {
-        this.cachedToken = null;
-        token = await this.getAccessToken();
-        try {
-          const res2 = await doSend(token);
-          // eslint-disable-next-line no-console
-          console.log(`[BALE] OTP sent successfully to ${this.maskPhone(phone)} after token refresh (status ${res2.status})`);
-          return;
-        } catch (e2) {
-          if (this.verbose) {
-            // eslint-disable-next-line no-console
-            console.error('[BALE] send_otp failed after token refresh', (e2 as any)?.response?.status, (e2 as any)?.response?.data || (e2 as any)?.message);
-          }
-          throw new InternalServerErrorException('Failed to send OTP via Bale (after refresh)');
-        }
-      }
-      throw new InternalServerErrorException('Failed to send OTP via Bale');
+
+      throw new InternalServerErrorException(
+        `Failed to send OTP via Bale Safir: ${data?.error_data?.[0]?.description || err?.message || 'unknown error'}`,
+      );
     }
   }
 }
+
+// Avoid referencing static property in decorator context
+const SafirBase = 'https://safir.bale.ai/api/v3';
