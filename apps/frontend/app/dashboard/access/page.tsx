@@ -74,37 +74,81 @@ export default function AccessPage() {
     loadDeptPerms(selectedDept);
   }, [selectedDept]);
 
+  // Track which pages still have a wildcard "*" row (not yet expanded to per-role rows)
+  const [wildcardPages, setWildcardPages] = React.useState<Set<string>>(new Set());
+
   async function loadDeptPerms(deptId: string) {
     const res = await fetch(`${API}/permissions?departmentId=${deptId}`, { headers: authH });
     if (!res.ok) return;
     const rows: PermRow[] = await res.json();
     const m: Matrix = {};
+    const wildcards = new Set<string>();
     for (const p of pages) {
       m[p.page] = { MANAGER: false, EXPERT: false, USER: false };
     }
+    // Pass 1: apply wildcard rows
     for (const r of rows) {
       if (!m[r.page]) m[r.page] = { MANAGER: false, EXPERT: false, USER: false };
       if (r.role === "*") {
         CONFIGURABLE_ROLES.forEach(ro => { m[r.page][ro] = r.canRead; });
-      } else if (CONFIGURABLE_ROLES.includes(r.role as CRole)) {
+        wildcards.add(r.page);
+      }
+    }
+    // Pass 2: role-specific rows always override wildcard
+    for (const r of rows) {
+      if (CONFIGURABLE_ROLES.includes(r.role as CRole)) {
         m[r.page][r.role as CRole] = r.canRead;
+        wildcards.delete(r.page); // has at least one role-specific row
       }
     }
     setMatrix(m);
+    setWildcardPages(wildcards);
+  }
+
+  async function saveRole(page: string, role: CRole, value: boolean) {
+    await fetch(`${API}/permissions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authH },
+      body: JSON.stringify({ departmentId: selectedDept, page, role, canRead: value, canWrite: false }),
+    });
   }
 
   async function toggle(page: string, role: CRole) {
     if (!selectedDept) return;
     const cur = matrix[page]?.[role] ?? false;
+    const newVal = !cur;
     const key = `${page}|${role}`;
     setSaving(key);
     try {
-      await fetch(`${API}/permissions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authH },
-        body: JSON.stringify({ departmentId: selectedDept, page, role, canRead: !cur, canWrite: false }),
+      if (wildcardPages.has(page)) {
+        // Expand the wildcard: save all 3 roles explicitly so they become independent
+        const current = matrix[page] ?? { MANAGER: false, EXPERT: false, USER: false };
+        await Promise.all(
+          CONFIGURABLE_ROLES.map(r => saveRole(page, r, r === role ? newVal : current[r]))
+        );
+        setWildcardPages(s => { const n = new Set(s); n.delete(page); return n; });
+      } else {
+        await saveRole(page, role, newVal);
+      }
+      setMatrix(m => ({ ...m, [page]: { ...m[page], [role]: newVal } }));
+    } catch { toast.error("خطا در ذخیره"); }
+    finally { setSaving(null); }
+  }
+
+  async function toggleAll(page: string) {
+    if (!selectedDept) return;
+    const cur = matrix[page] ?? { MANAGER: false, EXPERT: false, USER: false };
+    const allOn = CONFIGURABLE_ROLES.every(r => cur[r]);
+    const newVal = !allOn;
+    const key = `${page}|all`;
+    setSaving(key);
+    try {
+      await Promise.all(CONFIGURABLE_ROLES.map(r => saveRole(page, r, newVal)));
+      setMatrix(m => {
+        const row: Record<CRole, boolean> = { MANAGER: newVal, EXPERT: newVal, USER: newVal };
+        return { ...m, [page]: row };
       });
-      setMatrix(m => ({ ...m, [page]: { ...m[page], [role]: !cur } }));
+      setWildcardPages(s => { const n = new Set(s); n.delete(page); return n; });
     } catch { toast.error("خطا در ذخیره"); }
     finally { setSaving(null); }
   }
@@ -203,10 +247,16 @@ export default function AccessPage() {
                       </span>
                     </th>
                   ))}
+                  <th className="text-center px-3 py-2.5 font-medium text-theme-muted text-xs w-16">همه</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-theme">
-                {configurablePages.map(p => (
+                {configurablePages.map(p => {
+                  const cur = matrix[p.page] ?? { MANAGER: false, EXPERT: false, USER: false };
+                  const allOn = CONFIGURABLE_ROLES.every(r => cur[r]);
+                  const someOn = CONFIGURABLE_ROLES.some(r => cur[r]);
+                  const allKey = `${p.page}|all`;
+                  return (
                   <tr key={p.page} className="hover:bg-theme-hover/50 transition-colors group">
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
@@ -215,9 +265,9 @@ export default function AccessPage() {
                       </div>
                     </td>
                     {CONFIGURABLE_ROLES.map(role => {
-                      const on = matrix[p.page]?.[role] ?? false;
+                      const on = cur[role];
                       const key = `${p.page}|${role}`;
-                      const isSaving = saving === key;
+                      const isSaving = saving === key || saving === allKey;
                       return (
                         <td key={role} className="px-4 py-2.5 text-center">
                           <button
@@ -238,8 +288,30 @@ export default function AccessPage() {
                         </td>
                       );
                     })}
+                    {/* Select-all column */}
+                    <td className="px-3 py-2.5 text-center">
+                      <button
+                        onClick={() => toggleAll(p.page)}
+                        disabled={!!saving}
+                        title={allOn ? "حذف دسترسی همه نقش‌ها" : "دسترسی همه نقش‌ها"}
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border transition-all ${
+                          saving === allKey ? "opacity-60 cursor-wait" :
+                          allOn
+                            ? "bg-blue-500 border-blue-400 text-white hover:bg-blue-600"
+                            : someOn
+                            ? "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-200"
+                            : "bg-theme-secondary border-theme text-theme-muted hover:border-blue-400 hover:text-blue-500"
+                        }`}
+                      >
+                        {saving === allKey
+                          ? <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          : allOn ? <Check className="w-3.5 h-3.5" /> : someOn ? <span className="w-2 h-0.5 bg-current rounded block" /> : <Check className="w-3.5 h-3.5 opacity-30" />
+                        }
+                      </button>
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
