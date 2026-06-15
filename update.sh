@@ -142,17 +142,13 @@ if [ "$DO_BUILD" -eq 1 ]; then
   fi
 
   step_start "Frontend build"
-  FE_BUILD_OUT=$(npm --prefix apps/frontend run build 2>&1)
-  FE_BUILD_EC=$?
-  echo "$FE_BUILD_OUT" | grep -E '(Route |✓|warn |⚠)' | grep -v "^$" | head -20 || true
-  # Check both exit code and error strings in output (Next.js sometimes exits 0 on build errors)
-  if [ $FE_BUILD_EC -ne 0 ] || echo "$FE_BUILD_OUT" | grep -qE '(Build error occurred|Turbopack build failed|Error: )'; then
+  if npm --prefix apps/frontend run build; then
+    step_done
+  else
     step_fail
-    echo -e "${RED}--- Frontend build error output ---${NC}"
-    echo "$FE_BUILD_OUT" | grep -A5 -E '(Build error|Turbopack|Error:)' | head -50
+    err "Frontend build failed — see output above"
     exit 1
   fi
-  step_done
 else
   _STEP_NAME="Backend build";   step_skip
   _STEP_NAME="Prisma migrate";  step_skip
