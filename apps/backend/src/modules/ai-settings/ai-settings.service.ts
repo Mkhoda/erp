@@ -286,6 +286,7 @@ export class AiSettingsService {
       success = false;
       errorMsg = err?.response?.data?.error?.message || err?.message || 'خطای ناشناخته';
       rawResponse = JSON.stringify(err?.response?.data || err?.message || '').substring(0, 1000);
+      console.error(`[AI Chat ERROR] provider=${providerType} model=${provider.model} status=${err?.response?.status} msg=${errorMsg} raw=${rawResponse}`);
       content = `⚠️ خطا در دریافت پاسخ از ${provider.name}: ${errorMsg}`;
     }
 
@@ -332,7 +333,7 @@ export class AiSettingsService {
     const { data } = await firstValueFrom(
       this.http.post(
         `${baseUrl}/chat/completions`,
-        { model: model || 'gpt-4o-mini', messages: [...sys, ...messages], temperature: safeMode ? 0.3 : 0.7, max_tokens: 2048 },
+        { model: model || 'gpt-4o-mini', messages: [...sys, ...messages], temperature: safeMode ? 0.3 : 0.7, max_tokens: 2048, stream: false },
         { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 30000 },
       ),
     );
