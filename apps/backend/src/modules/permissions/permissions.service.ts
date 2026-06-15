@@ -88,27 +88,9 @@ export class PermissionsService {
     });
   }
 
-  /**
-   * Sync defaults: for every known page × every department, create a canRead=true row
-   * with role='*' if one does not exist yet. Existing rows are NOT overwritten.
-   */
+  /** Disabled: wildcard permissions are no longer used. Access must be explicitly granted per role via the access page. */
   async syncDefaults() {
-    const departments = await this.prisma.department.findMany({ select: { id: true } });
-    let created = 0;
-    for (const dept of departments) {
-      for (const { page } of KNOWN_PAGES) {
-        const existing = await this.prisma.pagePermission.findUnique({
-          where: { departmentId_page_role: { departmentId: dept.id, page, role: '*' } },
-        });
-        if (!existing) {
-          await this.prisma.pagePermission.create({
-            data: { departmentId: dept.id, page, role: '*', canRead: true, canWrite: false },
-          });
-          created++;
-        }
-      }
-    }
-    return { created, total: departments.length * KNOWN_PAGES.length };
+    return { created: 0, total: 0, message: 'syncDefaults is disabled — grant access explicitly via the access page.' };
   }
 
   /**
