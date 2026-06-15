@@ -32,6 +32,7 @@ model User {
   aiUsage       AiUsage[]
   conversations Conversation[]
   memories      UserMemory[]
+  todos         Todo[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -371,6 +372,19 @@ model AiUsage {
   @@index([userId])
   @@index([providerType])
   @@index([createdAt])
+}
+
+// Personal to-do items per user
+model Todo {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 // HTTP request/response logs for admin debugging

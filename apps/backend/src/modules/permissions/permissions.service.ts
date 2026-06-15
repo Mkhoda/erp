@@ -166,14 +166,25 @@ export class PermissionsService {
     });
     const depts = await this.prisma.department.findMany({ where: { id: { in: deptArray } } });
 
-    // Merge by page: canRead/canWrite = OR across matching rows
-    const pageMap = new Map<string, { canRead: boolean; canWrite: boolean }>();
+    // Merge by page: wildcard (*) sets base value; role-specific rows override it.
+    // This ensures an admin can revoke access for a specific role even if a * row grants it.
+    const wildcardMap = new Map<string, { canRead: boolean; canWrite: boolean }>();
+    const specificMap = new Map<string, { canRead: boolean; canWrite: boolean }>();
     for (const p of perms) {
-      if (activePaths && !activePaths.has(p.page)) continue; // skip inactive pages
-      const cur = pageMap.get(p.page);
-      if (!cur) pageMap.set(p.page, { canRead: p.canRead, canWrite: p.canWrite });
-      else { cur.canRead = cur.canRead || p.canRead; cur.canWrite = cur.canWrite || p.canWrite; }
+      if (activePaths && !activePaths.has(p.page)) continue;
+      if (p.role === '*') {
+        wildcardMap.set(p.page, { canRead: p.canRead, canWrite: p.canWrite });
+      } else {
+        // OR across multiple role-specific rows (e.g., user belongs to 2 depts)
+        const cur = specificMap.get(p.page);
+        if (!cur) specificMap.set(p.page, { canRead: p.canRead, canWrite: p.canWrite });
+        else { cur.canRead = cur.canRead || p.canRead; cur.canWrite = cur.canWrite || p.canWrite; }
+      }
     }
+    // Apply: wildcard first, then specific overrides
+    const pageMap = new Map<string, { canRead: boolean; canWrite: boolean }>();
+    for (const [page, v] of wildcardMap) pageMap.set(page, { ...v });
+    for (const [page, v] of specificMap) pageMap.set(page, { ...v });
 
     const permissions = Array.from(pageMap.entries()).map(([page, v]) => ({ page, canRead: v.canRead, canWrite: v.canWrite }));
     const menuPages = permissions.filter(p => p.canRead).map(p => p.page);

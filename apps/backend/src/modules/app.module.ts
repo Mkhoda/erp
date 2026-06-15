@@ -10,6 +10,7 @@ import { PermissionsModule } from './permissions/permissions.module';
 import { AiSettingsModule } from './ai-settings/ai-settings.module';
 import { RequestLogsModule } from './request-logs/request-logs.module';
 import { ChatHistoryModule } from './chat-history/chat-history.module';
+import { TodosModule } from './todos/todos.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
@@ -28,6 +29,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     AiSettingsModule,
     RequestLogsModule,
     ChatHistoryModule,
+    TodosModule,
   ],
   controllers: [ReportsController],
   providers: [
