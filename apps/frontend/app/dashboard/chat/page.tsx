@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -50,7 +50,7 @@ function groupByDate(convos: Convo[]): Array<{ label: string; items: Convo[] }> 
   return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
 }
 
-export default function ChatPage() {
+function ChatPageInner() {
   const searchParams = useSearchParams();
 
   const [providers, setProviders] = React.useState<Provider[]>([]);
@@ -540,5 +540,13 @@ export default function ChatPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-full text-theme-muted text-sm">در حال بارگذاری...</div>}>
+      <ChatPageInner />
+    </Suspense>
   );
 }

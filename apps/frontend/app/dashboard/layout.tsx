@@ -78,7 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace("/signin");
       return;
     }
-    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    const API = process.env.NEXT_PUBLIC_API_URL || "/api";
     fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => {
         if (!r.ok) throw new Error("Unauthorized");
@@ -100,7 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   React.useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    const API = process.env.NEXT_PUBLIC_API_URL || "/api";
     fetch(`${API}/permissions/menu`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(data => setAllowedPages(data?.menuPages ?? []))
