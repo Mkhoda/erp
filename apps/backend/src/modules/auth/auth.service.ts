@@ -57,7 +57,9 @@ export class AuthService {
 
   async loginByPhone(dto: LoginByPhoneDto) {
     const phone = this.normalizePhone(dto.phone);
-    const user = await this.prisma.user.findFirst({ where: { phone } });
+    // Support both stored formats: 989... and 09...
+    const phoneAlt = phone.startsWith('98') ? '0' + phone.slice(2) : '98' + phone.slice(1);
+    const user = await this.prisma.user.findFirst({ where: { OR: [{ phone }, { phone: phoneAlt }] } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
     if (user.disabled) throw new UnauthorizedException('حساب کاربری غیرفعال است');
     if (!user.password) throw new UnauthorizedException('Password not set');

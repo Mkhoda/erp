@@ -214,7 +214,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex bg-theme-base min-h-dvh" dir="rtl">
+    <div className="flex bg-theme-base h-dvh overflow-hidden" dir="rtl">
       {/* Command Palette */}
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
 

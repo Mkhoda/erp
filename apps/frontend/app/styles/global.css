@@ -696,6 +696,11 @@ html:not(.dark) body {
   color: rgb(148 163 184);
 }
 
+/* Input with right-side icon (RTL: icon on right) */
+.input-icon-r { padding-right: 2.5rem; }
+/* Input with left-side icon */
+.input-icon-l { padding-left: 2.5rem; }
+
 .dark .input-theme::placeholder {
   color: rgb(100 116 139);
 }

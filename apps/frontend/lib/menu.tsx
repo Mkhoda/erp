@@ -47,16 +47,13 @@ export const MENU: MenuItem[] = [
     icon: LayoutDashboard,
   },
 
-  // ── هوش مصنوعی (accordion) ────────────────────────────────
+  // ── هوش مصنوعی ────────────────────────────────────────────
   {
     id: 'ai',
     title: 'هوش مصنوعی',
     icon: Sparkles,
     children: [
-      { id: 'ai.chat',      title: 'گفتگو با AI',     page: '/dashboard/chat',       icon: MessageSquare, isNew: true },
-      { id: 'ai.knowledge', title: 'پایگاه دانش',    page: '/dashboard/knowledge',  icon: Brain },
-      { id: 'ai.workflows', title: 'گردش‌کارها',      page: '/dashboard/workflows',  icon: Workflow },
-      { id: 'ai.agents',    title: 'عوامل هوشمند',   page: '/dashboard/agents',     icon: Bot, isNew: true },
+      { id: 'ai.chat', title: 'گفتگو با AI', page: '/dashboard/chat', icon: MessageSquare, isNew: true },
     ],
   },
 
@@ -73,13 +70,6 @@ export const MENU: MenuItem[] = [
       { id: 'assets.categories',  title: 'دسته‌بندی‌ها',   page: '/dashboard/assets/categories',   icon: Tag },
       { id: 'assets.assignments', title: 'واگذاری‌ها',     page: '/dashboard/assets/assignments',  icon: Handshake },
     ],
-  },
-  {
-    id: 'accounting',
-    title: 'حسابداری دارایی',
-    page: '/dashboard/accounting',
-    icon: CircleDollarSign,
-    roles: ['ADMIN', 'MANAGER', 'EXPERT'],
   },
   {
     id: 'org',
@@ -111,7 +101,7 @@ export const MENU: MenuItem[] = [
     roles: ['ADMIN', 'MANAGER', 'EXPERT'],
   },
 
-  // ── مدیریت سیستم (accordion, ADMIN only) ──────────────────
+  // ── مدیریت سیستم (ADMIN only) ─────────────────────────────
   {
     id: 'admin',
     title: 'مدیریت سیستم',
@@ -119,19 +109,11 @@ export const MENU: MenuItem[] = [
     section: 'مدیریت',
     roles: ['ADMIN'],
     children: [
-      { id: 'admin.aiSettings', title: 'تنظیمات AI',      page: '/dashboard/ai-settings', icon: Cpu },
-      { id: 'admin.aiUsage',   title: 'مصرف AI',          page: '/dashboard/ai-usage',    icon: BarChart3 },
-      { id: 'admin.logs',      title: 'لاگ سیستم',        page: '/dashboard/system-logs',  icon: ScrollText },
-      { id: 'access',          title: 'دسترسی صفحات',    page: '/dashboard/access',       icon: FileText },
-      { id: 'admin.roles',     title: 'نقش‌ها',           page: '/dashboard/roles',        icon: Shield },
+      { id: 'admin.aiSettings', title: 'تنظیمات AI',   page: '/dashboard/ai-settings',  icon: Cpu },
+      { id: 'admin.aiUsage',    title: 'مصرف AI',       page: '/dashboard/ai-usage',     icon: BarChart3 },
+      { id: 'admin.logs',       title: 'لاگ سیستم',    page: '/dashboard/system-logs',  icon: ScrollText },
+      { id: 'access',           title: 'دسترسی صفحات', page: '/dashboard/access',       icon: FileText },
     ],
-  },
-  {
-    id: 'settings',
-    title: 'تنظیمات',
-    page: '/dashboard/settings',
-    icon: Settings,
-    roles: ['ADMIN', 'MANAGER'],
   },
 ];
 

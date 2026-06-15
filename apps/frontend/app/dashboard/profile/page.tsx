@@ -45,7 +45,7 @@ export default function ProfilePage() {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         setMe(data);
-        setEdit({ firstName: data?.firstName || '', lastName: data?.lastName || '', phone: data?.phone || '' });
+        setEdit({ firstName: data?.firstName || '', lastName: data?.lastName || '' });
       })
       .catch(() => {});
   }, [token]);
@@ -56,16 +56,15 @@ export default function ProfilePage() {
 
   async function save() {
     if (!me) return;
-    if (edit.phone && !isValidPhone(edit.phone)) { setSaveMsg({ type: 'err', text: 'شماره موبایل نامعتبر است' }); return; }
     setSaving(true); setSaveMsg(null);
     try {
       const res = await fetch(`${API}/users/me`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ firstName: edit.firstName, lastName: edit.lastName, phone: edit.phone ? normalizeTo98(edit.phone) : undefined }),
+        body: JSON.stringify({ firstName: edit.firstName, lastName: edit.lastName }),
       });
       if (!res.ok) throw new Error('خطا در ذخیره');
-      setMe(prev => prev ? { ...prev, firstName: edit.firstName, lastName: edit.lastName, phone: edit.phone ? normalizeTo98(edit.phone!) : prev.phone } : prev);
+      setMe(prev => prev ? { ...prev, firstName: edit.firstName, lastName: edit.lastName } : prev);
       setSaveMsg({ type: 'ok', text: 'اطلاعات با موفقیت ذخیره شد' });
     } catch { setSaveMsg({ type: 'err', text: 'خطا در ذخیره اطلاعات' }); }
     finally { setSaving(false); }
@@ -180,15 +179,11 @@ export default function ProfilePage() {
                 <div className="relative">
                   <Phone className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
                   <input
-                    type="tel"
-                    dir="ltr"
-                    value={edit.phone || ''}
-                    onChange={e => setEdit(s => ({ ...s, phone: e.target.value }))}
-                    className="input-theme pr-10 text-right"
-                    placeholder="09123456789"
+                    type="tel" dir="ltr" value={me.phone || ''} disabled
+                    className="input-theme pr-10 text-right opacity-60 cursor-not-allowed bg-theme-hover"
                   />
                 </div>
-                <p className="mt-1 text-theme-muted text-xs">برای بازیابی رمز عبور و تایید هویت استفاده می‌شود</p>
+                <p className="mt-1 text-theme-muted text-xs">شماره موبایل قابل تغییر نیست</p>
               </div>
 
               {me.email && (
