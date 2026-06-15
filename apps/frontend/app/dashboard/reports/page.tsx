@@ -2,11 +2,11 @@
 import React from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, AreaChart, Area,
+  PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
 import {
   Boxes, Users, Handshake, Building2, BarChart3, TrendingUp,
-  Package, UserCheck, AlertCircle, CheckCircle,
+  Package, UserCheck, CheckCircle,
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
