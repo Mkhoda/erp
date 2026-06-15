@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Some clients/older SWs probe for this Next.js file; respond 200 with empty JSON

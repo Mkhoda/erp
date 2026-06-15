@@ -6,12 +6,9 @@ const nextConfig = {
     ],
   },
 
-  // Allow build to continue despite type/lint errors
+  // Allow build to continue despite type errors
   typescript: {
     ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   },
 
   // Next.js 16 host-header security: whitelist trusted origins.

@@ -144,10 +144,12 @@ if [ "$DO_BUILD" -eq 1 ]; then
   step_start "Frontend build"
   FE_BUILD_OUT=$(npm --prefix apps/frontend run build 2>&1)
   FE_BUILD_EC=$?
-  echo "$FE_BUILD_OUT" | grep -E '(Error:|error |Route |✓|warn |⚠|Failed|Turbopack)' | grep -v "^$" | head -40 || true
-  if [ $FE_BUILD_EC -ne 0 ]; then
+  echo "$FE_BUILD_OUT" | grep -E '(Route |✓|warn |⚠)' | grep -v "^$" | head -20 || true
+  # Check both exit code and error strings in output (Next.js sometimes exits 0 on build errors)
+  if [ $FE_BUILD_EC -ne 0 ] || echo "$FE_BUILD_OUT" | grep -qE '(Build error occurred|Turbopack build failed|Error: )'; then
     step_fail
-    echo "$FE_BUILD_OUT" | tail -30
+    echo -e "${RED}--- Frontend build error output ---${NC}"
+    echo "$FE_BUILD_OUT" | grep -A5 -E '(Build error|Turbopack|Error:)' | head -50
     exit 1
   fi
   step_done
