@@ -59,7 +59,9 @@ export default function AccessPage() {
         fetch(`${API}/permissions/pages`, { headers: authH }),
         fetch(`${API}/departments`, { headers: authH }),
       ]);
-      const pageList: KnownPage[] = pRes.ok ? await pRes.json() : [];
+      // API returns { path, label } but our type uses { page, label } — normalize
+      const rawPages = pRes.ok ? await pRes.json() : [];
+      const pageList: KnownPage[] = rawPages.map((p: any) => ({ page: p.path ?? p.page, label: p.label }));
       const deptList: Dept[] = dRes.ok ? await dRes.json() : [];
       setPages(pageList.filter(p => !ADMIN_LOCKED.includes(p.page)));
       setDepts(deptList);
