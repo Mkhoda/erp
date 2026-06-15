@@ -321,19 +321,34 @@ export class AiSettingsService {
         return this.chatAnthropic(baseUrl, provider.apiKey, provider.model, messages, safeMode);
       case 'gemini':
         return this.chatGemini(baseUrl, provider.apiKey, provider.model, messages, safeMode);
+      case 'agnes':
+        return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, messages, safeMode, true);
       default:
         return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, messages, safeMode);
     }
   }
 
-  private async chatOpenAI(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean) {
-    const sys = safeMode
-      ? [{ role: 'system', content: 'You are a helpful, safe, and professional assistant. Respond in the same language as the user. Avoid harmful content.' }]
-      : [];
+  private async chatOpenAI(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean, isAgnes = false) {
+    // Agnes AI doesn't support role:'system' — prepend safe prompt as a user/assistant pair instead
+    let finalMessages: any[];
+    if (safeMode && isAgnes) {
+      finalMessages = [
+        { role: 'user', content: 'You are a helpful, safe, and professional assistant. Respond in the same language as the user.' },
+        { role: 'assistant', content: 'Understood. I will be helpful and respond in the same language.' },
+        ...messages,
+      ];
+    } else if (safeMode) {
+      finalMessages = [
+        { role: 'system', content: 'You are a helpful, safe, and professional assistant. Respond in the same language as the user. Avoid harmful content.' },
+        ...messages,
+      ];
+    } else {
+      finalMessages = messages;
+    }
     const { data } = await firstValueFrom(
       this.http.post(
         `${baseUrl}/chat/completions`,
-        { model: model || 'gpt-4o-mini', messages: [...sys, ...messages], temperature: safeMode ? 0.3 : 0.7, max_tokens: 2048, stream: false },
+        { model: model || 'gpt-4o-mini', messages: finalMessages, temperature: safeMode ? 0.3 : 0.7, max_tokens: 2048, stream: false },
         { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 30000 },
       ),
     );
