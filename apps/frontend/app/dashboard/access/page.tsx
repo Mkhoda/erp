@@ -74,63 +74,57 @@ export default function AccessPage() {
     loadDeptPerms(selectedDept);
   }, [selectedDept]);
 
-  // Track which pages still have a wildcard "*" row (not yet expanded to per-role rows)
-  const [wildcardPages, setWildcardPages] = React.useState<Set<string>>(new Set());
+  // pagesRef lets loadDeptPerms always see the latest pages without stale closure
+  const pagesRef = React.useRef<KnownPage[]>([]);
+  React.useEffect(() => { pagesRef.current = pages; }, [pages]);
 
   async function loadDeptPerms(deptId: string) {
     const res = await fetch(`${API}/permissions?departmentId=${deptId}`, { headers: authH });
     if (!res.ok) return;
     const rows: PermRow[] = await res.json();
     const m: Matrix = {};
-    const wildcards = new Set<string>();
-    for (const p of pages) {
-      m[p.page] = { MANAGER: false, EXPERT: false, USER: false };
+    // Init all known pages to false
+    for (const p of pagesRef.current) {
+      if (!ADMIN_LOCKED.includes(p.page)) m[p.page] = { MANAGER: false, EXPERT: false, USER: false };
     }
-    // Pass 1: apply wildcard rows
+    // Apply wildcard rows first, then role-specific rows override
+    const wildcardValues: Record<string, boolean> = {};
     for (const r of rows) {
-      if (!m[r.page]) m[r.page] = { MANAGER: false, EXPERT: false, USER: false };
-      if (r.role === "*") {
-        CONFIGURABLE_ROLES.forEach(ro => { m[r.page][ro] = r.canRead; });
-        wildcards.add(r.page);
+      if (r.role === "*") wildcardValues[r.page] = r.canRead;
+    }
+    for (const page of Object.keys(m)) {
+      if (wildcardValues[page] !== undefined) {
+        CONFIGURABLE_ROLES.forEach(ro => { m[page][ro] = wildcardValues[page]; });
       }
     }
-    // Pass 2: role-specific rows always override wildcard
     for (const r of rows) {
       if (CONFIGURABLE_ROLES.includes(r.role as CRole)) {
+        if (!m[r.page]) m[r.page] = { MANAGER: false, EXPERT: false, USER: false };
         m[r.page][r.role as CRole] = r.canRead;
-        wildcards.delete(r.page); // has at least one role-specific row
       }
     }
     setMatrix(m);
-    setWildcardPages(wildcards);
   }
 
-  async function saveRole(page: string, role: CRole, value: boolean) {
-    await fetch(`${API}/permissions`, {
+  async function savePermission(page: string, role: CRole, value: boolean) {
+    const res = await fetch(`${API}/permissions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authH },
       body: JSON.stringify({ departmentId: selectedDept, page, role, canRead: value, canWrite: false }),
     });
+    if (!res.ok) throw new Error("save failed");
   }
 
   async function toggle(page: string, role: CRole) {
     if (!selectedDept) return;
     const cur = matrix[page]?.[role] ?? false;
-    const newVal = !cur;
     const key = `${page}|${role}`;
     setSaving(key);
     try {
-      if (wildcardPages.has(page)) {
-        // Expand the wildcard: save all 3 roles explicitly so they become independent
-        const current = matrix[page] ?? { MANAGER: false, EXPERT: false, USER: false };
-        await Promise.all(
-          CONFIGURABLE_ROLES.map(r => saveRole(page, r, r === role ? newVal : current[r]))
-        );
-        setWildcardPages(s => { const n = new Set(s); n.delete(page); return n; });
-      } else {
-        await saveRole(page, role, newVal);
-      }
-      setMatrix(m => ({ ...m, [page]: { ...m[page], [role]: newVal } }));
+      // Always save as role-specific (never wildcard) so each role is independent
+      await savePermission(page, role, !cur);
+      // Reload from server — source of truth, no stale state
+      await loadDeptPerms(selectedDept);
     } catch { toast.error("خطا در ذخیره"); }
     finally { setSaving(null); }
   }
@@ -138,17 +132,12 @@ export default function AccessPage() {
   async function toggleAll(page: string) {
     if (!selectedDept) return;
     const cur = matrix[page] ?? { MANAGER: false, EXPERT: false, USER: false };
-    const allOn = CONFIGURABLE_ROLES.every(r => cur[r]);
-    const newVal = !allOn;
+    const newVal = !CONFIGURABLE_ROLES.every(r => cur[r]);
     const key = `${page}|all`;
     setSaving(key);
     try {
-      await Promise.all(CONFIGURABLE_ROLES.map(r => saveRole(page, r, newVal)));
-      setMatrix(m => {
-        const row: Record<CRole, boolean> = { MANAGER: newVal, EXPERT: newVal, USER: newVal };
-        return { ...m, [page]: row };
-      });
-      setWildcardPages(s => { const n = new Set(s); n.delete(page); return n; });
+      await Promise.all(CONFIGURABLE_ROLES.map(r => savePermission(page, r, newVal)));
+      await loadDeptPerms(selectedDept);
     } catch { toast.error("خطا در ذخیره"); }
     finally { setSaving(null); }
   }
