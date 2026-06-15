@@ -8,9 +8,6 @@ const BASE_PAGES = [
   '/dashboard/profile',
   '/dashboard/change-password',
   '/dashboard/chat',
-  '/dashboard/knowledge',
-  '/dashboard/workflows',
-  '/dashboard/agents',
 ];
 
 @Injectable()

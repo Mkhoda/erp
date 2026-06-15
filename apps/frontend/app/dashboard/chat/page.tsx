@@ -221,7 +221,12 @@ function ChatPageInner() {
   const grouped = groupByDate(convos);
 
   return (
-    <div className="flex h-[calc(100vh-88px)] overflow-hidden bg-theme-base" dir="rtl">
+    <div className="flex h-[calc(100vh-88px)] overflow-hidden bg-theme-card border border-theme rounded-xl relative" dir="rtl">
+      {/* Subtle background blobs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+        <div className="absolute -top-20 -right-20 w-80 h-80 bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-purple-500/5 dark:bg-purple-500/10 rounded-full blur-3xl" />
+      </div>
 
       {/* ── Conversation sidebar ── */}
       <AnimatePresence initial={false}>

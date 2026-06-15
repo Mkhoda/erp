@@ -4,9 +4,7 @@ import {
   LayoutDashboard,
   Boxes,
   Users,
-  Settings,
   FileText,
-  CircleDollarSign,
   Layers,
   Tag,
   Handshake,
@@ -14,10 +12,6 @@ import {
   Building,
   Home,
   MessageSquare,
-  Brain,
-  Workflow,
-  Bot,
-  Sparkles,
   Shield,
   BarChart3,
   Cpu,
@@ -47,14 +41,13 @@ export const MENU: MenuItem[] = [
     icon: LayoutDashboard,
   },
 
-  // ── هوش مصنوعی ────────────────────────────────────────────
+  // ── گفتگو با AI ───────────────────────────────────────────
   {
-    id: 'ai',
-    title: 'هوش مصنوعی',
-    icon: Sparkles,
-    children: [
-      { id: 'ai.chat', title: 'گفتگو با AI', page: '/dashboard/chat', icon: MessageSquare, isNew: true },
-    ],
+    id: 'ai.chat',
+    title: 'گفتگو با AI',
+    page: '/dashboard/chat',
+    icon: MessageSquare,
+    isNew: true,
   },
 
   // ── ERP ───────────────────────────────────────────────────
