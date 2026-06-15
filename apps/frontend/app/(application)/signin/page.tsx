@@ -69,6 +69,7 @@ export default function SignInPage() {
         throw new Error(data.message || 'نام کاربری یا رمز عبور اشتباه است');
       }
       const data = await res.json();
+      if (!data.access_token) throw new Error('پاسخ نامعتبر از سرور — لطفاً دوباره تلاش کنید');
       localStorage.setItem('token', data.access_token);
       // Also set cookie for middleware auth check
       document.cookie = `token=${data.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;

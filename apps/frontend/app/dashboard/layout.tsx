@@ -237,20 +237,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         className={`
           fixed inset-y-0 right-0 z-50 flex flex-col
           md:relative md:translate-x-0 md:inset-auto
+          bg-theme-card border-l border-theme
           transition-all duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"}
-          ${sidebarCollapsed ? "md:w-[80px]" : "w-64 md:w-64"}
-          p-3
+          ${sidebarCollapsed ? "md:w-[64px]" : "w-60 md:w-60"}
         `}
       >
-        <div className="flex flex-col flex-1 bg-theme-card shadow-2xl backdrop-blur-xl border border-theme rounded-2xl overflow-hidden">
-
           {/* Brand */}
-          <div className={`flex items-center border-theme border-b px-3 py-3.5 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
-            <div className="flex items-center gap-2.5 min-w-0">
-              {/* Logo mark */}
-              <div className="flex justify-center items-center bg-ai-gradient shadow-blue-500/30 shadow-md rounded-xl w-8 h-8 shrink-0">
-                <Sparkles className="w-4 h-4 text-white" />
+          <div className={`flex items-center border-b border-theme px-3 py-3 shrink-0 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex justify-center items-center bg-ai-gradient rounded-lg w-7 h-7 shrink-0">
+                <Sparkles className="w-3.5 h-3.5 text-white" />
               </div>
               {!sidebarCollapsed && (
                 <div className="min-w-0">
@@ -259,69 +256,58 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
               )}
             </div>
-
-            {/* Collapse toggle — desktop only */}
             <button
-              className="hidden md:flex justify-center items-center hover:bg-theme-hover p-1 rounded-lg transition-colors shrink-0"
+              className="hidden md:flex justify-center items-center hover:bg-theme-hover p-1 rounded-md transition-colors shrink-0"
               onClick={() => setSidebarCollapsed(v => !v)}
               title={sidebarCollapsed ? "باز کردن منو" : "بستن منو"}
             >
               <ChevronLeft className={`w-4 h-4 text-theme-muted transition-transform duration-300 ${sidebarCollapsed ? "rotate-180" : ""}`} />
             </button>
-
-            {/* Close — mobile only */}
             <button
-              className="md:hidden hover:bg-theme-hover p-1.5 rounded-lg transition-colors"
+              className="md:hidden hover:bg-theme-hover p-1.5 rounded-md transition-colors"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-4 h-4 text-theme-secondary" />
             </button>
           </div>
 
-          {/* User card */}
+          {/* User info */}
           {me && !sidebarCollapsed && (
-            <div className="bg-gradient-to-r from-blue-600/10 dark:from-blue-950/50 to-purple-600/10 dark:to-purple-950/50 mx-3 mt-3 p-3 border border-blue-200/50 dark:border-blue-800/50 rounded-xl">
-              <div className="flex items-center gap-2.5">
-                <div className="flex justify-center items-center bg-ai-gradient shadow rounded-full w-8 h-8 font-bold text-white text-sm shrink-0">
-                  {initial}
-                </div>
-                <div className="min-w-0">
-                  <div className="font-medium text-theme-primary text-sm truncate">{fullName}</div>
-                  <div className="text-[11px] text-blue-600 dark:text-blue-400">{ROLE_LABELS[role || ""] || role}</div>
-                </div>
+            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-theme shrink-0">
+              <div className="flex justify-center items-center bg-ai-gradient rounded-full w-7 h-7 font-bold text-white text-xs shrink-0">
+                {initial}
+              </div>
+              <div className="min-w-0">
+                <div className="font-medium text-theme-primary text-xs truncate">{fullName}</div>
+                <div className="text-[10px] text-theme-muted">{ROLE_LABELS[role || ""] || role}</div>
               </div>
             </div>
           )}
-
-          {/* Collapsed avatar */}
           {me && sidebarCollapsed && (
-            <div className="flex justify-center mt-3">
-              <div className="flex justify-center items-center bg-ai-gradient shadow rounded-full w-8 h-8 font-bold text-white text-sm">
+            <div className="flex justify-center py-2 border-b border-theme shrink-0">
+              <div className="flex justify-center items-center bg-ai-gradient rounded-full w-7 h-7 font-bold text-white text-xs">
                 {initial}
               </div>
             </div>
           )}
 
           {/* Nav */}
-          <div className="flex-1 px-2 py-3 overflow-y-auto">
-            {/* Profile link */}
+          <div className="flex-1 px-2 py-2 overflow-y-auto">
             {!sidebarCollapsed && (
               <Link
                 href="/dashboard/profile"
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium mb-2 transition-all duration-200
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium mb-1 transition-colors
                   ${pathname === "/dashboard/profile"
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/30"
-                    : "text-theme-secondary hover:bg-theme-hover hover:text-theme-primary"
+                    ? "bg-blue-600 text-white"
+                    : "text-theme-secondary hover:bg-theme-hover"
                   }`}
               >
                 <UserCog className={`w-4 h-4 shrink-0 ${pathname === "/dashboard/profile" ? "text-white" : "text-theme-muted"}`} />
                 پروفایل
               </Link>
             )}
-
-            {!sidebarCollapsed && <div className="mb-2 border-theme border-t" />}
-
+            {!sidebarCollapsed && <div className="mb-1 border-theme border-t" />}
             <TwoLayerSidebar
               allowedPages={allowedPages}
               role={role}
@@ -331,33 +317,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Bottom actions */}
-          <div className={`px-3 pb-3 border-theme border-t pt-3 space-y-1 ${sidebarCollapsed ? "flex flex-col items-center" : ""}`}>
+          <div className={`px-2 py-2 border-t border-theme shrink-0 ${sidebarCollapsed ? "flex flex-col items-center" : ""}`}>
             {!sidebarCollapsed ? (
               <button
                 onClick={logout}
-                className="flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-950/40 px-3 py-2.5 rounded-xl w-full font-medium text-red-600 dark:text-red-400 text-sm transition-all"
+                className="flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-950/40 px-3 py-2 rounded-lg w-full text-red-600 dark:text-red-400 text-sm transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 خروج از سیستم
               </button>
             ) : (
-              <button
-                onClick={logout}
-                title="خروج"
-                className="hover:bg-red-50 dark:hover:bg-red-950/40 p-2 rounded-xl text-red-500 transition-colors"
-              >
+              <button onClick={logout} title="خروج"
+                className="hover:bg-red-50 dark:hover:bg-red-950/40 p-2 rounded-lg text-red-500 transition-colors">
                 <LogOut className="w-4 h-4" />
               </button>
             )}
           </div>
-        </div>
-      </aside>
 
       {/* ── MAIN ── */}
+      </aside>
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Floating header */}
-        <header className="top-0 z-30 sticky p-3">
-          <div className="flex items-center gap-3 bg-theme-card shadow-sm backdrop-blur-xl px-4 py-2.5 border border-theme rounded-2xl">
+        {/* Header */}
+        <header className="top-0 z-30 sticky bg-theme-card border-b border-theme">
+          <div className="flex items-center gap-3 px-4 py-2.5">
             {/* Mobile menu */}
             <button
               className="md:hidden flex-shrink-0 hover:bg-theme-hover p-2 border border-theme rounded-xl transition-all"
@@ -399,7 +381,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Theme toggle */}
               <button
                 onClick={cycleTheme}
-                className="flex justify-center items-center hover:bg-theme-hover p-2 border border-theme rounded-xl text-theme-secondary transition-all"
+                className="flex justify-center items-center hover:bg-theme-hover p-1.5 rounded-lg text-theme-secondary transition-colors"
                 title={`تم: ${themeLabel}`}
               >
                 <ThemeIcon className={`w-4 h-4 ${theme === "dark" ? "text-amber-400" : theme === "light" ? "text-amber-500" : ""}`} />
@@ -415,7 +397,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page content */}
-        <main className="flex-1 px-3 pb-6 page-enter">
+        <main className="flex-1 p-4 page-enter overflow-auto">
           <ToastProvider>
             {children}
           </ToastProvider>
@@ -430,7 +412,7 @@ function NotificationBell() {
   const [count] = React.useState(3);
   return (
     <div className="relative">
-      <button className="flex justify-center items-center hover:bg-theme-hover p-2 border border-theme rounded-xl text-theme-secondary transition-all">
+      <button className="flex justify-center items-center hover:bg-theme-hover p-1.5 rounded-lg text-theme-secondary transition-colors">
         <Bell className="w-4 h-4" />
         {count > 0 && (
           <span className="top-1.5 right-1.5 absolute bg-blue-500 rounded-full w-2 h-2 notif-pulse" />
@@ -475,7 +457,7 @@ function HeaderUserMenu({ me, role, onLogout }: { me: any; role: Role | null; on
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="left-0 z-50 absolute bg-theme-card shadow-2xl backdrop-blur-xl mt-2 border border-theme rounded-2xl w-52 overflow-hidden"
+            className="left-0 z-50 absolute bg-theme-card shadow-xl mt-1 border border-theme rounded-xl w-52 overflow-hidden"
           >
             <div className="px-4 py-3 border-theme border-b">
               <div className="font-semibold text-theme-primary text-sm truncate">{fullName}</div>
