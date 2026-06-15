@@ -109,15 +109,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   // Check page access — show forbidden screen instead of silent redirect
-  const BASE_ALWAYS_ALLOWED = [
-    "/dashboard",
+  // NOTE: "/dashboard" exact-only — prefix would match every sub-page and bypass the check
+  const BASE_ALWAYS_ALLOWED_EXACT = ["/dashboard"];
+  const BASE_ALWAYS_ALLOWED_PREFIX = [
     "/dashboard/profile",
     "/dashboard/change-password",
     "/dashboard/chat",
   ];
   React.useEffect(() => {
     if (!allowedPages || !pathname) return;
-    const isBase = BASE_ALWAYS_ALLOWED.some(p => pathname === p || pathname.startsWith(p + "/"));
+    const isBase =
+      BASE_ALWAYS_ALLOWED_EXACT.includes(pathname) ||
+      BASE_ALWAYS_ALLOWED_PREFIX.some(p => pathname === p || pathname.startsWith(p + "/"));
     if (isBase) { setAccessDenied(false); return; }
     const ok = allowedPages.some(p => pathname === p || pathname.startsWith(p + "/"));
     setAccessDenied(!ok);
