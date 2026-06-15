@@ -333,7 +333,7 @@ export class AiSettingsService {
       this.http.post(
         `${baseUrl}/chat/completions`,
         { model: model || 'gpt-4o-mini', messages: [...sys, ...messages], temperature: safeMode ? 0.3 : 0.7, max_tokens: 2048 },
-        { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } },
+        { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 30000 },
       ),
     );
     // Handle both string content and array content (some providers return [{type:'text',text:'...'}])
