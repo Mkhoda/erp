@@ -7,7 +7,7 @@ import {
   ChevronLeft, LayoutDashboard, Boxes, Layers, Tag,
   Handshake, UserCog, Building, MapPin, Home,
   CircleDollarSign, Users, Shield, FileText, Settings,
-  Bell, Sparkles, Cpu, Calendar,
+  Bell, Sparkles, Cpu, Calendar, ShieldOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import TwoLayerSidebar from "../components/TwoLayerSidebar";
@@ -69,6 +69,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [theme, setTheme] = React.useState<Theme>("system");
   const [cmdOpen, setCmdOpen] = React.useState(false);
   const [authReady, setAuthReady] = React.useState(false);
+  const [accessDenied, setAccessDenied] = React.useState(false);
 
   // Auth
   React.useEffect(() => {
@@ -107,21 +108,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .catch(() => setAllowedPages([]));
   }, []);
 
-  // Redirect if page not allowed
+  // Check page access — show forbidden screen instead of silent redirect
+  const BASE_ALWAYS_ALLOWED = [
+    "/dashboard",
+    "/dashboard/profile",
+    "/dashboard/change-password",
+    "/dashboard/chat",
+  ];
   React.useEffect(() => {
     if (!allowedPages || !pathname) return;
-    if (
-      pathname === "/dashboard" ||
-      pathname.startsWith("/dashboard/profile") ||
-      pathname.startsWith("/dashboard/change-password") ||
-      pathname.startsWith("/dashboard/chat") ||
-      pathname.startsWith("/dashboard/knowledge") ||
-      pathname.startsWith("/dashboard/workflows") ||
-      pathname.startsWith("/dashboard/agents")
-    ) return;
+    const isBase = BASE_ALWAYS_ALLOWED.some(p => pathname === p || pathname.startsWith(p + "/"));
+    if (isBase) { setAccessDenied(false); return; }
     const ok = allowedPages.some(p => pathname === p || pathname.startsWith(p + "/"));
-    if (!ok) router.replace("/dashboard");
-  }, [allowedPages, pathname, router]);
+    setAccessDenied(!ok);
+  }, [allowedPages, pathname]);
 
   // Theme
   React.useEffect(() => {
@@ -399,10 +399,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Page content */}
         <main className="flex-1 p-4 page-enter overflow-auto">
           <ToastProvider>
-            {children}
+            {accessDenied && allowedPages !== null ? (
+              <ForbiddenScreen pathname={pathname} />
+            ) : (
+              children
+            )}
           </ToastProvider>
         </main>
       </div>
+    </div>
+  );
+}
+
+/* ── Forbidden Screen ── */
+function ForbiddenScreen({ pathname }: { pathname: string }) {
+  const router = useRouter();
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6" dir="rtl">
+      <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+        <ShieldOff className="w-10 h-10 text-red-500 dark:text-red-400" />
+      </div>
+      <div className="text-center max-w-sm">
+        <h1 className="text-xl font-bold text-theme-primary mb-2">دسترسی مجاز نیست</h1>
+        <p className="text-theme-muted text-sm leading-relaxed">
+          شما مجاز به مشاهده این صفحه نیستید.
+          <br />
+          برای دسترسی به این بخش با مدیر سیستم تماس بگیرید.
+        </p>
+        <code className="inline-block mt-3 text-[11px] text-theme-muted font-mono bg-theme-hover px-2 py-1 rounded">{pathname}</code>
+      </div>
+      <button
+        onClick={() => router.push("/dashboard")}
+        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+      >
+        <LayoutDashboard className="w-4 h-4" />
+        بازگشت به داشبورد
+      </button>
     </div>
   );
 }
