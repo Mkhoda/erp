@@ -397,12 +397,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 page-enter overflow-auto">
+        <main className="flex-1 p-4 overflow-auto">
           <ToastProvider>
-            {accessDenied && allowedPages !== null ? (
+            {allowedPages === null ? (
+              // Permissions still loading — don't render page content yet
+              <div className="flex items-center justify-center min-h-[40vh]">
+                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : accessDenied ? (
               <ForbiddenScreen pathname={pathname} />
             ) : (
-              children
+              <div className="page-enter">{children}</div>
             )}
           </ToastProvider>
         </main>
