@@ -1,13 +1,12 @@
 import { Module } from '@nestjs/common';
-import { HttpModule } from '@nestjs/axios';
 import { ChatHistoryController } from './chat-history.controller';
 import { ChatHistoryService } from './chat-history.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AiSettingsService } from '../ai-settings/ai-settings.service';
+import { AiSettingsModule } from '../ai-settings/ai-settings.module';
 
 @Module({
-  imports: [HttpModule],
+  imports: [AiSettingsModule],
   controllers: [ChatHistoryController],
-  providers: [ChatHistoryService, AiSettingsService, PrismaService],
+  providers: [ChatHistoryService, PrismaService],
 })
 export class ChatHistoryModule {}
