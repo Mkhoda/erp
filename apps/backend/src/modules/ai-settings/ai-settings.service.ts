@@ -11,6 +11,7 @@ const DEFAULT_URLS: Record<string, string> = {
   anthropic: 'https://api.anthropic.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
   deepseek: 'https://api.deepseek.com/v1',
+  groq: 'https://api.groq.com/openai/v1',
   custom: '',
 };
 
@@ -51,7 +52,7 @@ export class AiSettingsService {
 
   /** Create or update a provider (upsert by type). */
   async upsert(dto: AiProviderDto) {
-    const validTypes = ['agnes', 'openai', 'anthropic', 'gemini', 'deepseek', 'custom'];
+    const validTypes = ['agnes', 'openai', 'anthropic', 'gemini', 'deepseek', 'groq', 'custom'];
     if (!validTypes.includes(dto.type)) {
       throw new BadRequestException(`Invalid type. Must be one of: ${validTypes.join(', ')}`);
     }
