@@ -16,6 +16,9 @@ import {
   BarChart3,
   Cpu,
   ScrollText,
+  Fingerprint,
+  Settings,
+  Activity,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -92,6 +95,22 @@ export const MENU: MenuItem[] = [
     icon: BarChart3,
     section: 'تحلیل',
     roles: ['ADMIN', 'MANAGER', 'EXPERT'],
+  },
+
+  // ── حضور و غیاب ───────────────────────────────────────────
+  // NOTE: only settings + sync pages exist today (slices 1-2). The
+  // employee/manager/HR pages (records, calendar, requests, approvals,
+  // holidays, shifts, reports) are added here as their slices ship.
+  {
+    id: 'attendance',
+    title: 'حضور و غیاب',
+    icon: Fingerprint,
+    section: 'حضور و غیاب',
+    roles: ['ADMIN'],
+    children: [
+      { id: 'attendance.settings', title: 'تنظیمات حضور و غیاب', page: '/dashboard/attendance/settings', icon: Settings },
+      { id: 'attendance.sync',     title: 'پایش همگام‌سازی',     page: '/dashboard/attendance/sync',     icon: Activity },
+    ],
   },
 
   // ── مدیریت سیستم (ADMIN only) ─────────────────────────────
