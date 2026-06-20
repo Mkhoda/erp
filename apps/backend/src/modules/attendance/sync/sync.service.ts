@@ -5,6 +5,7 @@ import { SourcesService } from '../integration/sources.service';
 import { MssqlProvider } from '../integration/mssql.provider';
 import { AttendanceSourceProvider } from '../integration/source-provider.interface';
 import { inferDirection, normalizePunchAt } from '../integration/punch-time.util';
+import { RecomputeService } from '../engine/recompute.service';
 
 export interface SyncResult {
   sourceId: string;
@@ -26,6 +27,7 @@ export class SyncService {
     private prisma: PrismaService,
     private sources: SourcesService,
     private mssql: MssqlProvider,
+    private recompute: RecomputeService,
   ) {}
 
   private providerFor(driver: string): AttendanceSourceProvider {
@@ -83,6 +85,9 @@ export class SyncService {
     let imported = 0;
     let skipped = 0;
     let lastError: string | undefined;
+    // Mapped punches accumulated across batches → recomputed into AttendanceDay
+    // after the import drains.
+    const affected: Array<{ userId: string | null; punchAt: Date }> = [];
 
     try {
       // Drain in batches until a short read (fewer rows than batchSize).
@@ -131,6 +136,7 @@ export class SyncService {
         });
         imported += res.count;
         skipped += rows.length - res.count;
+        for (const d of data) if (d.userId) affected.push({ userId: d.userId, punchAt: d.punchAt as Date });
 
         // Touch device last-seen + auto-register unseen device codes.
         await this.touchDevices(sourceId, rows);
@@ -143,6 +149,13 @@ export class SyncService {
         });
 
         if (rows.length < source.batchSize) break; // drained
+      }
+
+      // Recompute the AttendanceDay rows touched by this import. Failures here
+      // are logged inside the service and must not fail the sync itself.
+      if (affected.length) {
+        const days = await this.recompute.recomputeForRawRows(affected);
+        this.logger.log(`Recomputed ${days} attendance day(s) after sync ${sourceId}`);
       }
 
       await this.prisma.attendanceSource.update({

@@ -19,6 +19,7 @@ import {
   Fingerprint,
   Settings,
   Activity,
+  ClipboardList,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -108,8 +109,10 @@ export const MENU: MenuItem[] = [
     section: 'حضور و غیاب',
     roles: ['ADMIN'],
     children: [
-      { id: 'attendance.settings', title: 'تنظیمات حضور و غیاب', page: '/dashboard/attendance/settings', icon: Settings },
-      { id: 'attendance.sync',     title: 'پایش همگام‌سازی',     page: '/dashboard/attendance/sync',     icon: Activity },
+      { id: 'attendance.dashboard', title: 'داشبورد حضور',         page: '/dashboard/attendance',          icon: LayoutDashboard },
+      { id: 'attendance.records',   title: 'کارکرد روزانه',        page: '/dashboard/attendance/records',  icon: ClipboardList },
+      { id: 'attendance.settings',  title: 'تنظیمات حضور و غیاب',  page: '/dashboard/attendance/settings', icon: Settings },
+      { id: 'attendance.sync',      title: 'پایش همگام‌سازی',      page: '/dashboard/attendance/sync',     icon: Activity },
     ],
   },
 

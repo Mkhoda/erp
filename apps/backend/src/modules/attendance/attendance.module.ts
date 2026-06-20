@@ -7,21 +7,41 @@ import { SourcesController } from './integration/sources.controller';
 import { SyncService } from './sync/sync.service';
 import { SyncScheduler } from './sync/sync.scheduler';
 import { SyncController } from './sync/sync.controller';
+import { CalcService } from './engine/calc.service';
+import { RecomputeService } from './engine/recompute.service';
+import { MaintenanceController } from './engine/maintenance.controller';
+import { RecordsService } from './records/records.service';
+import { RecordsController } from './records/records.controller';
+import { DashboardsService } from './dashboards/dashboards.service';
+import { DashboardsController } from './dashboards/dashboards.controller';
+import { ReportsService } from './reports/reports.service';
+import { ReportsController } from './reports/reports.controller';
 
 // Attendance & Workforce Management.
-// Slice 1: schema + permissions (done).  Slice 2: integration + sync engine.
-// Later slices (calc engine, records/calendar, workflows, dashboards, reports)
-// register their controllers/services here.
+// Slices 1-2: schema + integration/sync.  Slice 3: calc engine + records,
+// dashboard, and Excel/PDF reporting.
 @Module({
   imports: [ScheduleModule.forRoot()],
-  controllers: [SourcesController, SyncController],
+  controllers: [
+    SourcesController,
+    SyncController,
+    MaintenanceController,
+    RecordsController,
+    DashboardsController,
+    ReportsController,
+  ],
   providers: [
     PrismaService,
     MssqlProvider,
     SourcesService,
     SyncService,
     SyncScheduler,
+    CalcService,
+    RecomputeService,
+    RecordsService,
+    DashboardsService,
+    ReportsService,
   ],
-  exports: [SourcesService, SyncService],
+  exports: [SourcesService, SyncService, RecomputeService],
 })
 export class AttendanceModule {}

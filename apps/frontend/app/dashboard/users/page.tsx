@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { List, LayoutGrid, Plus, Pencil, Users as UsersIcon, Upload, Phone, Ban, CheckCircle, KeyRound, Eye, EyeOff, UserX } from "lucide-react";
+import { List, LayoutGrid, Plus, Pencil, Users as UsersIcon, Upload, Phone, Ban, CheckCircle, KeyRound, Eye, EyeOff, UserX, CreditCard } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader";
 import SearchBar from "../../components/ui/SearchBar";
 import SkeletonTable, { SkeletonCards } from "../../components/ui/SkeletonTable";
@@ -17,6 +17,7 @@ type User = {
   lastName: string;
   role: "ADMIN" | "MANAGER" | "USER" | "EXPERT";
   disabled?: boolean;
+  attendanceCardNo?: string | null;
   userDepartments?: Array<{ departmentId: string; department?: { id: string; name: string } }>;
 };
 
@@ -81,7 +82,7 @@ export default function UsersPage() {
   const filtered = users.filter(u => {
     if (!showDisabled && u.disabled) return false;
     const name = `${u.firstName || ""} ${u.lastName || ""}`.toLowerCase();
-    const matchQ = name.includes(query.toLowerCase()) || (u.phone || "").includes(query) || (u.email || "").toLowerCase().includes(query.toLowerCase());
+    const matchQ = name.includes(query.toLowerCase()) || (u.phone || "").includes(query) || (u.email || "").toLowerCase().includes(query.toLowerCase()) || (u.attendanceCardNo || "").includes(query);
     const matchRole = roleFilter === "ALL" || u.role === roleFilter;
     const matchDept = !departmentFilter || u.userDepartments?.some(x => x.departmentId === departmentFilter);
     return matchQ && matchRole && matchDept;
@@ -137,6 +138,7 @@ export default function UsersPage() {
         phone: editing.phone || null,
         email: editing.email || null,
         role: editing.role,
+        attendanceCardNo: editing.attendanceCardNo || null,
         departmentIds: editing.departmentIds,
       };
       if (isNew) payload.password = editing.password;
@@ -340,6 +342,15 @@ export default function UsersPage() {
           <div>
             <label className="block mb-1.5 font-medium text-theme-secondary text-xs">ایمیل (اختیاری)</label>
             <input type="email" dir="ltr" value={editing?.email || ""} onChange={e => setEditing((s: any) => ({ ...s, email: e.target.value }))} className="input-theme text-sm" placeholder="email@example.com" />
+          </div>
+
+          <div>
+            <label className="block mb-1.5 font-medium text-theme-secondary text-xs">کد کارت حضور و غیاب (اختیاری)</label>
+            <div className="relative">
+              <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
+              <input type="text" dir="ltr" value={editing?.attendanceCardNo || ""} onChange={e => setEditing((s: any) => ({ ...s, attendanceCardNo: e.target.value }))} className="input-theme text-sm pr-10" placeholder="مثلاً 1024" />
+            </div>
+            <p className="mt-1 text-[11px] text-theme-muted">شماره کارتی که در دستگاه حضور و غیاب برای این کاربر ثبت شده است.</p>
           </div>
 
           {/* Password — required for new, optional reset for existing */}

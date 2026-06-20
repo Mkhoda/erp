@@ -12,11 +12,11 @@ export class UsersService {
       : undefined;
     return this.prisma.user.findMany({
       where,
-      select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, userDepartments: { select: { departmentId: true, department: true } } },
+      select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, attendanceCardNo: true, userDepartments: { select: { departmentId: true, department: true } } },
     });
   }
   findOne(id: string) {
-    return this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, userDepartments: { select: { departmentId: true, department: true } } } });
+    return this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, attendanceCardNo: true, userDepartments: { select: { departmentId: true, department: true } } } });
   }
   async create(data: any) {
     const payload = { ...data };
@@ -28,6 +28,11 @@ export class UsersService {
     else payload.email = payload.email.trim().toLowerCase();
     // Normalize phone
     if (!payload.phone || payload.phone.trim() === '') payload.phone = null;
+    // Normalize attendance card number — empty becomes null (column is @unique)
+    if ('attendanceCardNo' in payload) {
+      payload.attendanceCardNo = payload.attendanceCardNo && String(payload.attendanceCardNo).trim() !== ''
+        ? String(payload.attendanceCardNo).trim() : null;
+    }
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
     const created = await this.prisma.user.create({ data: payload, select: { id: true, email: true, firstName: true, lastName: true, role: true, departmentId: true } });
@@ -94,9 +99,14 @@ export class UsersService {
     if ('phone' in payload && (!payload.phone || payload.phone.trim() === '')) {
       payload.phone = null;
     }
+    // Normalize attendance card number — empty becomes null (column is @unique)
+    if ('attendanceCardNo' in payload) {
+      payload.attendanceCardNo = payload.attendanceCardNo && String(payload.attendanceCardNo).trim() !== ''
+        ? String(payload.attendanceCardNo).trim() : null;
+    }
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
-    const updated = await this.prisma.user.update({ where: { id }, data: payload, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, disabled: true } });
+    const updated = await this.prisma.user.update({ where: { id }, data: payload, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, disabled: true, attendanceCardNo: true } });
     if (departmentIds) {
       // reset memberships
       await this.prisma.userDepartment.deleteMany({ where: { userId: id } });

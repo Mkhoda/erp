@@ -1,0 +1,206 @@
+"use client";
+import React from "react";
+import {
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area,
+} from "recharts";
+import {
+  Users, Clock, AlertTriangle, Moon, CalendarCheck, CalendarX,
+  RefreshCw, Loader2, Fingerprint, ArrowLeft, TimerReset,
+} from "lucide-react";
+import Link from "next/link";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "/api";
+
+const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
+const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته" };
+const STATUS_COLOR: Record<string,string> = { PRESENT:"#10b981", LATE:"#f59e0b", EARLY_LEAVE:"#eab308", ABSENT:"#ef4444", INCOMPLETE:"#f97316", LEAVE:"#3b82f6", MISSION:"#8b5cf6", REMOTE_WORK:"#06b6d4", HOLIDAY:"#94a3b8", COMPANY_HOLIDAY:"#64748b", WEEKEND:"#cbd5e1" };
+
+const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
+const fmtMin = (m: number) => { const h = Math.floor((m||0)/60); const mm = (m||0)%60; return `${faNum(h)}:${String(mm).padStart(2,"0")}`; };
+const fmtHours = (m: number) => `${faNum(Math.round((m||0)/60*10)/10)} ساعت`;
+
+export default function AttendanceDashboardPage() {
+  React.useEffect(() => { document.title = "داشبورد حضور و غیاب | Arzesh"; }, []);
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+  const [data, setData] = React.useState<any>(null);
+  const [departments, setDepartments] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [jYear, setJYear] = React.useState<number | null>(null);
+  const [jMonth, setJMonth] = React.useState<number | null>(null);
+  const [deptId, setDeptId] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [relinking, setRelinking] = React.useState(false);
+  const [msg, setMsg] = React.useState<string | null>(null);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (jYear) qs.set("jYear", String(jYear));
+      if (jMonth) qs.set("jMonth", String(jMonth));
+      if (deptId) qs.set("departmentId", deptId);
+      const res = await fetch(`${API}/attendance/dashboard?${qs}`, { headers: h });
+      const d = res.ok ? await res.json() : null;
+      setData(d);
+      if (d && jYear == null) { setJYear(d.jYear); setJMonth(d.jMonth); }
+    } finally { setLoading(false); }
+    // eslint-disable-next-line
+  }, [jYear, jMonth, deptId]);
+
+  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
+    // eslint-disable-next-line
+  }, []);
+
+  async function relink() {
+    setRelinking(true); setMsg(null);
+    try {
+      const res = await fetch(`${API}/attendance/maintenance/relink`, { method: "POST", headers: h });
+      const r = await res.json();
+      setMsg(`اتصال انجام شد: ${faNum(r.linked)} پانچ متصل، ${faNum(r.recomputed)} روز محاسبه شد`);
+      await load();
+    } catch { setMsg("خطا در بازمحاسبه"); }
+    finally { setRelinking(false); setTimeout(() => setMsg(null), 6000); }
+  }
+
+  const yearOpts = React.useMemo(() => {
+    const base = jYear ?? 1404;
+    return [base - 2, base - 1, base, base + 1];
+  }, [jYear]);
+
+  const statusPie = Object.entries(data?.statusCounts || {}).map(([k, v]) => ({ name: STATUS_FA[k] || k, key: k, value: v as number }));
+  const trend = (data?.trend || []).map((t: any) => ({ روز: t.jDay, حاضر: t.present, اضافه‌کار: Math.round(t.overtimeMinutes/60*10)/10, تاخیر: Math.round(t.delayMinutes/60*10)/10 }));
+  const topOt = (data?.topOvertime || []).map((u: any) => ({ name: u.name, ساعت: Math.round(u.value/60*10)/10 }));
+  const topDelay = (data?.topDelay || []).map((u: any) => ({ name: u.name, دقیقه: u.value }));
+  const t = data?.totals || {};
+  const today = data?.todayCounts || {};
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 space-y-5" dir="rtl">
+      {/* Header + filters */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center"><Fingerprint className="w-5 h-5 text-white" /></div>
+          <div>
+            <h1 className="text-xl font-bold text-theme-primary">داشبورد حضور و غیاب</h1>
+            <p className="text-sm text-theme-muted">{jMonth ? `${J_MONTHS[jMonth-1]} ${faNum(jYear||0)}` : "—"}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select className="input-theme text-sm w-auto" value={jYear ?? ""} onChange={e => setJYear(+e.target.value)}>
+            {yearOpts.map(y => <option key={y} value={y}>{faNum(y)}</option>)}
+          </select>
+          <select className="input-theme text-sm w-auto" value={jMonth ?? ""} onChange={e => setJMonth(+e.target.value)}>
+            {J_MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+          </select>
+          <select className="input-theme text-sm w-auto" value={deptId} onChange={e => setDeptId(e.target.value)}>
+            <option value="">همه دپارتمان‌ها</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+          <Link href="/dashboard/attendance/records" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> کارکرد روزانه</Link>
+          <button onClick={relink} disabled={relinking} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50" title="اتصال پانچ‌های وارد‌شده به کاربران دارای کد کارت و بازمحاسبه">
+            {relinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} اتصال و بازمحاسبه
+          </button>
+        </div>
+      </div>
+      {msg && <div className="text-sm text-green-600 bg-green-500/10 rounded-lg px-3 py-2">{msg}</div>}
+
+      {loading ? (
+        <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
+      ) : !data ? (
+        <div className="bg-theme-card border border-theme rounded-xl p-8 text-center text-theme-muted">داده‌ای یافت نشد</div>
+      ) : (
+        <>
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <Stat icon={Users} color="bg-blue-500" label="کاربران دارای کارت" value={faNum(data.mappedUsers)} />
+            <Stat icon={CalendarCheck} color="bg-green-500" label="حاضر امروز" value={faNum(today.PRESENT || 0)} />
+            <Stat icon={CalendarX} color="bg-red-500" label="غایب امروز" value={faNum(today.ABSENT || 0)} />
+            <Stat icon={Clock} color="bg-violet-500" label="مجموع اضافه‌کار" value={fmtHours(t.overtimeMinutes)} />
+            <Stat icon={AlertTriangle} color="bg-amber-500" label="مجموع تاخیر" value={fmtHours(t.delayMinutes)} />
+            <Stat icon={Moon} color="bg-slate-500" label="مجموع شب‌کاری" value={fmtHours(t.nightMinutes)} />
+          </div>
+
+          {/* Charts row 1 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Card title="توزیع وضعیت">
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie data={statusPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={(e:any)=>faNum(e.value)}>
+                    {statusPie.map((s, i) => <Cell key={i} fill={STATUS_COLOR[s.key] || "#888"} />)}
+                  </Pie>
+                  <Tooltip formatter={(v:any)=>faNum(v)} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+            <div className="lg:col-span-2">
+              <Card title="روند ماهانه (حاضرین و اضافه‌کار)">
+                <ResponsiveContainer width="100%" height={240}>
+                  <AreaChart data={trend}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                    <XAxis dataKey="روز" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Area type="monotone" dataKey="حاضر" stroke="#10b981" fill="#10b98133" />
+                    <Area type="monotone" dataKey="اضافه‌کار" stroke="#8b5cf6" fill="#8b5cf633" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Card>
+            </div>
+          </div>
+
+          {/* Charts row 2 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card title="بیشترین اضافه‌کار (ساعت)">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={topOt} layout="vertical" margin={{ right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="ساعت" fill="#8b5cf6" radius={[0,4,4,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+            <Card title="بیشترین تاخیر (دقیقه)">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={topDelay} layout="vertical" margin={{ right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="دقیقه" fill="#f59e0b" radius={[0,4,4,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Stat({ icon: Icon, color, label, value }: { icon: any; color: string; label: string; value: string }) {
+  return (
+    <div className="bg-theme-card border border-theme rounded-xl p-3 flex items-center gap-3">
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${color}`}><Icon className="w-4 h-4 text-white" /></div>
+      <div className="min-w-0">
+        <div className="text-lg font-bold text-theme-primary truncate">{value}</div>
+        <div className="text-[11px] text-theme-muted truncate">{label}</div>
+      </div>
+    </div>
+  );
+}
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-theme-card border border-theme rounded-xl p-4">
+      <h2 className="font-semibold text-theme-primary text-sm mb-3">{title}</h2>
+      {children}
+    </div>
+  );
+}
