@@ -12,6 +12,7 @@ const DEFAULT_URLS: Record<string, string> = {
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
   deepseek: 'https://api.deepseek.com/v1',
   groq: 'https://api.groq.com/openai/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
   custom: '',
 };
 
@@ -52,7 +53,7 @@ export class AiSettingsService {
 
   /** Create or update a provider (upsert by type). */
   async upsert(dto: AiProviderDto) {
-    const validTypes = ['agnes', 'openai', 'anthropic', 'gemini', 'deepseek', 'groq', 'custom'];
+    const validTypes = ['agnes', 'openai', 'anthropic', 'gemini', 'deepseek', 'groq', 'openrouter', 'custom'];
     if (!validTypes.includes(dto.type)) {
       throw new BadRequestException(`Invalid type. Must be one of: ${validTypes.join(', ')}`);
     }
@@ -324,6 +325,8 @@ export class AiSettingsService {
         return this.chatGemini(baseUrl, provider.apiKey, provider.model, messages, safeMode);
       case 'agnes':
         return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, messages, safeMode, true);
+      case 'openrouter':
+        return this.chatOpenRouter(baseUrl, provider.apiKey, provider.model, messages, safeMode);
       default:
         return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, messages, safeMode);
     }
@@ -487,6 +490,35 @@ export class AiSettingsService {
     return Array.from(map.values())
       .map(e => ({ ...e, providers: Array.from(e.providers) }))
       .sort((a, b) => b.totalTokens - a.totalTokens);
+  }
+
+  private async chatOpenRouter(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean) {
+    const sys = safeMode
+      ? [{ role: 'system', content: 'You are a helpful, safe, and professional assistant. Respond in the same language as the user.' }]
+      : [];
+    const { data } = await firstValueFrom(
+      this.http.post(
+        `${baseUrl}/chat/completions`,
+        { model: model || 'openai/gpt-4o-mini', messages: [...sys, ...messages], max_tokens: 2048, stream: false },
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://erp.arzesh.net',
+            'X-Title': 'Arzesh ERP',
+          },
+          timeout: 30000,
+        },
+      ),
+    );
+    const rawContent = data.choices?.[0]?.message?.content;
+    const content = typeof rawContent === 'string' ? rawContent : '';
+    return {
+      content,
+      promptTokens: data.usage?.prompt_tokens || 0,
+      completionTokens: data.usage?.completion_tokens || 0,
+      totalTokens: data.usage?.total_tokens || 0,
+    };
   }
 
   private maskKey(key: string): string {

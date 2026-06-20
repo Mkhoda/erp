@@ -35,8 +35,9 @@ const PROVIDER_INFO: Record<string, { label: string; color: string; defaultUrl: 
   anthropic: { label: "Anthropic",     color: "#d97757", defaultUrl: "https://api.anthropic.com/v1",     docUrl: "https://docs.anthropic.com", defaultModel: "claude-sonnet-4-20250514" },
   gemini:    { label: "Google Gemini", color: "#4285f4", defaultUrl: "https://generativelanguage.googleapis.com/v1beta", docUrl: "https://ai.google.dev/docs", defaultModel: "gemini-pro" },
   deepseek:  { label: "DeepSeek",      color: "#4d6bfe", defaultUrl: "https://api.deepseek.com/v1",      docUrl: "https://platform.deepseek.com/api-docs", defaultModel: "deepseek-chat" },
-  groq:      { label: "Groq",          color: "#f55036", defaultUrl: "https://api.groq.com/openai/v1",   docUrl: "https://console.groq.com/docs", defaultModel: "llama-3.3-70b-versatile" },
-  custom:    { label: "سفارشی",        color: "#6b7280", defaultUrl: "",                                  docUrl: "", defaultModel: "" },
+  groq:        { label: "Groq",        color: "#f55036", defaultUrl: "https://api.groq.com/openai/v1",  docUrl: "https://console.groq.com/docs", defaultModel: "llama-3.3-70b-versatile" },
+  openrouter:  { label: "OpenRouter",  color: "#7c3aed", defaultUrl: "https://openrouter.ai/api/v1",    docUrl: "https://openrouter.ai/docs", defaultModel: "openai/gpt-4o-mini" },
+  custom:      { label: "سفارشی",      color: "#6b7280", defaultUrl: "",                                 docUrl: "", defaultModel: "" },
 };
 
 export default function AiSettingsPage() {
