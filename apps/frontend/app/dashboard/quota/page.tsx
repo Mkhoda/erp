@@ -57,7 +57,7 @@ export default function QuotaPage() {
     try {
       const [qRes, uRes, dRes, sRes] = await Promise.all([
         fetch(`${API}/quota?limit=200`, { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`${API}/hrm/users`, { headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(`${API}/users`, { headers: { Authorization: `Bearer ${token()}` } }),
         fetch(`${API}/quota/defaults`, { headers: { Authorization: `Bearer ${token()}` } }),
         fetch(`${API}/quota/stats`, { headers: { Authorization: `Bearer ${token()}` } }),
       ]);
