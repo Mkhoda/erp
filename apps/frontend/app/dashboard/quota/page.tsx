@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Shield, Users, RotateCcw, Settings, Plus, Trash2, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react";
+import { Shield, Users, RotateCcw, Settings, Plus, Trash2, CheckCircle, TrendingUp, Zap } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
