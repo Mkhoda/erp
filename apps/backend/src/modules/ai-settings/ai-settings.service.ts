@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { Prisma } from '@prisma/client';
+import { QuotaService } from '../quota/quota.service';
 
 /** Well-known default base URLs for each provider type. */
 const DEFAULT_URLS: Record<string, string> = {
@@ -31,6 +32,7 @@ export class AiSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly http: HttpService,
+    private readonly quota: QuotaService,
   ) {}
 
   /** List all configured providers (masks API keys). */
@@ -268,6 +270,9 @@ export class AiSettingsService {
     if (!provider) throw new NotFoundException('Provider not found');
     if (!provider.isActive) throw new BadRequestException('این مدل هوش مصنوعی غیرفعال است');
 
+    // Quota enforcement
+    await this.quota.check(userId, providerType);
+
     const startTime = Date.now();
     let content = '';
     let promptTokens = 0;
@@ -294,6 +299,11 @@ export class AiSettingsService {
 
     const latencyMs = Date.now() - startTime;
     const lastPrompt = [...messages].reverse().find((m: { role: string; content: string }) => m.role === 'user')?.content || '';
+
+    // Increment quota usage (fire and forget — don't block response)
+    if (totalTokens > 0) {
+      this.quota.increment(userId, providerType, totalTokens).catch(() => {});
+    }
 
     await this.prisma.aiUsage.create({
       data: {

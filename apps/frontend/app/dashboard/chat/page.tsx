@@ -71,6 +71,7 @@ function ChatPageInner() {
   const [renameVal, setRenameVal] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [attachment, setAttachment] = React.useState<{ file: File; preview?: string } | null>(null);
+  const [quota, setQuota] = React.useState<any>(null);
   const endRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -88,7 +89,11 @@ function ChatPageInner() {
       fetch(`${API}/chat-history/memory`, { headers: h() }).then(r => r.ok ? r.json() : []),
     ]).then(([provs, convList, mems]) => {
       setProviders(provs);
-      if (provs.length > 0) setSelectedProvider(provs[0]);
+      if (provs.length > 0) {
+        setSelectedProvider(provs[0]);
+        fetch(`${API}/quota/me/${provs[0].type}`, { headers: h() })
+          .then(r => r.ok ? r.json() : null).then(d => { if (d) setQuota(d); }).catch(() => {});
+      }
       setConvos(convList);
       setMemories(mems);
       if (startId) loadConvo(startId);
@@ -168,7 +173,14 @@ function ChatPageInner() {
       ).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
     } catch {
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: "خطا در اتصال.", error: true, createdAt: new Date().toISOString() }]);
-    } finally { setSending(false); }
+    } finally {
+      setSending(false);
+      // Refresh quota after message
+      if (selectedProvider) {
+        fetch(`${API}/quota/me/${selectedProvider.type}`, { headers: h() })
+          .then(r => r.ok ? r.json() : null).then(d => { if (d) setQuota(d); }).catch(() => {});
+      }
+    }
   };
 
   const deleteConvo = async (id: string, e: React.MouseEvent) => {
@@ -339,7 +351,22 @@ function ChatPageInner() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1 text-xs text-theme-muted shrink-0">
+          <div className="flex items-center gap-2 text-xs text-theme-muted shrink-0">
+            {/* Quota widget */}
+            {quota && quota.monthlyLimit > 0 && (
+              <div className="hidden md:flex items-center gap-2 bg-theme-hover px-2.5 py-1.5 rounded-lg">
+                <div className="text-right">
+                  <div className="text-[10px] text-theme-muted leading-tight">{quota.usedTokens.toLocaleString()} / {quota.monthlyLimit.toLocaleString()}</div>
+                  <div className="bg-theme-card rounded-full w-20 h-1 mt-0.5 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${quota.usagePercent >= 90 ? "bg-red-500" : quota.usagePercent >= 70 ? "bg-yellow-500" : "bg-green-500"}`}
+                      style={{ width: `${Math.min(100, quota.usagePercent)}%` }} />
+                  </div>
+                </div>
+                <span className={`font-bold text-xs ${quota.usagePercent >= 90 ? "text-red-500" : quota.usagePercent >= 70 ? "text-yellow-500" : "text-green-600"}`}>
+                  {quota.usagePercent}%
+                </span>
+              </div>
+            )}
             {memories.length > 0 && (
               <button onClick={() => setMemoryOpen(!memoryOpen)}
                 className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-colors ${memoryOpen ? "text-blue-500 bg-blue-50 dark:bg-blue-900/20" : "hover:bg-theme-hover"}`}>

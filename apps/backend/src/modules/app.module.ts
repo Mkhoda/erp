@@ -11,6 +11,7 @@ import { AiSettingsModule } from './ai-settings/ai-settings.module';
 import { RequestLogsModule } from './request-logs/request-logs.module';
 import { ChatHistoryModule } from './chat-history/chat-history.module';
 import { TodosModule } from './todos/todos.module';
+import { QuotaModule } from './quota/quota.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
@@ -30,6 +31,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     RequestLogsModule,
     ChatHistoryModule,
     TodosModule,
+    QuotaModule,
   ],
   controllers: [ReportsController],
   providers: [

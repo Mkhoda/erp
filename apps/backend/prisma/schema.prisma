@@ -33,6 +33,7 @@ model User {
   conversations Conversation[]
   memories      UserMemory[]
   todos         Todo[]
+  quotas        UserQuota[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -372,6 +373,33 @@ model AiUsage {
   @@index([userId])
   @@index([providerType])
   @@index([createdAt])
+}
+
+// Per-user token quota per AI provider
+model UserQuota {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerType String   // "openai" | "anthropic" | "agnes" | ...
+  monthlyLimit Int      // 0 = unlimited
+  usedTokens   Int      @default(0)
+  periodStart  DateTime
+  periodEnd    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, providerType])
+  @@index([userId])
+  @@index([providerType])
+}
+
+// Platform-wide default quotas per provider (auto-assigned to new users)
+model DefaultQuota {
+  id           String   @id @default(cuid())
+  providerType String   @unique
+  monthlyLimit Int      // 0 = unlimited
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 // Personal to-do items per user

@@ -29,5 +29,6 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/ai-settings',        label: 'تنظیمات هوش مصنوعی', adminOnly: true },
   { page: '/dashboard/access',             label: 'دسترسی صفحات',       adminOnly: true },
   { page: '/dashboard/ai-usage',           label: 'مصرف AI',             adminOnly: true },
+  { page: '/dashboard/quota',              label: 'سقف توکن',             adminOnly: true },
   { page: '/dashboard/system-logs',        label: 'لاگ سیستم',           adminOnly: true },
 ];
