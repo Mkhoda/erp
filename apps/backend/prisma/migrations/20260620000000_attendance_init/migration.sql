@@ -367,9 +367,6 @@ CREATE INDEX "AttendanceRequest_status_idx" ON "AttendanceRequest"("status");
 CREATE INDEX "AttendanceNotification_userId_isRead_idx" ON "AttendanceNotification"("userId", "isRead");
 
 -- CreateIndex
-CREATE INDEX "Conversation_userId_updatedAt_idx" ON "Conversation"("userId", "updatedAt");
-
--- CreateIndex
 CREATE UNIQUE INDEX "User_attendanceCardNo_key" ON "User"("attendanceCardNo");
 
 -- AddForeignKey
