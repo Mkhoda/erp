@@ -27,7 +27,9 @@ export function decryptSecret(stored: string | null | undefined): string {
   if (!stored) return '';
   if (!stored.startsWith(PREFIX)) return stored; // legacy plaintext
   try {
-    const [, ivHex, tagHex, dataHex] = stored.split(':');
+    // PREFIX ("enc:v1:") itself contains colons — strip it before splitting
+    // the iv:tag:data payload, otherwise the parts misalign.
+    const [ivHex, tagHex, dataHex] = stored.slice(PREFIX.length).split(':');
     const iv = Buffer.from(ivHex, 'hex');
     const tag = Buffer.from(tagHex, 'hex');
     const data = Buffer.from(dataHex, 'hex');
