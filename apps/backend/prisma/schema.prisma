@@ -34,6 +34,17 @@ model User {
   memories      UserMemory[]
   todos         Todo[]
   quotas        UserQuota[]
+  // ── Attendance & Workforce ──
+  // Card number used to match imported device punches to this user.
+  attendanceCardNo String? @unique
+  rawAttendance         RawAttendanceRecord[]
+  attendanceDays        AttendanceDay[]
+  attendanceOverrides   AttendanceOverride[]    @relation("AttnOverrideBy")
+  attendanceRule        UserAttendanceRule?
+  shiftAssignments      ShiftAssignment[]
+  leaveRequests         LeaveRequest[]          @relation("LeaveUser")
+  attendanceRequests    AttendanceRequest[]     @relation("AttnReqUser")
+  attendanceNotifications AttendanceNotification[] @relation("AttnNotifUser")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -432,4 +443,374 @@ model RequestLog {
   @@index([createdAt])
   @@index([path])
   @@index([statusCode])
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Attendance & Workforce Management
+// ════════════════════════════════════════════════════════════════════
+
+enum PunchDirection {
+  IN
+  OUT
+  UNKNOWN
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  EARLY_LEAVE
+  ABSENT
+  INCOMPLETE
+  LEAVE
+  MISSION
+  REMOTE_WORK
+  HOLIDAY
+  COMPANY_HOLIDAY
+  WEEKEND
+}
+
+enum HolidayType {
+  OFFICIAL
+  COMPANY
+  HALF_DAY
+}
+
+enum ShiftType {
+  FIXED
+  ROTATING
+  NIGHT
+  WEEKLY_ROTATION
+  MONTHLY_ROTATION
+  TWENTY_FOUR_FORTY_EIGHT
+}
+
+enum LeaveKind {
+  VACATION
+  SICK
+  MISSION
+  REMOTE_WORK
+  HOURLY
+}
+
+enum AttnRequestType {
+  CHECK_IN_FIX
+  CHECK_OUT_FIX
+  FULL_DAY_FIX
+  EXPLANATION
+  LEAVE
+}
+
+enum AttnRequestStatus {
+  PENDING
+  MANAGER_APPROVED
+  HR_APPROVED
+  APPROVED
+  REJECTED
+}
+
+enum SyncRunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+enum AttnNotifType {
+  MISSING_PUNCH
+  ABSENCE
+  DELAY
+  EXCESSIVE_OVERTIME
+  SYNC_FAILURE
+  DEVICE_OFFLINE
+}
+
+enum AttnNotifChannel {
+  IN_APP
+  BALE
+  EMAIL
+}
+
+// ── Integration / Sync settings (one row per external source) ──
+model AttendanceSource {
+  id              String   @id @default(cuid())
+  name            String                            // e.g. "EOSDB Main"
+  driver          String   @default("mssql")        // mssql | mysql | http (extensible)
+  host            String
+  port            Int      @default(1433)
+  database        String
+  username        String
+  password        String                            // encrypted at rest (see crypto.util)
+  tableName       String   @default("dbo.TimeRecords")
+  timeZone        String   @default("Asia/Tehran")
+  syncEnabled     Boolean  @default(false)
+  syncIntervalSec Int      @default(300)
+  batchSize       Int      @default(1000)
+  initialSyncDate DateTime?
+  initialRecordId Int      @default(0)
+  autoRetry       Boolean  @default(true)
+  retryCount      Int      @default(3)
+  lastRecordId    Int      @default(0)              // cursor: last imported RecordID
+  lastSyncAt      DateTime?
+  lastSuccessAt   DateTime?
+  lastFailureAt   DateTime?
+  lastError       String?
+  devices         AttendanceDevice[]
+  syncLogs        AttendanceSyncLog[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ── DeviceCode → friendly name + direction hint + offline detection ──
+model AttendanceDevice {
+  id          String           @id @default(cuid())
+  sourceId    String
+  source      AttendanceSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  deviceCode  String
+  name        String
+  direction   PunchDirection   @default(UNKNOWN)    // IN-only / OUT-only readers
+  lastSeenAt  DateTime?
+  isActive    Boolean          @default(true)
+
+  @@unique([sourceId, deviceCode])
+}
+
+// ── Per-run sync audit log ──
+model AttendanceSyncLog {
+  id           String           @id @default(cuid())
+  sourceId     String
+  source       AttendanceSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  status       SyncRunStatus
+  trigger      String                                // "scheduled" | "manual"
+  fromRecordId Int
+  toRecordId   Int
+  imported     Int              @default(0)
+  skipped      Int              @default(0)
+  errorDetail  String?
+  startedAt    DateTime         @default(now())
+  finishedAt   DateTime?
+
+  @@index([sourceId, startedAt])
+}
+
+// ── Layer 1: immutable raw imported records ──
+model RawAttendanceRecord {
+  id         String   @id @default(cuid())
+  sourceId   String
+  recordId   Int                                     // device RecordID
+  cardNo     String
+  mDate      String?                                 // raw mDate as received
+  sDate      String?
+  rTime      String?
+  rType      String?                                 // raw RType
+  deviceCode String?
+  punchAt    DateTime                                // normalized, tz-adjusted timestamp
+  userId     String?                                 // resolved from cardNo (null = unmapped)
+  user       User?    @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([sourceId, recordId])                     // duplicate prevention
+  @@index([userId, punchAt])
+  @@index([cardNo, punchAt])
+}
+
+// ── Layer 2: computed daily attendance ──
+model AttendanceDay {
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id])
+  gregDate          DateTime                          // midnight of the work date
+  jYear             Int
+  jMonth            Int
+  jDay              Int
+  firstCheckIn      DateTime?
+  lastCheckOut      DateTime?
+  workedMinutes     Int              @default(0)
+  overtimeMinutes   Int              @default(0)
+  delayMinutes      Int              @default(0)
+  earlyLeaveMinutes Int              @default(0)
+  nightMinutes      Int              @default(0)
+  status            AttendanceStatus
+  isHolidayWork     Boolean          @default(false)
+  shiftId           String?
+  shift             Shift?           @relation(fields: [shiftId], references: [id])
+  hasOverride       Boolean          @default(false)
+  computedAt        DateTime         @default(now())
+
+  @@unique([userId, gregDate])
+  @@index([jYear, jMonth])
+  @@index([status])
+}
+
+// ── Layer 3: audited manual overrides ──
+model AttendanceOverride {
+  id          String            @id @default(cuid())
+  userId      String
+  gregDate    DateTime
+  newCheckIn  DateTime?
+  newCheckOut DateTime?
+  forceStatus AttendanceStatus?
+  reason      String
+  createdById String
+  createdBy   User              @relation("AttnOverrideBy", fields: [createdById], references: [id])
+  requestId   String?                                // links to approved AttendanceRequest
+  createdAt   DateTime          @default(now())
+
+  @@index([userId, gregDate])
+}
+
+// ── Global work schedule / rules (default + named schedules) ──
+model WorkSchedule {
+  id             String   @id @default(cuid())
+  name           String   @unique @default("default")
+  isDefault      Boolean  @default(false)
+  startTime      String   @default("08:00")           // "HH:mm"
+  endTime        String   @default("17:00")
+  dailyMinutes   Int      @default(480)
+  weeklyMinutes  Int      @default(2640)
+  lunchMinutes   Int      @default(60)
+  flexEnabled    Boolean  @default(false)
+  flexInStart    String?  @default("07:30")
+  flexInEnd      String?  @default("09:00")
+  graceMinutes   Int      @default(30)
+  workDays       Int[]    @default([6, 0, 1, 2, 3])    // JS getDay(): Sat..Wed (Thu/Fri weekend)
+  otMinThreshold Int      @default(30)
+  otMaxDaily     Int      @default(240)
+  otMaxMonthly   Int      @default(3600)
+  otRounding     Int      @default(15)                 // round OT to nearest N minutes
+  userRules      UserAttendanceRule[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ── Per-user override of WorkSchedule ──
+model UserAttendanceRule {
+  id           String        @id @default(cuid())
+  userId       String        @unique
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduleId   String?
+  schedule     WorkSchedule? @relation(fields: [scheduleId], references: [id])
+  startTime    String?
+  endTime      String?
+  dailyMinutes Int?
+  graceMinutes Int?
+  flexEnabled  Boolean?
+  otAllowed    Boolean       @default(true)
+  otMaxDaily   Int?
+  otMaxMonthly Int?
+  updatedAt    DateTime      @updatedAt
+}
+
+model Shift {
+  id           String            @id @default(cuid())
+  name         String            @unique
+  type         ShiftType
+  startTime    String                                  // "HH:mm" (NIGHT may cross midnight)
+  endTime      String
+  breakMinutes Int               @default(0)
+  cycleDays    Int?                                    // rotating / 24-48 patterns
+  pattern      Json?                                   // e.g. ["D","D","N","off"]
+  isActive     Boolean           @default(true)
+  assignments  ShiftAssignment[]
+  calendar     ShiftCalendarDay[]
+  days         AttendanceDay[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model ShiftAssignment {
+  id        String    @id @default(cuid())
+  shiftId   String
+  shift     Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate DateTime
+  endDate   DateTime?
+
+  @@index([userId, startDate])
+}
+
+// ── Materialized resolved shift per user per day (for rotations) ──
+model ShiftCalendarDay {
+  id       String   @id @default(cuid())
+  shiftId  String
+  shift    Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  userId   String
+  gregDate DateTime
+  isOff    Boolean  @default(false)
+
+  @@unique([userId, gregDate])
+}
+
+model Holiday {
+  id        String      @id @default(cuid())
+  title     String
+  type      HolidayType
+  startDate DateTime
+  endDate   DateTime                                   // single day → start == end
+  recurring Boolean     @default(false)                // repeats yearly by jMonth/jDay
+  jMonth    Int?
+  jDay      Int?
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@index([startDate, endDate])
+}
+
+model LeaveRequest {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation("LeaveUser", fields: [userId], references: [id])
+  kind         LeaveKind
+  startDate    DateTime
+  endDate      DateTime
+  startTime    String?                                 // for HOURLY
+  endTime      String?
+  reason       String?
+  attachment   String?
+  status       AttnRequestStatus @default(PENDING)
+  managerById  String?
+  hrById       String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime          @default(now())
+
+  @@index([userId, startDate])
+  @@index([status])
+}
+
+// ── Manual correction / explanation workflow ──
+model AttendanceRequest {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation("AttnReqUser", fields: [userId], references: [id])
+  type         AttnRequestType
+  gregDate     DateTime
+  requestedIn  DateTime?
+  requestedOut DateTime?
+  description  String
+  attachment   String?
+  status       AttnRequestStatus @default(PENDING)
+  managerById  String?
+  hrById       String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime          @default(now())
+
+  @@index([userId, gregDate])
+  @@index([status])
+}
+
+model AttendanceNotification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation("AttnNotifUser", fields: [userId], references: [id])
+  type      AttnNotifType
+  channel   AttnNotifChannel @default(IN_APP)
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  meta      Json?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
 }

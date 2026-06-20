@@ -4,6 +4,8 @@ export const ADMIN_PAGES: string[] = [
   '/dashboard/access',
   '/dashboard/ai-usage',
   '/dashboard/system-logs',
+  '/dashboard/attendance/settings',
+  '/dashboard/attendance/sync',
 ];
 
 export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[] = [
@@ -25,10 +27,22 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/users',              label: 'کاربران' },
   { page: '/dashboard/reports',            label: 'گزارش‌ها' },
 
+  // ── Attendance & Workforce (restricted by dept + role) ──
+  { page: '/dashboard/attendance',             label: 'حضور و غیاب' },
+  { page: '/dashboard/attendance/records',     label: 'کارکرد روزانه' },
+  { page: '/dashboard/attendance/calendar',    label: 'تقویم حضور' },
+  { page: '/dashboard/attendance/requests',    label: 'درخواست‌های اصلاح' },
+  { page: '/dashboard/attendance/approvals',   label: 'صف تایید حضور' },
+  { page: '/dashboard/attendance/holidays',    label: 'تعطیلات' },
+  { page: '/dashboard/attendance/shifts',      label: 'شیفت‌ها' },
+  { page: '/dashboard/attendance/reports',     label: 'گزارش‌های حضور' },
+
   // ── Admin-only pages ──
   { page: '/dashboard/ai-settings',        label: 'تنظیمات هوش مصنوعی', adminOnly: true },
   { page: '/dashboard/access',             label: 'دسترسی صفحات',       adminOnly: true },
   { page: '/dashboard/ai-usage',           label: 'مصرف AI',             adminOnly: true },
   { page: '/dashboard/quota',              label: 'سقف توکن',             adminOnly: true },
   { page: '/dashboard/system-logs',        label: 'لاگ سیستم',           adminOnly: true },
+  { page: '/dashboard/attendance/settings', label: 'تنظیمات حضور و غیاب', adminOnly: true },
+  { page: '/dashboard/attendance/sync',     label: 'پایش همگام‌سازی',      adminOnly: true },
 ];

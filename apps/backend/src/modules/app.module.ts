@@ -12,6 +12,7 @@ import { RequestLogsModule } from './request-logs/request-logs.module';
 import { ChatHistoryModule } from './chat-history/chat-history.module';
 import { TodosModule } from './todos/todos.module';
 import { QuotaModule } from './quota/quota.module';
+import { AttendanceModule } from './attendance/attendance.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
@@ -32,6 +33,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     ChatHistoryModule,
     TodosModule,
     QuotaModule,
+    AttendanceModule,
   ],
   controllers: [ReportsController],
   providers: [
