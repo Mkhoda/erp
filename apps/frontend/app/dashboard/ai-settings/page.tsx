@@ -6,7 +6,7 @@ import {
   Zap, Save, Trash2, Plus, RefreshCw, ExternalLink,
 } from "lucide-react";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 type Provider = {
   id: string;
