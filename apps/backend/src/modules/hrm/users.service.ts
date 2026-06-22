@@ -37,6 +37,12 @@ export class UsersService {
       payload.attendanceCardNo = payload.attendanceCardNo && String(payload.attendanceCardNo).trim() !== ''
         ? String(payload.attendanceCardNo).trim() : null;
     }
+    // Remove any placeholder user that already owns this card number.
+    if (payload.attendanceCardNo) {
+      await this.prisma.user.deleteMany({
+        where: { attendanceCardNo: payload.attendanceCardNo, disabled: true, firstName: 'کارت', phone: null, email: null },
+      });
+    }
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
     const created = await this.prisma.user.create({ data: payload, select: { id: true, email: true, firstName: true, lastName: true, role: true, departmentId: true } });
@@ -118,6 +124,20 @@ export class UsersService {
     if ('attendanceCardNo' in payload) {
       payload.attendanceCardNo = payload.attendanceCardNo && String(payload.attendanceCardNo).trim() !== ''
         ? String(payload.attendanceCardNo).trim() : null;
+    }
+    // If assigning a card number, delete any placeholder user that already owns it.
+    // Placeholder users are created by provisionCardsAndRecompute: disabled=true, firstName='کارت', no phone/email.
+    if (payload.attendanceCardNo) {
+      await this.prisma.user.deleteMany({
+        where: {
+          attendanceCardNo: payload.attendanceCardNo,
+          id: { not: id },         // not the user we're currently updating
+          disabled: true,
+          firstName: 'کارت',
+          phone: null,
+          email: null,
+        },
+      });
     }
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
