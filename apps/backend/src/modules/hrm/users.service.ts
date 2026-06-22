@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RecomputeService } from '../attendance/engine/recompute.service';
@@ -45,7 +45,16 @@ export class UsersService {
     }
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
-    const created = await this.prisma.user.create({ data: payload, select: { id: true, email: true, firstName: true, lastName: true, role: true, departmentId: true } });
+    let created: any;
+    try {
+      created = await this.prisma.user.create({ data: payload, select: { id: true, email: true, firstName: true, lastName: true, role: true, departmentId: true } });
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        const field = e?.meta?.target?.[0] || 'فیلد';
+        throw new ConflictException(`مقدار وارد شده برای «${field}» قبلاً ثبت شده است`);
+      }
+      throw e;
+    }
     if (departmentIds?.length) {
       await this.prisma.userDepartment.createMany({ data: departmentIds.map((d) => ({ userId: created.id, departmentId: d })) });
     }
@@ -141,7 +150,16 @@ export class UsersService {
     }
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
-    const updated = await this.prisma.user.update({ where: { id }, data: payload, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, disabled: true, attendanceCardNo: true } });
+    let updated: any;
+    try {
+      updated = await this.prisma.user.update({ where: { id }, data: payload, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, disabled: true, attendanceCardNo: true } });
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        const field = e?.meta?.target?.[0] || 'فیلد';
+        throw new ConflictException(`مقدار وارد شده برای «${field}» قبلاً ثبت شده است`);
+      }
+      throw e;
+    }
     if (departmentIds) {
       // reset memberships
       await this.prisma.userDepartment.deleteMany({ where: { userId: id } });

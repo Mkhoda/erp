@@ -581,6 +581,7 @@ html:not(.dark) body {
   font-size: 0.875rem;
   font-weight: 600;
   color: rgb(71 85 105);
+  text-align: center;
 }
 
 .dark .table-theme th {

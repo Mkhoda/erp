@@ -40,14 +40,14 @@ function RoleBadge({ role }: { role: string }) {
 
 function StatCard({ label, value, sub, color }: { label: string; value: number; sub?: string; color: string }) {
   return (
-    <div className="bg-theme-card border border-theme rounded-2xl px-5 py-4 flex items-center gap-4">
+    <div className="flex items-center gap-4 bg-theme-card px-5 py-4 border border-theme rounded-2xl">
       <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center`}>
         <UsersIcon className="w-5 h-5 text-white" />
       </div>
       <div>
-        <div className="text-2xl font-bold text-theme-primary">{value.toLocaleString("fa-IR")}</div>
-        <div className="text-xs text-theme-muted">{label}</div>
-        {sub && <div className="text-[11px] text-theme-muted mt-0.5">{sub}</div>}
+        <div className="font-bold text-theme-primary text-2xl">{value.toLocaleString("fa-IR")}</div>
+        <div className="text-theme-muted text-xs">{label}</div>
+        {sub && <div className="mt-0.5 text-[11px] text-theme-muted">{sub}</div>}
       </div>
     </div>
   );
@@ -183,7 +183,7 @@ export default function UsersPage() {
   }
 
   const ViewToggle = (
-    <div className="flex bg-theme-secondary border border-theme p-1 rounded-xl">
+    <div className="flex bg-theme-secondary p-1 border border-theme rounded-xl">
       {(["list", "grid"] as const).map(v => (
         <button key={v} onClick={() => setView(v)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${view === v ? "bg-theme-card shadow text-theme-primary" : "text-theme-muted hover:text-theme-secondary"}`}>
           {v === "list" ? <><List className="w-3.5 h-3.5" />فهرست</> : <><LayoutGrid className="w-3.5 h-3.5" />کارت</>}
@@ -210,7 +210,7 @@ export default function UsersPage() {
 
       {/* Stats row */}
       {!loading && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="gap-3 grid grid-cols-2 lg:grid-cols-4">
           <StatCard label="کل کاربران" value={users.length} color="from-blue-500 to-blue-600" />
           <StatCard label="کاربران فعال" value={active} sub={disabled > 0 ? `${disabled} غیرفعال` : undefined} color="from-emerald-500 to-emerald-600" />
           <StatCard label="مدیران و سرپرستان" value={admins} color="from-purple-500 to-purple-600" />
@@ -219,20 +219,20 @@ export default function UsersPage() {
       )}
 
       <SearchBar value={query} onChange={setQuery} placeholder="جستجو نام، موبایل، ایمیل، کد کارت..." count={filtered.length} countLabel="کاربر">
-        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="select-theme text-sm">
+        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="text-sm select-theme">
           <option value="ALL">همه نقش‌ها</option>
           <option value="ADMIN">مدیر ارشد</option>
           <option value="MANAGER">مدیر</option>
           <option value="EXPERT">کارشناس</option>
           <option value="USER">کاربر</option>
         </select>
-        <select value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)} className="select-theme text-sm">
+        <select value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)} className="text-sm select-theme">
           <option value="">همه دپارتمان‌ها</option>
           {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
-        <label className="flex items-center gap-1.5 text-sm text-theme-secondary cursor-pointer whitespace-nowrap">
+        <label className="flex items-center gap-1.5 text-theme-secondary text-sm whitespace-nowrap cursor-pointer">
           <input type="checkbox" checked={showDisabled} onChange={e => setShowDisabled(e.target.checked)} className="rounded accent-blue-600" />
-          نمایش غیرفعال {disabled > 0 && <span className="badge badge-warning text-[10px]">{disabled}</span>}
+          نمایش غیرفعال {disabled > 0 && <span className="text-[10px] badge badge-warning">{disabled}</span>}
         </label>
       </SearchBar>
 
@@ -262,16 +262,16 @@ export default function UsersPage() {
                     <tr key={u.id} className={u.disabled ? "opacity-55" : ""}>
                       {/* Name + email */}
                       <td>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 text-justify">
                           <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${u.disabled ? "from-slate-400 to-slate-500" : avatarColor(u)} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
                             {u.disabled ? <UserX className="w-3.5 h-3.5" /> : (u.firstName?.[0] || u.phone?.[0] || "U").toUpperCase()}
                           </div>
                           <div className="min-w-0">
                             <div className="font-medium text-theme-primary text-sm">{u.firstName} {u.lastName}</div>
                             {u.email && (
-                              <div className="flex items-center gap-1 text-theme-muted text-xs mt-0.5">
+                              <div className="flex items-center gap-1 mt-0.5 text-theme-muted text-xs">
                                 <Mail className="w-3 h-3 shrink-0" />
-                                <span className="truncate max-w-[160px]" dir="ltr">{u.email}</span>
+                                <span className="max-w-[160px] truncate" dir="ltr">{u.email}</span>
                               </div>
                             )}
                           </div>
@@ -279,14 +279,14 @@ export default function UsersPage() {
                       </td>
                       {/* Phone */}
                       <td>
-                        <div className="flex items-center gap-1 text-theme-secondary text-sm" dir="ltr">
+                        <div className="flex justify-center items-center gap-1 text-theme-secondary text-sm" dir="ltr">
                           {u.phone ? <><Phone className="w-3 h-3 text-theme-muted" />{u.phone}</> : <span className="text-theme-muted">—</span>}
                         </div>
                       </td>
                       <td><RoleBadge role={u.role} /></td>
                       {/* Departments */}
                       <td>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap justify-center gap-1">
                           {u.userDepartments?.length
                             ? u.userDepartments.slice(0, 2).map(x => <span key={x.departmentId} className="badge badge-teal">{x.department?.name || x.departmentId}</span>)
                             : <span className="text-theme-muted text-sm">—</span>}
@@ -296,19 +296,19 @@ export default function UsersPage() {
                       {/* Card */}
                       <td>
                         {u.attendanceCardNo
-                          ? <span className="flex items-center gap-1 font-mono text-xs text-theme-secondary"><Hash className="w-3 h-3" />{u.attendanceCardNo}</span>
+                          ? <span className="flex items-center gap-1 font-mono text-theme-secondary text-xs"><Hash className="w-3 h-3" />{u.attendanceCardNo}</span>
                           : <span className="text-theme-muted text-xs">—</span>}
                       </td>
                       {/* Status */}
                       <td>
                         {u.disabled
-                          ? <span className="badge badge-warning"><Ban className="w-3 h-3 me-0.5" />غیرفعال</span>
-                          : <span className="badge badge-success"><CheckCircle className="w-3 h-3 me-0.5" />فعال</span>}
+                          ? <span className="badge badge-warning"><Ban className="me-0.5 w-3 h-3" />غیرفعال</span>
+                          : <span className="badge badge-success"><CheckCircle className="me-0.5 w-3 h-3" />فعال</span>}
                       </td>
                       {/* Actions */}
                       <td>
-                        <div className="flex gap-1.5">
-                          <button onClick={() => onEdit(u)} className="btn-theme-secondary text-xs py-1 px-2.5 gap-1">
+                        <div className="flex justify-center gap-1.5">
+                          <button onClick={() => onEdit(u)} className="gap-1 px-2.5 py-1 text-xs btn-theme-secondary">
                             <Pencil className="w-3 h-3" />ویرایش
                           </button>
                           <button
@@ -331,7 +331,7 @@ export default function UsersPage() {
         </div>
       ) : (
         /* ── GRID VIEW ── */
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="gap-4 grid sm:grid-cols-2 lg:grid-cols-3">
           {loading ? (
             <SkeletonCards count={6} />
           ) : filtered.length === 0 ? (
@@ -351,12 +351,12 @@ export default function UsersPage() {
                     </div>
                   </div>
                   {u.disabled
-                    ? <span className="badge badge-warning text-[10px]">غیرفعال</span>
-                    : <span className="badge badge-success text-[10px]">فعال</span>}
+                    ? <span className="text-[10px] badge badge-warning">غیرفعال</span>
+                    : <span className="text-[10px] badge badge-success">فعال</span>}
                 </div>
 
                 {/* Info rows */}
-                <div className="space-y-2 text-xs mb-4">
+                <div className="space-y-2 mb-4 text-xs">
                   {u.phone && (
                     <div className="flex items-center gap-2 text-theme-secondary" dir="ltr">
                       <Phone className="w-3.5 h-3.5 text-theme-muted shrink-0" />
@@ -386,8 +386,8 @@ export default function UsersPage() {
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-1 border-t border-theme">
-                  <button onClick={() => onEdit(u)} className="btn-theme-secondary flex-1 justify-center text-xs py-1.5 gap-1 mt-3">
+                <div className="flex gap-2 pt-1 border-theme border-t">
+                  <button onClick={() => onEdit(u)} className="flex-1 justify-center gap-1 mt-3 py-1.5 text-xs btn-theme-secondary">
                     <Pencil className="w-3 h-3" />ویرایش
                   </button>
                   <button
@@ -412,54 +412,54 @@ export default function UsersPage() {
         title={editing?.id ? "ویرایش کاربر" : "افزودن کاربر جدید"}
         size="lg"
         footer={<>
-          <button type="button" onClick={() => { setOpen(false); setEditing(null); }} className="btn-theme-secondary text-sm">انصراف</button>
-          <button form="user-form" type="submit" disabled={saving} className="btn-theme-primary text-sm disabled:opacity-50">{saving ? "در حال ذخیره..." : "ذخیره"}</button>
+          <button type="button" onClick={() => { setOpen(false); setEditing(null); }} className="text-sm btn-theme-secondary">انصراف</button>
+          <button form="user-form" type="submit" disabled={saving} className="disabled:opacity-50 text-sm btn-theme-primary">{saving ? "در حال ذخیره..." : "ذخیره"}</button>
         </>}
       >
         <form id="user-form" onSubmit={onSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="gap-3 grid grid-cols-2">
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نام *</label>
-              <input required value={editing?.firstName || ""} onChange={e => setEditing((s: any) => ({ ...s, firstName: e.target.value }))} className="input-theme text-sm" placeholder="نام" />
+              <input required value={editing?.firstName || ""} onChange={e => setEditing((s: any) => ({ ...s, firstName: e.target.value }))} className="text-sm input-theme" placeholder="نام" />
             </div>
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نام خانوادگی *</label>
-              <input required value={editing?.lastName || ""} onChange={e => setEditing((s: any) => ({ ...s, lastName: e.target.value }))} className="input-theme text-sm" placeholder="نام خانوادگی" />
+              <input required value={editing?.lastName || ""} onChange={e => setEditing((s: any) => ({ ...s, lastName: e.target.value }))} className="text-sm input-theme" placeholder="نام خانوادگی" />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="gap-3 grid grid-cols-2">
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-xs">
                 شماره موبایل {!editing?.id && <span className="text-red-500">*</span>}
               </label>
               <div className="relative">
-                <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
-                <input type="tel" dir="ltr" value={editing?.phone || ""} onChange={e => setEditing((s: any) => ({ ...s, phone: e.target.value }))} className="input-theme text-sm pr-10" placeholder="09123456789" />
+                <Phone className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
+                <input type="tel" dir="ltr" value={editing?.phone || ""} onChange={e => setEditing((s: any) => ({ ...s, phone: e.target.value }))} className="pr-10 text-sm input-theme" placeholder="09123456789" />
               </div>
             </div>
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-xs">ایمیل (اختیاری)</label>
               <div className="relative">
-                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
-                <input type="email" dir="ltr" value={editing?.email || ""} onChange={e => setEditing((s: any) => ({ ...s, email: e.target.value }))} className="input-theme text-sm pr-10" placeholder="email@example.com" />
+                <Mail className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
+                <input type="email" dir="ltr" value={editing?.email || ""} onChange={e => setEditing((s: any) => ({ ...s, email: e.target.value }))} className="pr-10 text-sm input-theme" placeholder="email@example.com" />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="gap-3 grid grid-cols-2">
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-xs">کد کارت حضور و غیاب</label>
               <div className="relative">
-                <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
-                <input type="text" dir="ltr" value={editing?.attendanceCardNo || ""} onChange={e => setEditing((s: any) => ({ ...s, attendanceCardNo: e.target.value }))} className="input-theme text-sm pr-10" placeholder="مثلاً 1024" />
+                <CreditCard className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
+                <input type="text" dir="ltr" value={editing?.attendanceCardNo || ""} onChange={e => setEditing((s: any) => ({ ...s, attendanceCardNo: e.target.value }))} className="pr-10 text-sm input-theme" placeholder="مثلاً 1024" />
               </div>
             </div>
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نقش</label>
               <div className="relative">
-                <ShieldCheck className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted" />
-                <select value={editing?.role || "USER"} onChange={e => setEditing((s: any) => ({ ...s, role: e.target.value }))} className="select-theme text-sm pr-10">
+                <ShieldCheck className="top-1/2 right-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2" />
+                <select value={editing?.role || "USER"} onChange={e => setEditing((s: any) => ({ ...s, role: e.target.value }))} className="pr-10 text-sm select-theme">
                   <option value="USER">کاربر</option>
                   <option value="EXPERT">کارشناس</option>
                   <option value="MANAGER">مدیر</option>
@@ -474,8 +474,8 @@ export default function UsersPage() {
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-xs">رمز عبور <span className="text-red-500">*</span></label>
               <div className="relative">
-                <input type={showNewPwd ? "text" : "password"} value={editing?.password || ""} onChange={e => setEditing((s: any) => ({ ...s, password: e.target.value }))} required className="input-theme text-sm pl-10" placeholder="حداقل ۶ کاراکتر" />
-                <button type="button" onClick={() => setShowNewPwd(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-secondary">
+                <input type={showNewPwd ? "text" : "password"} value={editing?.password || ""} onChange={e => setEditing((s: any) => ({ ...s, password: e.target.value }))} required className="pl-10 text-sm input-theme" placeholder="حداقل ۶ کاراکتر" />
+                <button type="button" onClick={() => setShowNewPwd(v => !v)} className="top-1/2 left-3 absolute text-theme-muted hover:text-theme-secondary -translate-y-1/2">
                   {showNewPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -490,8 +490,8 @@ export default function UsersPage() {
                 <div>
                   <label className="block mb-1.5 font-medium text-theme-secondary text-xs">رمز عبور جدید (خالی = بدون تغییر)</label>
                   <div className="relative">
-                    <input type={showNewPwd ? "text" : "password"} value={editing?.newPassword || ""} onChange={e => setEditing((s: any) => ({ ...s, newPassword: e.target.value }))} className="input-theme text-sm pl-10" placeholder="رمز جدید..." />
-                    <button type="button" onClick={() => setShowNewPwd(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-secondary">
+                    <input type={showNewPwd ? "text" : "password"} value={editing?.newPassword || ""} onChange={e => setEditing((s: any) => ({ ...s, newPassword: e.target.value }))} className="pl-10 text-sm input-theme" placeholder="رمز جدید..." />
+                    <button type="button" onClick={() => setShowNewPwd(v => !v)} className="top-1/2 left-3 absolute text-theme-muted hover:text-theme-secondary -translate-y-1/2">
                       {showNewPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -504,23 +504,23 @@ export default function UsersPage() {
           {/* Departments */}
           <div>
             <label className="block mb-1.5 font-medium text-theme-secondary text-xs">دپارتمان‌ها</label>
-            <div className="bg-theme-secondary border border-theme rounded-xl p-3">
+            <div className="bg-theme-secondary p-3 border border-theme rounded-xl">
               <div className="flex flex-wrap gap-1 mb-2 min-h-[24px]">
                 {(editing?.departmentIds || []).map((id: string) => {
                   const d = departments.find(x => x.id === id);
                   if (!d) return null;
                   return (
-                    <span key={id} className="badge badge-teal gap-1">
+                    <span key={id} className="gap-1 badge badge-teal">
                       {d.name}
                       <button type="button" onClick={() => setEditing((s: any) => ({ ...s, departmentIds: s.departmentIds.filter((x: string) => x !== id) }))} className="hover:opacity-70">×</button>
                     </span>
                   );
                 })}
               </div>
-              <input placeholder="جستجوی دپارتمان..." value={deptSearch} onChange={e => setDeptSearch(e.target.value)} className="input-theme text-xs mb-2" />
+              <input placeholder="جستجوی دپارتمان..." value={deptSearch} onChange={e => setDeptSearch(e.target.value)} className="mb-2 text-xs input-theme" />
               <div className="border border-theme rounded-lg max-h-28 overflow-auto">
                 {departments.filter(d => d.name.includes(deptSearch)).map(d => (
-                  <label key={d.id} className="flex items-center gap-2 hover:bg-theme-hover px-3 py-1.5 text-xs cursor-pointer transition-colors">
+                  <label key={d.id} className="flex items-center gap-2 hover:bg-theme-hover px-3 py-1.5 text-xs transition-colors cursor-pointer">
                     <input type="checkbox" checked={(editing?.departmentIds || []).includes(d.id)}
                       onChange={() => setEditing((s: any) => {
                         const arr = [...(s.departmentIds || [])];
@@ -536,53 +536,53 @@ export default function UsersPage() {
           </div>
 
           {/* Attendance rule */}
-          <div className="border-t border-theme pt-4">
+          <div className="pt-4 border-theme border-t">
             <div className="flex items-center gap-2 mb-3">
               <Clock className="w-4 h-4 text-blue-500" />
               <span className="font-medium text-theme-primary text-sm">تنظیمات حضور و غیاب</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="gap-3 grid grid-cols-1 sm:grid-cols-2">
               <div>
                 <label className="block mb-1.5 text-theme-secondary text-xs">نوع کارمند</label>
-                <select value={editing?.rule?.employeeType || "FULL_TIME"} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, employeeType: e.target.value } }))} className="input-theme text-sm">
+                <select value={editing?.rule?.employeeType || "FULL_TIME"} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, employeeType: e.target.value } }))} className="text-sm input-theme">
                   <option value="FULL_TIME">تمام‌وقت (اضافه‌کار و تاخیر محاسبه می‌شود)</option>
                   <option value="HOURLY">ساعتی (فقط ساعت حضور؛ بدون اضافه‌کار)</option>
                 </select>
               </div>
               <div className="flex items-center gap-4 mt-6">
-                <label className="flex items-center gap-2 text-sm text-theme-primary">
+                <label className="flex items-center gap-2 text-theme-primary text-sm">
                   <input type="checkbox" checked={!!editing?.rule?.flexEnabled} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, flexEnabled: e.target.checked } }))} /> شناوری
                 </label>
                 {editing?.rule?.employeeType !== "HOURLY" && (
-                  <label className="flex items-center gap-2 text-sm text-theme-primary">
+                  <label className="flex items-center gap-2 text-theme-primary text-sm">
                     <input type="checkbox" checked={editing?.rule?.otAllowed !== false} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, otAllowed: e.target.checked } }))} /> اضافه‌کار مجاز
                   </label>
                 )}
               </div>
               <div>
                 <label className="block mb-1.5 text-theme-secondary text-xs">ساعت شروع (اختیاری)</label>
-                <input type="time" dir="ltr" value={editing?.rule?.startTime || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, startTime: e.target.value } }))} className="input-theme text-sm" />
+                <input type="time" dir="ltr" value={editing?.rule?.startTime || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, startTime: e.target.value } }))} className="text-sm input-theme" />
               </div>
               <div>
                 <label className="block mb-1.5 text-theme-secondary text-xs">ساعت پایان (اختیاری)</label>
-                <input type="time" dir="ltr" value={editing?.rule?.endTime || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, endTime: e.target.value } }))} className="input-theme text-sm" />
+                <input type="time" dir="ltr" value={editing?.rule?.endTime || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, endTime: e.target.value } }))} className="text-sm input-theme" />
               </div>
               <div>
                 <label className="block mb-1.5 text-theme-secondary text-xs">ساعت کاری روزانه (دقیقه)</label>
-                <input type="number" dir="ltr" value={editing?.rule?.dailyMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, dailyMinutes: e.target.value } }))} className="input-theme text-sm" placeholder="پیش‌فرض سازمان" />
+                <input type="number" dir="ltr" value={editing?.rule?.dailyMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, dailyMinutes: e.target.value } }))} className="text-sm input-theme" placeholder="پیش‌فرض سازمان" />
               </div>
               <div>
                 <label className="block mb-1.5 text-theme-secondary text-xs">میزان ارفاق ورود (دقیقه)</label>
-                <input type="number" dir="ltr" value={editing?.rule?.graceMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, graceMinutes: e.target.value } }))} className="input-theme text-sm" placeholder="پیش‌فرض سازمان" />
+                <input type="number" dir="ltr" value={editing?.rule?.graceMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, graceMinutes: e.target.value } }))} className="text-sm input-theme" placeholder="پیش‌فرض سازمان" />
               </div>
               {editing?.rule?.employeeType !== "HOURLY" && <>
                 <div>
                   <label className="block mb-1.5 text-theme-secondary text-xs">حداکثر اضافه‌کار روزانه (دقیقه)</label>
-                  <input type="number" dir="ltr" value={editing?.rule?.otMaxDaily ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, otMaxDaily: e.target.value } }))} className="input-theme text-sm" placeholder="پیش‌فرض سازمان" />
+                  <input type="number" dir="ltr" value={editing?.rule?.otMaxDaily ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, otMaxDaily: e.target.value } }))} className="text-sm input-theme" placeholder="پیش‌فرض سازمان" />
                 </div>
                 <div>
                   <label className="block mb-1.5 text-theme-secondary text-xs">حداکثر اضافه‌کار ماهانه (دقیقه)</label>
-                  <input type="number" dir="ltr" value={editing?.rule?.otMaxMonthly ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, otMaxMonthly: e.target.value } }))} className="input-theme text-sm" placeholder="پیش‌فرض سازمان" />
+                  <input type="number" dir="ltr" value={editing?.rule?.otMaxMonthly ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, otMaxMonthly: e.target.value } }))} className="text-sm input-theme" placeholder="پیش‌فرض سازمان" />
                 </div>
               </>}
             </div>
@@ -669,31 +669,31 @@ function BulkImportModal({ onClose, onImported, departments }: { onClose: () => 
 
   return (
     <Modal open onClose={onClose} title="وارد کردن دسته‌ای کاربران (CSV)" size="xl"
-      footer={<><button onClick={onClose} className="btn-theme-secondary text-sm">انصراف</button><button onClick={importNow} disabled={!preview?.length} className="btn-theme-primary text-sm disabled:opacity-50 gap-1.5"><Upload className="w-4 h-4" />وارد کن</button></>}
+      footer={<><button onClick={onClose} className="text-sm btn-theme-secondary">انصراف</button><button onClick={importNow} disabled={!preview?.length} className="gap-1.5 disabled:opacity-50 text-sm btn-theme-primary"><Upload className="w-4 h-4" />وارد کن</button></>}
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="gap-4 grid grid-cols-2">
           <div>
             <label className="block mb-1.5 font-medium text-theme-secondary text-xs">آپلود فایل CSV</label>
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-theme rounded-xl p-6 cursor-pointer hover:bg-theme-hover transition-colors">
-              <Upload className="w-6 h-6 text-theme-muted mb-2" />
+            <label className="flex flex-col justify-center items-center hover:bg-theme-hover p-6 border-2 border-theme border-dashed rounded-xl transition-colors cursor-pointer">
+              <Upload className="mb-2 w-6 h-6 text-theme-muted" />
               <span className="text-theme-muted text-xs">{fileName || "کلیک کنید یا بکشید"}</span>
               <input type="file" accept=".csv,text/csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (!f) return; setFileName(f.name); f.text().then(process); }} />
             </label>
           </div>
           <div>
             <label className="block mb-1.5 font-medium text-theme-secondary text-xs">یا متن CSV پیست کنید</label>
-            <textarea rows={8} value={text} onChange={e => process(e.target.value)} className="input-theme text-xs resize-none font-mono" placeholder="firstName,lastName,phone,role" dir="ltr" />
+            <textarea rows={8} value={text} onChange={e => process(e.target.value)} className="font-mono text-xs resize-none input-theme" placeholder="firstName,lastName,phone,role" dir="ltr" />
           </div>
         </div>
         {headers && headers.length > 0 && (
-          <div className="bg-theme-secondary border border-theme rounded-xl p-4">
+          <div className="bg-theme-secondary p-4 border border-theme rounded-xl">
             <div className="mb-2 font-medium text-theme-primary text-xs">نقشه‌بندی ستون‌ها</div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="gap-2 grid grid-cols-2">
               {["phone","firstName","lastName","role","departmentId","password","email"].map(field => (
                 <label key={field} className="flex items-center gap-2 text-xs">
                   <span className="w-24 text-theme-secondary text-right">{field}</span>
-                  <select className="select-theme flex-1 text-xs py-1" value={mapping[field] || ""} onChange={e => setMapping(m => ({ ...m, [field]: e.target.value }))}>
+                  <select className="flex-1 py-1 text-xs select-theme" value={mapping[field] || ""} onChange={e => setMapping(m => ({ ...m, [field]: e.target.value }))}>
                     <option value="">-- انتخاب --</option>
                     {headers.map(h => <option key={h} value={h}>{h}</option>)}
                   </select>
