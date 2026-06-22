@@ -1,4 +1,4 @@
-import moment from 'moment-jalaali';
+import * as moment from 'moment-jalaali';
 import { RawPunchRow } from './source-provider.interface';
 
 // Fixed UTC offsets (minutes) for known device time zones. Iran abolished DST

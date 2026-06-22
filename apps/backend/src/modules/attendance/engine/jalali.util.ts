@@ -1,4 +1,4 @@
-import moment from 'moment-jalaali';
+import * as moment from 'moment-jalaali';
 
 // Iran is a fixed +03:30 offset (DST abolished in 2022). Attendance "work date"
 // and minutes-of-day are computed in Tehran local time.
