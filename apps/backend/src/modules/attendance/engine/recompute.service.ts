@@ -51,6 +51,31 @@ export class RecomputeService {
   }
 
   /**
+   * Link + recompute a single user. Called automatically when a card number is
+   * assigned/changed in the users panel so attendance appears without a manual
+   * "relink" step. Best-effort and idempotent.
+   */
+  async relinkUser(userId: string): Promise<{ linked: number; recomputed: number }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, attendanceCardNo: true },
+    });
+    if (!user?.attendanceCardNo) return { linked: 0, recomputed: 0 };
+
+    const r = await this.prisma.rawAttendanceRecord.updateMany({
+      where: { cardNo: user.attendanceCardNo, userId: null },
+      data: { userId },
+    });
+    const punches = await this.prisma.rawAttendanceRecord.findMany({
+      where: { userId },
+      select: { punchAt: true },
+    });
+    const pairs = punches.map((p) => ({ userId, gregDate: workDateOf(p.punchAt) }));
+    const recomputed = await this.recomputeDays(pairs);
+    return { linked: r.count, recomputed };
+  }
+
+  /**
    * Back-link raw punches imported BEFORE a card number was assigned, then
    * recompute. RawAttendanceRecord rows captured while a card was unmapped have
    * userId=null; once an admin sets User.attendanceCardNo this attaches them and

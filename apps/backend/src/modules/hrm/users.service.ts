@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RecomputeService } from '../attendance/engine/recompute.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private recompute: RecomputeService,
+  ) {}
 
   findAll(currentUser?: { role: string; userId?: string; departmentId?: string }) {
     const where = (currentUser && currentUser.role === 'MANAGER')
@@ -39,7 +43,18 @@ export class UsersService {
     if (departmentIds?.length) {
       await this.prisma.userDepartment.createMany({ data: departmentIds.map((d) => ({ userId: created.id, departmentId: d })) });
     }
+    // Auto-link + recompute attendance when a card number was set.
+    if (payload.attendanceCardNo) await this.linkAttendance(created.id);
     return created;
+  }
+
+  // Best-effort: never let attendance recompute break a user save.
+  private async linkAttendance(userId: string) {
+    try {
+      await this.recompute.relinkUser(userId);
+    } catch {
+      /* ignore — admin can re-run «اتصال و بازمحاسبه» from the dashboard */
+    }
   }
   
   // Bulk create users: accepts array of user-like objects.
@@ -114,6 +129,8 @@ export class UsersService {
         await this.prisma.userDepartment.createMany({ data: departmentIds.map((d) => ({ userId: id, departmentId: d })) });
       }
     }
+    // Auto-link + recompute attendance when a card number was set/changed.
+    if ('attendanceCardNo' in payload && payload.attendanceCardNo) await this.linkAttendance(id);
     return updated;
   }
   remove(id: string) { return this.prisma.user.delete({ where: { id } }); }
