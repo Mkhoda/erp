@@ -16,6 +16,8 @@ import { DashboardsService } from './dashboards/dashboards.service';
 import { DashboardsController } from './dashboards/dashboards.controller';
 import { ReportsService } from './reports/reports.service';
 import { ReportsController } from './reports/reports.controller';
+import { SchedulesService } from './schedules/schedules.service';
+import { SchedulesController } from './schedules/schedules.controller';
 
 // Attendance & Workforce Management.
 // Slices 1-2: schema + integration/sync.  Slice 3: calc engine + records,
@@ -29,6 +31,7 @@ import { ReportsController } from './reports/reports.controller';
     RecordsController,
     DashboardsController,
     ReportsController,
+    SchedulesController,
   ],
   providers: [
     PrismaService,
@@ -41,6 +44,7 @@ import { ReportsController } from './reports/reports.controller';
     RecordsService,
     DashboardsService,
     ReportsService,
+    SchedulesService,
   ],
   exports: [SourcesService, SyncService, RecomputeService],
 })

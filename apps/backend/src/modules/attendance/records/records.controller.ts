@@ -38,6 +38,16 @@ export class RecordsController {
     return this.records.summary(await this.filterFrom(req, q));
   }
 
+  // Year/month periods that have data (for data-aware filters).
+  @Get('periods')
+  async periods(@Req() req: any, @Query() q: any) {
+    return this.records.periods({
+      userId: q.userId || undefined,
+      departmentId: q.departmentId || undefined,
+      scopeDepartmentIds: await resolveDeptScope(this.prisma, req.user),
+    });
+  }
+
   @Get('day')
   async day(@Query('userId') userId: string, @Query('date') date: string) {
     return this.records.dayDetail(userId, parseWorkDate(date));

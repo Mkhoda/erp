@@ -88,6 +88,17 @@ export class RecordsService {
     };
   }
 
+  // Distinct (jYear, jMonth) periods that actually have computed data — drives
+  // the data-aware year/month filter dropdowns.
+  async periods(f: RecordFilter) {
+    const rows = await this.prisma.attendanceDay.groupBy({
+      by: ['jYear', 'jMonth'],
+      where: this.buildWhere(f),
+      orderBy: [{ jYear: 'desc' }, { jMonth: 'desc' }],
+    });
+    return rows.map((r) => ({ jYear: r.jYear, jMonth: r.jMonth }));
+  }
+
   // Day detail: computed row + every raw punch + any override (audit view).
   async dayDetail(userId: string, gregDate: Date) {
     const dayEnd = new Date(gregDate.getTime() + 24 * 60 * 60 * 1000);

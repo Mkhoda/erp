@@ -17,6 +17,7 @@ const STATUS_CLS: Record<string,string> = {
   HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500",
 };
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
+const faY = (n: number) => (n ?? 0).toLocaleString("fa-IR", { useGrouping: false }); // years: no thousands separator
 const fmtMin = (m: number) => { const h = Math.floor(Math.abs(m||0)/60); const mm = Math.abs(m||0)%60; return `${m<0?"-":""}${faNum(h)}:${String(mm).padStart(2,"0")}`; };
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
@@ -30,6 +31,7 @@ export default function AttendanceRecordsPage() {
   const [summary, setSummary] = React.useState<any>(null);
   const [departments, setDepartments] = React.useState<Array<{ id: string; name: string }>>([]);
   const [users, setUsers] = React.useState<any[]>([]);
+  const [periods, setPeriods] = React.useState<Array<{ jYear: number; jMonth: number }>>([]);
   const [loading, setLoading] = React.useState(true);
   const [detail, setDetail] = React.useState<any>(null);
   const [exporting, setExporting] = React.useState<string | null>(null);
@@ -70,6 +72,7 @@ export default function AttendanceRecordsPage() {
   React.useEffect(() => {
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
     fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
+    fetch(`${API}/attendance/records/periods`, { headers: h }).then(r => r.ok ? r.json() : []).then(p => setPeriods(Array.isArray(p) ? p : [])).catch(() => {});
     // eslint-disable-next-line
   }, []);
 
@@ -94,7 +97,9 @@ export default function AttendanceRecordsPage() {
     finally { setExporting(null); }
   }
 
-  const yearOpts = [1403, 1404, 1405, 1406];
+  // Data-driven options: only years/months that actually have records.
+  const yearOpts = [...new Set(periods.map(p => p.jYear))].sort((a, b) => b - a);
+  const monthOpts = [...new Set(periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth))].sort((a, b) => a - b);
   const personFiltered = users.filter((u: any) => {
     if (!personQuery) return true;
     const s = `${u.firstName} ${u.lastName} ${u.phone || ""} ${u.attendanceCardNo || ""}`.toLowerCase();
@@ -125,13 +130,13 @@ export default function AttendanceRecordsPage() {
 
       {/* Filters */}
       <div className="bg-theme-card border border-theme rounded-xl p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-        <select className="input-theme text-sm" value={jYear} onChange={e => setJYear(+e.target.value)}>
+        <select className="input-theme text-sm" value={jYear} onChange={e => { setJYear(+e.target.value); setJMonth(0); }}>
           <option value={0}>همه سال‌ها</option>
-          {yearOpts.map(y => <option key={y} value={y}>سال {faNum(y)}</option>)}
+          {yearOpts.map(y => <option key={y} value={y}>سال {faY(y)}</option>)}
         </select>
         <select className="input-theme text-sm" value={jMonth} onChange={e => setJMonth(+e.target.value)}>
           <option value={0}>همه ماه‌ها</option>
-          {J_MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+          {monthOpts.map(m => <option key={m} value={m}>{J_MONTHS[m-1]}</option>)}
         </select>
         <select className="input-theme text-sm" value={deptId} onChange={e => setDeptId(e.target.value)}>
           <option value="">همه دپارتمان‌ها</option>

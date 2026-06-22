@@ -11,6 +11,7 @@ import {
 
 // Effective rules for a user on a given day (global default + user override).
 export interface EffectiveSchedule {
+  employeeType: 'FULL_TIME' | 'HOURLY';
   startMin: number;
   endMin: number;
   dailyMinutes: number;
@@ -29,6 +30,7 @@ export interface EffectiveSchedule {
 // Hardcoded fallback matching the WorkSchedule schema defaults — used when no
 // default WorkSchedule row exists yet, so calculations never depend on seeding.
 const DEFAULTS: EffectiveSchedule = {
+  employeeType: 'FULL_TIME',
   startMin: 8 * 60,
   endMin: 17 * 60,
   dailyMinutes: 480,
@@ -73,6 +75,7 @@ export class CalcService {
       s.otRounding = base.otRounding;
     }
     if (rule) {
+      s.employeeType = rule.employeeType as 'FULL_TIME' | 'HOURLY';
       if (rule.startTime) s.startMin = parseHHmm(rule.startTime) ?? s.startMin;
       if (rule.endTime) s.endMin = parseHHmm(rule.endTime) ?? s.endMin;
       if (rule.dailyMinutes != null) s.dailyMinutes = rule.dailyMinutes;
@@ -81,6 +84,8 @@ export class CalcService {
       if (rule.otMaxDaily != null) s.otMaxDaily = rule.otMaxDaily;
       s.otAllowed = rule.otAllowed;
     }
+    // Hourly staff: presence only — never accrue overtime or lateness penalties.
+    if (s.employeeType === 'HOURLY') s.otAllowed = false;
     return s;
   }
 
@@ -170,6 +175,12 @@ export class CalcService {
       nightMinutes =
         this.overlapMinutes(inMin, outMin, 22 * 60, 30 * 60) +
         this.overlapMinutes(inMin, outMin, 0, 6 * 60);
+    }
+
+    // Hourly staff: only presence matters — drop lateness/early-leave.
+    if (sched.employeeType === 'HOURLY') {
+      delayMinutes = 0;
+      earlyLeaveMinutes = 0;
     }
 
     // ── Status precedence ──────────────────────────────────────────────

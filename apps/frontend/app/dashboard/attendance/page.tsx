@@ -17,6 +17,7 @@ const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر"
 const STATUS_COLOR: Record<string,string> = { PRESENT:"#10b981", LATE:"#f59e0b", EARLY_LEAVE:"#eab308", ABSENT:"#ef4444", INCOMPLETE:"#f97316", LEAVE:"#3b82f6", MISSION:"#8b5cf6", REMOTE_WORK:"#06b6d4", HOLIDAY:"#94a3b8", COMPANY_HOLIDAY:"#64748b", WEEKEND:"#cbd5e1" };
 
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
+const faY = (n: number) => (n ?? 0).toLocaleString("fa-IR", { useGrouping: false }); // years: no separator
 const fmtMin = (m: number) => { const h = Math.floor((m||0)/60); const mm = (m||0)%60; return `${faNum(h)}:${String(mm).padStart(2,"0")}`; };
 const fmtHours = (m: number) => `${faNum(Math.round((m||0)/60*10)/10)} ساعت`;
 
@@ -35,6 +36,7 @@ export default function AttendanceDashboardPage() {
   const [msg, setMsg] = React.useState<string | null>(null);
   const [diag, setDiag] = React.useState<any>(null);
   const [diagOpen, setDiagOpen] = React.useState(false);
+  const [periods, setPeriods] = React.useState<Array<{ jYear: number; jMonth: number }>>([]);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -46,6 +48,7 @@ export default function AttendanceDashboardPage() {
       const res = await fetch(`${API}/attendance/dashboard?${qs}`, { headers: h });
       const d = res.ok ? await res.json() : null;
       setData(d);
+      // Fallback seed (overridden by periods effect when data exists).
       if (d && jYear == null && Number.isFinite(d.jYear)) { setJYear(d.jYear); setJMonth(d.jMonth); }
     } finally { setLoading(false); }
     // eslint-disable-next-line
@@ -54,6 +57,12 @@ export default function AttendanceDashboardPage() {
   React.useEffect(() => { load(); }, [load]);
   React.useEffect(() => {
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
+    fetch(`${API}/attendance/records/periods`, { headers: h }).then(r => r.ok ? r.json() : []).then((p) => {
+      const arr = Array.isArray(p) ? p : [];
+      setPeriods(arr);
+      // Seed to the most recent period that actually has data.
+      if (arr.length && jYear == null) { setJYear(arr[0].jYear); setJMonth(arr[0].jMonth); }
+    }).catch(() => {});
     // eslint-disable-next-line
   }, []);
 
@@ -89,10 +98,15 @@ export default function AttendanceDashboardPage() {
   }, []);
   React.useEffect(() => { loadDiag(); }, [loadDiag]);
 
+  // Data-driven options — only years/months that have data.
   const yearOpts = React.useMemo(() => {
-    const base = jYear ?? 1404;
-    return [base - 2, base - 1, base, base + 1];
-  }, [jYear]);
+    const ys = [...new Set(periods.map(p => p.jYear))].sort((a, b) => b - a);
+    return ys.length ? ys : (jYear ? [jYear] : []);
+  }, [periods, jYear]);
+  const monthOpts = React.useMemo(() => {
+    const ms = [...new Set(periods.filter(p => p.jYear === jYear).map(p => p.jMonth))].sort((a, b) => a - b);
+    return ms.length ? ms : (jMonth ? [jMonth] : []);
+  }, [periods, jYear, jMonth]);
 
   const statusPie = Object.entries(data?.statusCounts || {}).map(([k, v]) => ({ name: STATUS_FA[k] || k, key: k, value: v as number }));
   const trend = (data?.trend || []).map((t: any) => ({ روز: t.jDay, حاضر: t.present, اضافه‌کار: Math.round(t.overtimeMinutes/60*10)/10, تاخیر: Math.round(t.delayMinutes/60*10)/10 }));
@@ -109,15 +123,15 @@ export default function AttendanceDashboardPage() {
           <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center"><Fingerprint className="w-5 h-5 text-white" /></div>
           <div>
             <h1 className="text-xl font-bold text-theme-primary">داشبورد حضور و غیاب</h1>
-            <p className="text-sm text-theme-muted">{jMonth ? `${J_MONTHS[jMonth-1]} ${faNum(jYear||0)}` : "—"}</p>
+            <p className="text-sm text-theme-muted">{jMonth ? `${J_MONTHS[jMonth-1]} ${faY(jYear||0)}` : "—"}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select className="input-theme text-sm w-auto" value={jYear ?? ""} onChange={e => setJYear(+e.target.value)}>
-            {yearOpts.map(y => <option key={y} value={y}>{faNum(y)}</option>)}
+            {yearOpts.map(y => <option key={y} value={y}>{faY(y)}</option>)}
           </select>
           <select className="input-theme text-sm w-auto" value={jMonth ?? ""} onChange={e => setJMonth(+e.target.value)}>
-            {J_MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+            {monthOpts.map(m => <option key={m} value={m}>{J_MONTHS[m-1]}</option>)}
           </select>
           <select className="input-theme text-sm w-auto" value={deptId} onChange={e => setDeptId(e.target.value)}>
             <option value="">همه دپارتمان‌ها</option>

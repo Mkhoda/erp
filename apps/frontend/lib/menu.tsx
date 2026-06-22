@@ -20,6 +20,7 @@ import {
   Settings,
   Activity,
   ClipboardList,
+  SlidersHorizontal,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -111,6 +112,7 @@ export const MENU: MenuItem[] = [
     children: [
       { id: 'attendance.dashboard', title: 'داشبورد حضور',         page: '/dashboard/attendance',          icon: LayoutDashboard },
       { id: 'attendance.records',   title: 'کارکرد روزانه',        page: '/dashboard/attendance/records',  icon: ClipboardList },
+      { id: 'attendance.workRules', title: 'قوانین کارکرد',        page: '/dashboard/attendance/work-rules', icon: SlidersHorizontal },
       { id: 'attendance.settings',  title: 'تنظیمات حضور و غیاب',  page: '/dashboard/attendance/settings', icon: Settings },
       { id: 'attendance.sync',      title: 'پایش همگام‌سازی',      page: '/dashboard/attendance/sync',     icon: Activity },
     ],

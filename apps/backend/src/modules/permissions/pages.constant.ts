@@ -6,6 +6,7 @@ export const ADMIN_PAGES: string[] = [
   '/dashboard/system-logs',
   '/dashboard/attendance/settings',
   '/dashboard/attendance/sync',
+  '/dashboard/attendance/work-rules',
 ];
 
 export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[] = [
@@ -45,4 +46,5 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/system-logs',        label: 'لاگ سیستم',           adminOnly: true },
   { page: '/dashboard/attendance/settings', label: 'تنظیمات حضور و غیاب', adminOnly: true },
   { page: '/dashboard/attendance/sync',     label: 'پایش همگام‌سازی',      adminOnly: true },
+  { page: '/dashboard/attendance/work-rules', label: 'قوانین کارکرد',     adminOnly: true },
 ];

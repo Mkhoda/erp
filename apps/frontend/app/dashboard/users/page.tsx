@@ -88,15 +88,25 @@ export default function UsersPage() {
     return matchQ && matchRole && matchDept;
   });
 
+  const DEFAULT_RULE = { employeeType: "FULL_TIME", otAllowed: true, flexEnabled: false, startTime: "", endTime: "", dailyMinutes: "", graceMinutes: "", otMaxDaily: "", otMaxMonthly: "" };
+
   function onAdd() {
-    setEditing({ firstName: "", lastName: "", phone: "", email: "", password: "", role: "USER", departmentIds: [] });
+    setEditing({ firstName: "", lastName: "", phone: "", email: "", password: "", role: "USER", departmentIds: [], rule: { ...DEFAULT_RULE } });
     setShowPwdField(false); setShowNewPwd(false);
     setOpen(true);
   }
-  function onEdit(u: User) {
-    setEditing({ ...u, departmentIds: (u.userDepartments || []).map(x => x.departmentId), newPassword: "" });
+  async function onEdit(u: User) {
+    setEditing({ ...u, departmentIds: (u.userDepartments || []).map(x => x.departmentId), newPassword: "", rule: { ...DEFAULT_RULE } });
     setShowPwdField(false); setShowNewPwd(false);
     setOpen(true);
+    // Load this user's attendance rule (if any) into the form.
+    try {
+      const r = await fetch(`${API}/attendance/user-rules/${u.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (r.ok) {
+        const rule = await r.json();
+        if (rule) setEditing((s: any) => s && s.id === u.id ? ({ ...s, rule: { ...DEFAULT_RULE, ...Object.fromEntries(Object.entries(rule).map(([k, v]) => [k, v ?? (DEFAULT_RULE as any)[k] ?? ""])) } }) : s);
+      }
+    } catch { /* ignore */ }
   }
 
   async function onToggleDisable(u: User) {
@@ -153,6 +163,18 @@ export default function UsersPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "خطا در ذخیره");
+      }
+      const saved = await res.json().catch(() => null);
+      const savedId = isNew ? saved?.id : editing.id;
+      // Persist this user's attendance rule (employee type, flex, OT caps).
+      if (savedId && editing.rule) {
+        try {
+          await fetch(`${API}/attendance/user-rules/${savedId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify(editing.rule),
+          });
+        } catch { /* best-effort */ }
       }
       toast.success(isNew ? "کاربر اضافه شد" : "کاربر ویرایش شد");
       setOpen(false); setEditing(null); await load();
@@ -426,6 +448,60 @@ export default function UsersPage() {
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* ── Attendance rule (per-user) ── */}
+          <div className="mt-2 border-t border-theme pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CreditCard className="w-4 h-4 text-blue-500" />
+              <span className="font-medium text-theme-primary text-sm">تنظیمات حضور و غیاب</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block mb-1.5 text-theme-secondary text-xs">نوع کارمند</label>
+                <select value={editing?.rule?.employeeType || "FULL_TIME"} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, employeeType: e.target.value } }))} className="input-theme text-sm">
+                  <option value="FULL_TIME">تمام‌وقت (اضافه‌کار و تاخیر محاسبه می‌شود)</option>
+                  <option value="HOURLY">ساعتی (فقط ساعت حضور؛ بدون اضافه‌کار)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-4 mt-6">
+                <label className="flex items-center gap-2 text-sm text-theme-primary">
+                  <input type="checkbox" checked={!!editing?.rule?.flexEnabled} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, flexEnabled: e.target.checked } }))} /> شناوری
+                </label>
+                {editing?.rule?.employeeType !== "HOURLY" && (
+                  <label className="flex items-center gap-2 text-sm text-theme-primary">
+                    <input type="checkbox" checked={editing?.rule?.otAllowed !== false} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, otAllowed: e.target.checked } }))} /> اضافه‌کار مجاز
+                  </label>
+                )}
+              </div>
+              <div>
+                <label className="block mb-1.5 text-theme-secondary text-xs">ساعت شروع (اختیاری)</label>
+                <input type="time" dir="ltr" value={editing?.rule?.startTime || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, startTime: e.target.value } }))} className="input-theme text-sm" />
+              </div>
+              <div>
+                <label className="block mb-1.5 text-theme-secondary text-xs">ساعت پایان (اختیاری)</label>
+                <input type="time" dir="ltr" value={editing?.rule?.endTime || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, endTime: e.target.value } }))} className="input-theme text-sm" />
+              </div>
+              <div>
+                <label className="block mb-1.5 text-theme-secondary text-xs">ساعت کاری روزانه (دقیقه)</label>
+                <input type="number" dir="ltr" value={editing?.rule?.dailyMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, dailyMinutes: e.target.value } }))} className="input-theme text-sm" placeholder="پیش‌فرض سازمان" />
+              </div>
+              <div>
+                <label className="block mb-1.5 text-theme-secondary text-xs">میزان شناوری/ارفاق ورود (دقیقه)</label>
+                <input type="number" dir="ltr" value={editing?.rule?.graceMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, graceMinutes: e.target.value } }))} className="input-theme text-sm" placeholder="پیش‌فرض سازمان" />
+              </div>
+              {editing?.rule?.employeeType !== "HOURLY" && <>
+                <div>
+                  <label className="block mb-1.5 text-theme-secondary text-xs">حداکثر اضافه‌کار روزانه (دقیقه)</label>
+                  <input type="number" dir="ltr" value={editing?.rule?.otMaxDaily ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, otMaxDaily: e.target.value } }))} className="input-theme text-sm" placeholder="پیش‌فرض سازمان" />
+                </div>
+                <div>
+                  <label className="block mb-1.5 text-theme-secondary text-xs">حداکثر اضافه‌کار ماهانه (دقیقه)</label>
+                  <input type="number" dir="ltr" value={editing?.rule?.otMaxMonthly ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, otMaxMonthly: e.target.value } }))} className="input-theme text-sm" placeholder="پیش‌فرض سازمان" />
+                </div>
+              </>}
+            </div>
+            <p className="mt-2 text-[11px] text-theme-muted">فیلدهای خالی از مقدار پیش‌فرض «قوانین کارکرد» سازمان استفاده می‌کنند.</p>
           </div>
         </form>
       </Modal>
