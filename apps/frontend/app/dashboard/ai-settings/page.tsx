@@ -115,7 +115,8 @@ export default function AiSettingsPage() {
     setTesting(prev => ({ ...prev, [id]: true }));
     try {
       const res = await fetch(`${API}/ai-settings/providers/${id}/test`, { method: "POST", headers: h() });
-      setTestResults(prev => ({ ...prev, [id]: await res.json() }));
+      const result = await res.json();
+      setTestResults(prev => ({ ...prev, [id]: result }));
     } catch {
       setTestResults(prev => ({ ...prev, [id]: { success: false, latencyMs: 0, error: "خطا در ارتباط" } }));
     } finally { setTesting(prev => ({ ...prev, [id]: false })); }
