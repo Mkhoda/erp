@@ -39,6 +39,21 @@ export class SyncService {
   }
 
   /**
+   * Reset the cursor to the source's initial RecordID and re-read everything.
+   * Use when the cursor advanced but RawAttendanceRecord is empty/incomplete.
+   * Existing rows are skipped (unique constraint), so it is safe to re-run.
+   */
+  async fullResync(sourceId: string): Promise<SyncResult> {
+    const src = await this.prisma.attendanceSource.findUnique({ where: { id: sourceId } });
+    if (!src) throw new Error('منبع حضور یافت نشد');
+    await this.prisma.attendanceSource.update({
+      where: { id: sourceId },
+      data: { lastRecordId: src.initialRecordId ?? 0 },
+    });
+    return this.runSource(sourceId, 'manual');
+  }
+
+  /**
    * Incremental sync of a single source. Reads rows with RecordID greater than
    * the stored cursor in batches, imports them into RawAttendanceRecord
    * (duplicates silently skipped via the unique constraint), advances the

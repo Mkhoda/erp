@@ -18,6 +18,12 @@ export class SyncController {
     return this.sync.runSource(sourceId, 'manual');
   }
 
+  // Reset cursor to the initial RecordID and re-import everything.
+  @Post('full')
+  full(@Body('sourceId') sourceId: string) {
+    return this.sync.fullResync(sourceId);
+  }
+
   @Get('status')
   status() {
     return this.sync.getStatus();

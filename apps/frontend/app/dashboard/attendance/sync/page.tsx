@@ -64,6 +64,17 @@ export default function SyncMonitorPage() {
     } finally { setRunningId(null); }
   }
 
+  async function fullResync(sourceId: string) {
+    if (!confirm("نشانگر صفر می‌شود و همه‌ی رکوردها از ابتدا دوباره خوانده می‌شوند. ادامه می‌دهید؟")) return;
+    setRunningId(sourceId);
+    try {
+      const res = await fetch(`${API}/attendance/sync/full`, { method: "POST", headers: h, body: JSON.stringify({ sourceId }) });
+      const r = await res.json();
+      alert(`وارد کردن مجدد انجام شد: ${(r.imported ?? 0).toLocaleString("fa-IR")} رکورد وارد شد`);
+      await load();
+    } finally { setRunningId(null); }
+  }
+
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
 
   return (
@@ -96,10 +107,17 @@ export default function SyncMonitorPage() {
                 {s.running && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> در حال اجرا</span>}
                 {!s.syncEnabled && <span className="text-xs px-2 py-0.5 rounded-full bg-theme-secondary text-theme-muted">غیرفعال</span>}
               </div>
-              <button onClick={() => runNow(s.id)} disabled={s.running || runningId === s.id}
-                className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50">
-                {runningId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />} اجرای دستی
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => runNow(s.id)} disabled={s.running || runningId === s.id}
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50">
+                  {runningId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />} اجرای دستی
+                </button>
+                <button onClick={() => fullResync(s.id)} disabled={s.running || runningId === s.id}
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-theme-secondary border border-theme text-theme-primary hover:bg-theme-hover disabled:opacity-50"
+                  title="نشانگر را صفر کرده و همه رکوردها را از ابتدا وارد می‌کند">
+                  <RefreshCw className="w-3.5 h-3.5" /> وارد کردن مجدد از صفر
+                </button>
+              </div>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-y-2 text-sm">
               <Stat label="آخرین RecordID" value={s.lastRecordId.toLocaleString("fa-IR")} />
