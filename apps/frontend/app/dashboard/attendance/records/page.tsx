@@ -34,14 +34,14 @@ export default function AttendanceRecordsPage() {
   const [detail, setDetail] = React.useState<any>(null);
   const [exporting, setExporting] = React.useState<string | null>(null);
 
-  const now = new Date();
-  const [jYear, setJYear] = React.useState<number>(1404);
-  const [jMonth, setJMonth] = React.useState<number>(1);
+  // 0 = "all" (no filter) — default shows every computed day so data always
+  // appears if it exists; the user narrows down from there.
+  const [jYear, setJYear] = React.useState<number>(0);
+  const [jMonth, setJMonth] = React.useState<number>(0);
   const [deptId, setDeptId] = React.useState("");
   const [userId, setUserId] = React.useState("");
   const [status, setStatus] = React.useState("");
   const [personQuery, setPersonQuery] = React.useState("");
-  const [seeded, setSeeded] = React.useState(false);
 
   const qs = React.useCallback(() => {
     const p = new URLSearchParams();
@@ -68,10 +68,6 @@ export default function AttendanceRecordsPage() {
 
   React.useEffect(() => { load(); }, [load]);
   React.useEffect(() => {
-    // seed current month from dashboard, and load filter lists
-    fetch(`${API}/attendance/dashboard`, { headers: h }).then(r => r.ok ? r.json() : null).then(d => {
-      if (d) { setJYear(d.jYear); setJMonth(d.jMonth); } setSeeded(true);
-    }).catch(() => setSeeded(true));
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
     fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
     // eslint-disable-next-line
@@ -98,7 +94,7 @@ export default function AttendanceRecordsPage() {
     finally { setExporting(null); }
   }
 
-  const yearOpts = [jYear - 2, jYear - 1, jYear, jYear + 1];
+  const yearOpts = [1403, 1404, 1405, 1406];
   const personFiltered = users.filter((u: any) => {
     if (!personQuery) return true;
     const s = `${u.firstName} ${u.lastName} ${u.phone || ""} ${u.attendanceCardNo || ""}`.toLowerCase();
@@ -130,9 +126,11 @@ export default function AttendanceRecordsPage() {
       {/* Filters */}
       <div className="bg-theme-card border border-theme rounded-xl p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         <select className="input-theme text-sm" value={jYear} onChange={e => setJYear(+e.target.value)}>
+          <option value={0}>همه سال‌ها</option>
           {yearOpts.map(y => <option key={y} value={y}>سال {faNum(y)}</option>)}
         </select>
         <select className="input-theme text-sm" value={jMonth} onChange={e => setJMonth(+e.target.value)}>
+          <option value={0}>همه ماه‌ها</option>
           {J_MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
         </select>
         <select className="input-theme text-sm" value={deptId} onChange={e => setDeptId(e.target.value)}>
