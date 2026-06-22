@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Copy, QrCode, Barcode as BarcodeIcon, Plus, Users, Building, Layers, Home, ClipboardList, Pencil, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Modal from '../../../components/ui/Modal';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -293,61 +294,53 @@ export default function AssetDetailPage() {
       </div>
 
       {/* Edit modal */}
-      <AnimatePresence>
-        {editOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="z-50 fixed inset-0 flex justify-center items-center bg-black/50 backdrop-blur-sm p-4"
-            onClick={e => { if (e.target === e.currentTarget) setEditOpen(false); }}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-              className="bg-theme-primary shadow-2xl border border-theme rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center px-5 py-4 border-theme border-b">
-                <h3 className="font-semibold text-theme-primary">ویرایش دارایی</h3>
-                <button onClick={() => setEditOpen(false)} className="hover:bg-theme-hover p-1.5 rounded-lg text-theme-muted"><X className="w-4 h-4" /></button>
+      <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="ویرایش دارایی"
+        size="lg"
+        footer={<>
+          <button type="button" onClick={() => setEditOpen(false)} className="btn-theme-secondary text-sm">انصراف</button>
+          <button form="asset-edit-form" type="submit" className="btn-theme-primary text-sm">ذخیره</button>
+        </>}
+      >
+        <form id="asset-edit-form" onSubmit={onSaveEdit} className="space-y-4">
+          <div>
+            <label className="block mb-1.5 font-medium text-theme-secondary text-sm">نام</label>
+            <input value={editData.name || ''} onChange={e => setEditData((s: any) => ({ ...s, name: e.target.value }))} className="input-theme" />
+          </div>
+          <div className="gap-3 grid grid-cols-2">
+            <div>
+              <label className="block mb-1.5 font-medium text-theme-secondary text-sm">بارکد</label>
+              <input value={editData.barcode || ''} onChange={e => setEditData((s: any) => ({ ...s, barcode: e.target.value }))} className="input-theme font-mono" dir="ltr" />
+            </div>
+            <div>
+              <label className="block mb-1.5 font-medium text-theme-secondary text-sm">بارکد قدیم</label>
+              <input value={editData.oldBarcode || ''} onChange={e => setEditData((s: any) => ({ ...s, oldBarcode: e.target.value }))} className="input-theme font-mono" dir="ltr" />
+            </div>
+          </div>
+          <div>
+            <label className="block mb-1.5 font-medium text-theme-secondary text-sm">توضیحات</label>
+            <textarea value={editData.description || ''} onChange={e => setEditData((s: any) => ({ ...s, description: e.target.value }))} className="input-theme resize-none" rows={3} />
+          </div>
+          <div>
+            <label className="block mb-1.5 font-medium text-theme-secondary text-sm">تصاویر</label>
+            <input type="file" accept="image/*" multiple onChange={e => onFiles(e.target.files)} className="block text-sm text-theme-muted" />
+            {Array.isArray(editData.images) && editData.images.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {editData.images.map((u: string, i: number) => (
+                  <div key={i} className="relative">
+                    <img src={u.startsWith('http') ? u : `${API}${u}`} alt="" className="border border-theme rounded-lg w-20 h-20 object-cover" />
+                    <button type="button" onClick={() => setEditData((s: any) => ({ ...s, images: s.images.filter((x: string) => x !== u) }))} className="-top-1.5 -right-1.5 absolute bg-red-500 rounded-full w-5 h-5 flex items-center justify-center text-white">
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
-              <form onSubmit={onSaveEdit} className="px-5 py-4 space-y-4">
-                <div>
-                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">نام</label>
-                  <input value={editData.name || ''} onChange={e => setEditData((s: any) => ({ ...s, name: e.target.value }))} className="input-theme" />
-                </div>
-                <div className="gap-3 grid grid-cols-2">
-                  <div>
-                    <label className="block mb-1.5 font-medium text-theme-secondary text-sm">بارکد</label>
-                    <input value={editData.barcode || ''} onChange={e => setEditData((s: any) => ({ ...s, barcode: e.target.value }))} className="input-theme font-mono" dir="ltr" />
-                  </div>
-                  <div>
-                    <label className="block mb-1.5 font-medium text-theme-secondary text-sm">بارکد قدیم</label>
-                    <input value={editData.oldBarcode || ''} onChange={e => setEditData((s: any) => ({ ...s, oldBarcode: e.target.value }))} className="input-theme font-mono" dir="ltr" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">توضیحات</label>
-                  <textarea value={editData.description || ''} onChange={e => setEditData((s: any) => ({ ...s, description: e.target.value }))} className="input-theme resize-none" rows={3} />
-                </div>
-                <div>
-                  <label className="block mb-1.5 font-medium text-theme-secondary text-sm">تصاویر</label>
-                  <input type="file" accept="image/*" multiple onChange={e => onFiles(e.target.files)} className="block text-sm text-theme-muted" />
-                  {Array.isArray(editData.images) && editData.images.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {editData.images.map((u: string, i: number) => (
-                        <div key={i} className="relative">
-                          <img src={u.startsWith('http') ? u : `${API}${u}`} alt="" className="border border-theme rounded-lg w-20 h-20 object-cover" />
-                          <button type="button" onClick={() => setEditData((s: any) => ({ ...s, images: s.images.filter((x: string) => x !== u) }))} className="-top-1.5 -right-1.5 absolute bg-red-500 rounded-full w-5 h-5 flex items-center justify-center text-white">
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setEditOpen(false)} className="btn-theme-secondary text-sm">انصراف</button>
-                  <button type="submit" className="btn-theme-primary text-sm">ذخیره</button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            )}
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

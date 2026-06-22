@@ -3,6 +3,7 @@ import React from "react";
 import {
   FileSpreadsheet, FileText, Loader2, Search, X, Clock, Fingerprint, ArrowLeft,
 } from "lucide-react";
+import Modal from "../../../components/ui/Modal";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -207,13 +208,15 @@ export default function AttendanceRecordsPage() {
       </div>
 
       {/* Day detail modal */}
-      {detail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDetail(null)}>
-          <div className="bg-theme-card border border-theme rounded-2xl p-5 w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-theme-primary">{detail.row.user ? `${detail.row.user.firstName} ${detail.row.user.lastName}` : ""} — {faDate(detail.row.gregDate)}</h3>
-              <button onClick={() => setDetail(null)} className="text-theme-muted hover:text-theme-primary"><X className="w-5 h-5" /></button>
-            </div>
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail ? `${detail.row.user ? `${detail.row.user.firstName} ${detail.row.user.lastName}` : ""} — ${faDate(detail.row.gregDate)}` : "جزئیات روز"}
+        size="md"
+        footer={<button onClick={() => setDetail(null)} className="btn-theme-secondary text-sm">بستن</button>}
+      >
+        {detail && (
+          <div>
             <div className="grid grid-cols-2 gap-2 text-sm mb-4">
               <Info label="وضعیت" value={STATUS_FA[detail.row.status] || detail.row.status} />
               <Info label="کارکرد" value={fmtMin(detail.row.workedMinutes)} />
@@ -222,7 +225,9 @@ export default function AttendanceRecordsPage() {
               <Info label="تعجیل" value={fmtMin(detail.row.earlyLeaveMinutes)} />
               <Info label="شب‌کاری" value={fmtMin(detail.row.nightMinutes)} />
             </div>
-            <div className="text-sm font-medium text-theme-secondary mb-2 flex items-center gap-1"><Clock className="w-4 h-4" /> پانچ‌های خام ({faNum(detail.punches?.length || 0)})</div>
+            <div className="text-sm font-medium text-theme-secondary mb-2 flex items-center gap-1">
+              <Clock className="w-4 h-4" /> پانچ‌های خام ({faNum(detail.punches?.length || 0)})
+            </div>
             <div className="space-y-1">
               {(detail.punches || []).map((p: any) => (
                 <div key={p.id} className="flex items-center justify-between text-sm bg-theme-secondary/30 rounded-lg px-3 py-1.5">
@@ -234,8 +239,8 @@ export default function AttendanceRecordsPage() {
             </div>
             {detail.override && <div className="mt-3 text-xs text-amber-600 bg-amber-500/10 rounded-lg p-2">اصلاح دستی توسط {detail.override.createdBy?.firstName} {detail.override.createdBy?.lastName}: {detail.override.reason}</div>}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

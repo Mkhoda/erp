@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -21,7 +22,10 @@ const sizeMap = {
 };
 
 export default function Modal({ open, onClose, title, subtitle, children, size = "md", footer }: Props) {
-  // Close on Escape
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => { setMounted(true); }, []);
+
   React.useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -29,7 +33,9 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
     return () => document.removeEventListener("keydown", h);
   }, [open, onClose]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -38,8 +44,7 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          onClick={onClose}
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
         >
           <motion.div
             key="modal-panel"
@@ -49,7 +54,6 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className={`bg-theme-primary border border-theme rounded-2xl shadow-2xl w-full ${sizeMap[size]} max-h-[90vh] flex flex-col`}
             dir="rtl"
-            onClick={e => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-start justify-between px-6 py-4 border-b border-theme shrink-0">
@@ -79,6 +83,7 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

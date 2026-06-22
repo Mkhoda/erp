@@ -5,6 +5,7 @@ import {
   Cpu, CheckCircle2, XCircle, Loader2, Eye, EyeOff,
   Zap, Save, Trash2, Plus, RefreshCw, ExternalLink, ChevronDown,
 } from "lucide-react";
+import Modal from "../../components/ui/Modal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -288,134 +289,69 @@ export default function AiSettingsPage() {
       )}
 
       {/* Create / Edit modal */}
-      <AnimatePresence>
-        {modal && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="z-40 fixed inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setModal(null)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="top-auto md:top-1/2 bottom-4 z-50 fixed inset-x-4 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 bg-theme-card shadow-2xl p-6 border border-theme rounded-2xl w-full md:w-[480px] md:-translate-y-1/2"
-            >
-              <h2 className="flex items-center gap-2 mb-5 font-bold text-theme-primary text-lg">
-                <Cpu className="w-5 h-5" style={{ color: typeColor(form.type) }} />
-                {modal.mode === "create" ? "افزودن مدل هوش مصنوعی" : `ویرایش: ${modal.provider?.name}`}
-              </h2>
-
-              <div className="space-y-4">
-                {/* Provider type (only in create mode) */}
-                {modal.mode === "create" && (
-                  <div>
-                    <label className="block mb-1 font-medium text-theme-primary text-xs">نوع ارائه‌دهنده</label>
-                    <div className="relative">
-                      <select
-                        value={form.type}
-                        onChange={e => onTypeChange(e.target.value)}
-                        className="bg-theme-primary px-4 py-2.5 border border-theme focus:border-blue-500 rounded-xl outline-none w-full text-theme-primary text-sm appearance-none"
-                      >
-                        {Object.entries(PROVIDER_INFO).map(([t, info]) => (
-                          <option key={t} value={t}>{info.label}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="top-1/2 left-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2 pointer-events-none" />
-                    </div>
-                  </div>
-                )}
-
-                {/* Custom display name */}
-                <div>
-                  <label className="block mb-1 font-medium text-theme-primary text-xs">نام سفارشی (نمایشی در گفتگو و گزارش‌ها)</label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    className="bg-theme-primary px-4 py-2.5 border border-theme focus:border-blue-500 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 w-full text-theme-primary text-sm transition-all"
-                    placeholder="مثلاً GPT-4o سریع، Claude هوشمند، ..."
-                  />
-                </div>
-
-                {/* Model ID */}
-                <div>
-                  <label className="block mb-1 font-medium text-theme-primary text-xs">شناسه مدل (Model ID)</label>
-                  <input
-                    type="text"
-                    value={form.model}
-                    onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
-                    className="bg-theme-primary px-4 py-2.5 border border-theme focus:border-blue-500 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 w-full font-mono text-theme-primary text-sm transition-all"
-                    placeholder={PROVIDER_INFO[form.type]?.defaultModel || ""}
-                  />
-                </div>
-
-                {/* API Key */}
-                <div>
-                  <label className="block mb-1 font-medium text-theme-primary text-xs">کلید API</label>
-                  <div className="relative">
-                    <input
-                      type={showKey ? "text" : "password"}
-                      value={form.apiKey}
-                      onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))}
-                      className="bg-theme-primary px-4 py-2.5 pl-10 border border-theme focus:border-blue-500 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 w-full font-mono text-theme-primary text-sm transition-all"
-                      placeholder={modal.mode === "edit" ? "خالی بذار = تغییر نده" : "sk-..."}
-                    />
-                    <button type="button" onClick={() => setShowKey(v => !v)} className="top-1/2 left-3 absolute text-theme-muted -translate-y-1/2">
-                      {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* API URL */}
-                <div>
-                  <label className="block mb-1 font-medium text-theme-primary text-xs">آدرس API (اختیاری)</label>
-                  <input
-                    type="text"
-                    value={form.apiUrl}
-                    onChange={e => setForm(f => ({ ...f, apiUrl: e.target.value }))}
-                    className="bg-theme-primary px-4 py-2.5 border border-theme focus:border-blue-500 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 w-full font-mono text-theme-primary text-sm transition-all"
-                    placeholder={PROVIDER_INFO[form.type]?.defaultUrl || ""}
-                  />
-                </div>
-
-                {/* Checkboxes */}
-                <div className="flex flex-col gap-2 pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded accent-blue-600 w-4 h-4" />
-                    <span className="text-sm text-theme-secondary">فعال — کاربران می‌توانند از این مدل استفاده کنند</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={form.safeMode} onChange={e => setForm(f => ({ ...f, safeMode: e.target.checked }))} className="rounded accent-green-600 w-4 h-4" />
-                    <span className="text-sm text-theme-secondary">حالت ایمن (Safe Mode) — فیلتر محتوای مضر</span>
-                  </label>
-                </div>
+      <Modal
+        open={!!modal}
+        onClose={() => setModal(null)}
+        title={modal?.mode === "create" ? "افزودن مدل هوش مصنوعی" : `ویرایش: ${modal?.provider?.name || ""}`}
+        size="md"
+        footer={<>
+          <button onClick={() => setModal(null)} className="btn-theme-secondary text-sm">انصراف</button>
+          <button
+            onClick={handleSave}
+            disabled={saving || (!form.apiKey && modal?.mode === "create")}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded-xl text-white text-sm transition-colors"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            ذخیره
+          </button>
+        </>}
+      >
+        <div className="space-y-4">
+          {modal?.mode === "create" && (
+            <div>
+              <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نوع ارائه‌دهنده</label>
+              <div className="relative">
+                <select value={form.type} onChange={e => onTypeChange(e.target.value)} className="select-theme text-sm appearance-none">
+                  {Object.entries(PROVIDER_INFO).map(([t, info]) => <option key={t} value={t}>{info.label}</option>)}
+                </select>
+                <ChevronDown className="top-1/2 left-3 absolute w-4 h-4 text-theme-muted -translate-y-1/2 pointer-events-none" />
               </div>
-
-              {saveMsg && (
-                <div className={`mt-3 text-sm text-center ${saveMsg.includes("✓") ? "text-green-600" : "text-red-500"}`}>
-                  {saveMsg}
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 mt-5">
-                <button onClick={() => setModal(null)} className="bg-theme-hover hover:bg-red-50 dark:hover:bg-red-950/30 px-4 py-2 rounded-xl text-theme-secondary hover:text-red-600 text-sm transition-colors">
-                  انصراف
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || (!form.apiKey && modal.mode === "create")}
-                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded-xl text-white text-sm transition-colors"
-                >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  ذخیره
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            </div>
+          )}
+          <div>
+            <label className="block mb-1.5 font-medium text-theme-secondary text-xs">نام سفارشی (نمایشی در گفتگو و گزارش‌ها)</label>
+            <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-theme text-sm" placeholder="مثلاً GPT-4o سریع، Claude هوشمند، ..." />
+          </div>
+          <div>
+            <label className="block mb-1.5 font-medium text-theme-secondary text-xs">شناسه مدل (Model ID)</label>
+            <input type="text" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} className="input-theme text-sm font-mono" placeholder={PROVIDER_INFO[form.type]?.defaultModel || ""} />
+          </div>
+          <div>
+            <label className="block mb-1.5 font-medium text-theme-secondary text-xs">کلید API</label>
+            <div className="relative">
+              <input type={showKey ? "text" : "password"} value={form.apiKey} onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} className="input-theme text-sm font-mono pl-10" placeholder={modal?.mode === "edit" ? "خالی بذار = تغییر نده" : "sk-..."} />
+              <button type="button" onClick={() => setShowKey(v => !v)} className="top-1/2 left-3 absolute text-theme-muted -translate-y-1/2">
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block mb-1.5 font-medium text-theme-secondary text-xs">آدرس API (اختیاری)</label>
+            <input type="text" value={form.apiUrl} onChange={e => setForm(f => ({ ...f, apiUrl: e.target.value }))} className="input-theme text-sm font-mono" placeholder={PROVIDER_INFO[form.type]?.defaultUrl || ""} />
+          </div>
+          <div className="flex flex-col gap-2 pt-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded accent-blue-600 w-4 h-4" />
+              <span className="text-sm text-theme-secondary">فعال — کاربران می‌توانند از این مدل استفاده کنند</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.safeMode} onChange={e => setForm(f => ({ ...f, safeMode: e.target.checked }))} className="rounded accent-green-600 w-4 h-4" />
+              <span className="text-sm text-theme-secondary">حالت ایمن (Safe Mode) — فیلتر محتوای مضر</span>
+            </label>
+          </div>
+          {saveMsg && <div className={`text-sm text-center ${saveMsg.includes("✓") ? "text-green-600" : "text-red-500"}`}>{saveMsg}</div>}
+        </div>
+      </Modal>
     </div>
   );
 }

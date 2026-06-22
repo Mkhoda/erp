@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { Shield, Users, RotateCcw, Settings, Plus, Trash2, CheckCircle, TrendingUp, Zap } from "lucide-react";
+import Modal from "../../components/ui/Modal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -301,44 +302,45 @@ export default function QuotaPage() {
       )}
 
       {/* Edit quota modal */}
-      {editModal && (
-        <div className="z-50 fixed inset-0 bg-black/40 flex items-center justify-center p-4" onClick={() => setEditModal(null)}>
-          <div className="bg-theme-card border border-theme rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-theme-primary mb-4">ویرایش سقف توکن</h3>
-            <div className="mb-2 text-sm text-theme-muted">سرویس: <span className="font-medium text-theme-primary">{PROVIDER_LABELS[editModal.providerType] || editModal.providerType}</span></div>
-            <div className="mb-4 text-sm text-theme-muted">عدد ۰ = نامحدود</div>
-            <input type="number" value={limitInput} onChange={e => setLimitInput(e.target.value)} min={0}
-              className="bg-theme-primary border border-theme rounded-xl px-4 py-2.5 w-full text-theme-primary text-sm outline-none focus:border-blue-500 mb-4" placeholder="مثلاً 1000000" />
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setEditModal(null)} className="px-4 py-2 rounded-xl bg-theme-hover text-theme-secondary text-sm">انصراف</button>
-              <button onClick={saveQuota} disabled={saving} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50">ذخیره</button>
-            </div>
-          </div>
+      <Modal
+        open={!!editModal}
+        onClose={() => setEditModal(null)}
+        title="ویرایش سقف توکن"
+        size="sm"
+        footer={<>
+          <button onClick={() => setEditModal(null)} className="btn-theme-secondary text-sm">انصراف</button>
+          <button onClick={saveQuota} disabled={saving} className="btn-theme-primary text-sm disabled:opacity-50">ذخیره</button>
+        </>}
+      >
+        <div className="space-y-3">
+          <div className="text-sm text-theme-muted">سرویس: <span className="font-medium text-theme-primary">{PROVIDER_LABELS[editModal?.providerType || ""] || editModal?.providerType}</span></div>
+          <div className="text-xs text-theme-muted">عدد ۰ = نامحدود</div>
+          <input type="number" value={limitInput} onChange={e => setLimitInput(e.target.value)} min={0} className="input-theme text-sm" placeholder="مثلاً 1000000" />
         </div>
-      )}
+      </Modal>
 
       {/* Default quota modal */}
-      {defModal && (
-        <div className="z-50 fixed inset-0 bg-black/40 flex items-center justify-center p-4" onClick={() => setDefModal(null)}>
-          <div className="bg-theme-card border border-theme rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-theme-primary mb-4">quota پیش‌فرض</h3>
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-theme-primary mb-1">سرویس</label>
-              <select value={defModal.providerType} onChange={e => setDefModal(d => d ? { ...d, providerType: e.target.value } : null)}
-                className="bg-theme-primary border border-theme rounded-xl px-3 py-2.5 w-full text-theme-primary text-sm outline-none focus:border-blue-500">
-                {Object.entries(PROVIDER_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </div>
-            <div className="mb-4 text-sm text-theme-muted">عدد ۰ = نامحدود</div>
-            <input type="number" value={limitInput} onChange={e => setLimitInput(e.target.value)} min={0}
-              className="bg-theme-primary border border-theme rounded-xl px-4 py-2.5 w-full text-theme-primary text-sm outline-none focus:border-blue-500 mb-4" placeholder="مثلاً 1000000" />
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setDefModal(null)} className="px-4 py-2 rounded-xl bg-theme-hover text-theme-secondary text-sm">انصراف</button>
-              <button onClick={saveDefault} disabled={saving} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50">ذخیره</button>
-            </div>
+      <Modal
+        open={!!defModal}
+        onClose={() => setDefModal(null)}
+        title="quota پیش‌فرض"
+        size="sm"
+        footer={<>
+          <button onClick={() => setDefModal(null)} className="btn-theme-secondary text-sm">انصراف</button>
+          <button onClick={saveDefault} disabled={saving} className="btn-theme-primary text-sm disabled:opacity-50">ذخیره</button>
+        </>}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-theme-secondary mb-1.5">سرویس</label>
+            <select value={defModal?.providerType || ""} onChange={e => setDefModal(d => d ? { ...d, providerType: e.target.value } : null)} className="select-theme text-sm">
+              {Object.entries(PROVIDER_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
           </div>
+          <div className="text-xs text-theme-muted">عدد ۰ = نامحدود</div>
+          <input type="number" value={limitInput} onChange={e => setLimitInput(e.target.value)} min={0} className="input-theme text-sm" placeholder="مثلاً 1000000" />
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
