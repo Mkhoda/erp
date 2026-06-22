@@ -122,7 +122,7 @@ function ChatPageInner() {
     if (!selectedProvider) return;
     const res = await fetch(`${API}/chat-history/conversations`, {
       method: "POST", headers: hj(),
-      body: JSON.stringify({ provider: selectedProvider.type, model: selectedProvider.model }),
+      body: JSON.stringify({ provider: selectedProvider.id, model: selectedProvider.model }),
     });
     if (!res.ok) return;
     const c = await res.json();
@@ -177,7 +177,7 @@ function ChatPageInner() {
       setSending(false);
       // Refresh quota after message
       if (selectedProvider) {
-        fetch(`${API}/quota/me/${selectedProvider.type}`, { headers: h() })
+        fetch(`${API}/quota/me/${selectedProvider.type}`, { headers: h() })  // quota still per type
           .then(r => r.ok ? r.json() : null).then(d => { if (d) setQuota(d); }).catch(() => {});
       }
     }
@@ -263,10 +263,10 @@ function ChatPageInner() {
             {/* Provider selector */}
             {providers.length > 0 && (
               <div className="px-3 py-2 border-b border-theme">
-                <select value={selectedProvider?.type || ""}
-                  onChange={e => setSelectedProvider(providers.find(p => p.type === e.target.value) || null)}
+                <select value={selectedProvider?.id || ""}
+                  onChange={e => setSelectedProvider(providers.find(p => p.id === e.target.value) || null)}
                   className="w-full bg-transparent text-theme-secondary text-xs outline-none border border-theme rounded-lg px-2 py-1.5">
-                  {providers.map(p => <option key={p.type} value={p.type}>{p.name} — {p.model || p.type}</option>)}
+                  {providers.map(p => <option key={p.id} value={p.id}>{p.name} — {p.model || p.type}</option>)}
                 </select>
               </div>
             )}

@@ -361,7 +361,6 @@ model AiProvider {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([type])
 }
 
 // AI usage tracking — records each API call for token consumption analytics
@@ -370,6 +369,7 @@ model AiUsage {
   userId      String
   user        User     @relation(fields: [userId], references: [id])
   providerType String                  // "openai" | "anthropic" | "gemini" | "deepseek" | "agnes" | "custom"
+  providerName String?                 // Custom display name e.g. "GPT-4o Production"
   model       String?                  // Model used e.g. "gpt-4o"
   prompt      String                   // User's input/prompt (truncated)
   promptTokens   Int    @default(0)
@@ -683,12 +683,19 @@ model WorkSchedule {
 }
 
 // ── Per-user override of WorkSchedule ──
+// Employee classification — drives whether overtime/lateness are computed.
+enum EmployeeType {
+  FULL_TIME // تمام‌وقت: اضافه‌کار، تاخیر و تعجیل محاسبه می‌شود
+  HOURLY    // ساعتی: بدون اضافه‌کار/تاخیر؛ فقط ساعت حضور مهم است
+}
+
 model UserAttendanceRule {
   id           String        @id @default(cuid())
   userId       String        @unique
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   scheduleId   String?
   schedule     WorkSchedule? @relation(fields: [scheduleId], references: [id])
+  employeeType EmployeeType  @default(FULL_TIME)
   startTime    String?
   endTime      String?
   dailyMinutes Int?
