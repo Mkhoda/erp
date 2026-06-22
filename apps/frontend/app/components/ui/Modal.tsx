@@ -39,6 +39,7 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={onClose}
         >
           <motion.div
             key="modal-panel"
@@ -48,6 +49,7 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className={`bg-theme-primary border border-theme rounded-2xl shadow-2xl w-full ${sizeMap[size]} max-h-[90vh] flex flex-col`}
             dir="rtl"
+            onClick={e => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-start justify-between px-6 py-4 border-b border-theme shrink-0">
