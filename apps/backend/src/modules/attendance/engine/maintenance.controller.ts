@@ -67,6 +67,13 @@ export class MaintenanceController {
     return this.recompute.relinkAndRecomputeAll();
   }
 
+  // Auto-create a placeholder user for every unknown CardNo, then link +
+  // recompute so all attendance becomes visible immediately.
+  @Post('provision-cards')
+  provisionCards() {
+    return this.recompute.provisionCardsAndRecompute();
+  }
+
   // Rebuild a Jalali month (all mapped users, or one user) — e.g. after editing
   // the work schedule or holidays.
   @Post('recompute-month')

@@ -69,6 +69,19 @@ export default function AttendanceDashboardPage() {
     finally { setRelinking(false); setTimeout(() => setMsg(null), 8000); }
   }
 
+  async function provisionCards() {
+    if (!confirm("برای هر شماره کارتِ بدون کاربر، یک کاربر موقت (غیرفعال) با نام «کارت <شماره>» ساخته می‌شود و کل حضور و غیاب محاسبه می‌گردد. بعداً می‌توانید نام واقعی را در صفحه کاربران ویرایش کنید. ادامه می‌دهید؟")) return;
+    setRelinking(true); setMsg(null);
+    try {
+      const res = await fetch(`${API}/attendance/maintenance/provision-cards`, { method: "POST", headers: h });
+      const r = await res.json();
+      setMsg(`${faNum(r.createdUsers)} کاربر ساخته شد، ${faNum(r.linked)} پانچ متصل، ${faNum(r.recomputed)} روز محاسبه شد (کل خام: ${faNum(r.rawTotal)})`);
+      await load();
+      await loadDiag();
+    } catch { setMsg("خطا در عملیات (ممکن است طول بکشد — دوباره بزنید)"); }
+    finally { setRelinking(false); setTimeout(() => setMsg(null), 10000); }
+  }
+
   const loadDiag = React.useCallback(async () => {
     const d = await fetch(`${API}/attendance/maintenance/diagnostics`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null);
     setDiag(d);
@@ -111,6 +124,9 @@ export default function AttendanceDashboardPage() {
             {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
           <Link href="/dashboard/attendance/records" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> کارکرد روزانه</Link>
+          <button onClick={provisionCards} disabled={relinking} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50" title="ساخت خودکار کاربر برای هر شماره کارت و محاسبه کامل">
+            {relinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />} ساخت کاربر از کارت‌ها
+          </button>
           <button onClick={relink} disabled={relinking} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50" title="اتصال پانچ‌های وارد‌شده به کاربران دارای کد کارت و بازمحاسبه">
             {relinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} اتصال و بازمحاسبه
           </button>

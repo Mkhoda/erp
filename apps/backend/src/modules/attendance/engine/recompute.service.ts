@@ -79,6 +79,56 @@ export class RecomputeService {
     return { linked, recomputed, users: users.length };
   }
 
+  /**
+   * Auto-provision a placeholder user for every device CardNo that has no
+   * matching user yet, then link + recompute. Lets attendance for unknown
+   * cards appear immediately; the admin renames the users later (the card
+   * link, and thus history, is preserved). Placeholder users are disabled
+   * (cannot log in) and named "کارت <cardNo>".
+   */
+  async provisionCardsAndRecompute(): Promise<{
+    rawTotal: number; createdUsers: number; linked: number; recomputed: number; users: number;
+  }> {
+    const rawTotal = await this.prisma.rawAttendanceRecord.count();
+
+    // Distinct card numbers seen in raw data.
+    const distinct = await this.prisma.rawAttendanceRecord.findMany({
+      distinct: ['cardNo'],
+      select: { cardNo: true },
+      where: { cardNo: { not: '' } },
+    });
+    const cardNos = distinct.map((d) => d.cardNo).filter(Boolean);
+
+    // Which already map to a user?
+    const existing = await this.prisma.user.findMany({
+      where: { attendanceCardNo: { in: cardNos } },
+      select: { attendanceCardNo: true },
+    });
+    const have = new Set(existing.map((u) => u.attendanceCardNo));
+
+    let createdUsers = 0;
+    for (const card of cardNos) {
+      if (have.has(card)) continue;
+      try {
+        await this.prisma.user.create({
+          data: {
+            firstName: 'کارت',
+            lastName: card,
+            attendanceCardNo: card,
+            role: 'USER',
+            disabled: true, // attendance-only identity; cannot sign in
+          },
+        });
+        createdUsers++;
+      } catch {
+        // unique race / bad value — skip, never abort the batch
+      }
+    }
+
+    const relink = await this.relinkAndRecomputeAll();
+    return { rawTotal, createdUsers, ...relink };
+  }
+
   // Recompute every mapped user for a Jalali month (e.g. after editing the
   // global schedule or adding a holiday). Bounded by mapped-user count.
   async recomputeAllForMonth(jYear: number, jMonth: number): Promise<number> {
