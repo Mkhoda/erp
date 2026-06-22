@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import {
-  FileSpreadsheet, FileText, Loader2, Search, X, Clock, Fingerprint, ArrowLeft,
+  FileSpreadsheet, FileText, Loader2, Search, X, Clock, Fingerprint, ArrowLeft, Eye,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import Link from "next/link";
@@ -19,7 +19,8 @@ const STATUS_CLS: Record<string,string> = {
 };
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 const faY = (n: number) => (n ?? 0).toLocaleString("fa-IR", { useGrouping: false }); // years: no thousands separator
-const fmtMin = (m: number) => { const h = Math.floor(Math.abs(m||0)/60); const mm = Math.abs(m||0)%60; return `${m<0?"-":""}${faNum(h)}:${String(mm).padStart(2,"0")}`; };
+const toFa = (s: string) => s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]); // map ASCII digits → Persian
+const fmtMin = (m: number) => { const h = Math.floor(Math.abs(m||0)/60); const mm = Math.abs(m||0)%60; return toFa(`${m<0?"-":""}${h}:${String(mm).padStart(2,"0")}`); };
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
 
@@ -175,19 +176,19 @@ export default function AttendanceRecordsPage() {
           <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-theme-muted text-right border-b border-theme bg-theme-secondary/30">
+            <table className="w-full text-sm text-center">
+              <thead><tr className="text-theme-muted text-center border-b border-theme bg-theme-secondary/30">
                 <th className="py-2 px-2 font-medium">#</th><th className="font-medium px-2">نام</th>
                 <th className="font-medium px-2">کد کارت</th><th className="font-medium px-2">دپارتمان</th>
                 <th className="font-medium px-2">تاریخ</th><th className="font-medium px-2">ورود</th><th className="font-medium px-2">خروج</th>
                 <th className="font-medium px-2">کارکرد</th><th className="font-medium px-2">اضافه‌کار</th><th className="font-medium px-2">تاخیر</th>
-                <th className="font-medium px-2">وضعیت</th>
+                <th className="font-medium px-2">وضعیت</th><th className="font-medium px-2">جزئیات</th>
               </tr></thead>
               <tbody>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={11} className="py-10 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
+                  <tr><td colSpan={12} className="py-10 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
                 ) : rows.map((r, i) => (
-                  <tr key={r.id} onClick={() => openDetail(r)} className="border-b border-theme/40 hover:bg-theme-hover cursor-pointer">
+                  <tr key={r.id} className="border-b border-theme/40 hover:bg-theme-hover">
                     <td className="py-1.5 px-2 text-theme-muted">{faNum(i+1)}</td>
                     <td className="px-2 text-theme-primary whitespace-nowrap">{r.user ? `${r.user.firstName} ${r.user.lastName}` : "—"}</td>
                     <td className="px-2 text-theme-muted" dir="ltr">{r.user?.attendanceCardNo || "—"}</td>
@@ -199,6 +200,12 @@ export default function AttendanceRecordsPage() {
                     <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
                     <td className="px-2 text-amber-600" dir="ltr">{r.delayMinutes ? fmtMin(r.delayMinutes) : "—"}</td>
                     <td className="px-2"><span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[r.status] || "bg-theme-secondary"}`}>{STATUS_FA[r.status] || r.status}</span></td>
+                    <td className="px-2">
+                      <button onClick={() => openDetail(r)} title="مشاهده جزئیات و پانچ‌ها"
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

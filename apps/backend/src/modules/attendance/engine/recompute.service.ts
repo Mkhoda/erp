@@ -51,6 +51,32 @@ export class RecomputeService {
   }
 
   /**
+   * Release a card number from any other user that currently holds it, so it
+   * can be assigned to a new owner without violating the unique constraint.
+   * Detaches their raw punches (set userId=null → re-linked to the new owner)
+   * and removes their computed days. Disabled placeholder users (created by
+   * provision-cards) are deleted; real users just have the card cleared.
+   */
+  async freeCard(cardNo: string, exceptUserId?: string): Promise<void> {
+    if (!cardNo) return;
+    const holders = await this.prisma.user.findMany({
+      where: { attendanceCardNo: cardNo, ...(exceptUserId ? { id: { not: exceptUserId } } : {}) },
+      select: { id: true, disabled: true },
+    });
+    for (const b of holders) {
+      await this.prisma.attendanceDay.deleteMany({ where: { userId: b.id } });
+      await this.prisma.rawAttendanceRecord.updateMany({ where: { userId: b.id }, data: { userId: null } });
+      if (b.disabled) {
+        await this.prisma.user
+          .delete({ where: { id: b.id } })
+          .catch(() => this.prisma.user.update({ where: { id: b.id }, data: { attendanceCardNo: null } }));
+      } else {
+        await this.prisma.user.update({ where: { id: b.id }, data: { attendanceCardNo: null } });
+      }
+    }
+  }
+
+  /**
    * Link + recompute a single user. Called automatically when a card number is
    * assigned/changed in the users panel so attendance appears without a manual
    * "relink" step. Best-effort and idempotent.

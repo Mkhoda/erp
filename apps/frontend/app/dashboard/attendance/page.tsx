@@ -18,7 +18,7 @@ const STATUS_COLOR: Record<string,string> = { PRESENT:"#10b981", LATE:"#f59e0b",
 
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 const faY = (n: number) => (n ?? 0).toLocaleString("fa-IR", { useGrouping: false }); // years: no separator
-const fmtMin = (m: number) => { const h = Math.floor((m||0)/60); const mm = (m||0)%60; return `${faNum(h)}:${String(mm).padStart(2,"0")}`; };
+const fmtMin = (m: number) => { const h = Math.floor((m||0)/60); const mm = (m||0)%60; return `${h}:${String(mm).padStart(2,"0")}`.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]); };
 const fmtHours = (m: number) => `${faNum(Math.round((m||0)/60*10)/10)} ساعت`;
 
 export default function AttendanceDashboardPage() {

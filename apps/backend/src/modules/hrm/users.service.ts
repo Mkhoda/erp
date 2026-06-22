@@ -37,11 +37,11 @@ export class UsersService {
       payload.attendanceCardNo = payload.attendanceCardNo && String(payload.attendanceCardNo).trim() !== ''
         ? String(payload.attendanceCardNo).trim() : null;
     }
-    // Remove any placeholder user that already owns this card number.
+    // Release the card from any existing holder (e.g. a provision-cards
+    // placeholder) — moves its punches/days aside — so the unique constraint
+    // isn't violated. Safe against the AttendanceDay foreign key.
     if (payload.attendanceCardNo) {
-      await this.prisma.user.deleteMany({
-        where: { attendanceCardNo: payload.attendanceCardNo, disabled: true, firstName: 'کارت', phone: null, email: null },
-      });
+      try { await this.recompute.freeCard(payload.attendanceCardNo); } catch { /* ignore */ }
     }
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
@@ -134,19 +134,11 @@ export class UsersService {
       payload.attendanceCardNo = payload.attendanceCardNo && String(payload.attendanceCardNo).trim() !== ''
         ? String(payload.attendanceCardNo).trim() : null;
     }
-    // If assigning a card number, delete any placeholder user that already owns it.
-    // Placeholder users are created by provisionCardsAndRecompute: disabled=true, firstName='کارت', no phone/email.
+    // Assigning a card number: release it from any other holder first (the
+    // provision-cards placeholder), moving its punches aside so they re-link to
+    // this user. Handles the AttendanceDay foreign key safely.
     if (payload.attendanceCardNo) {
-      await this.prisma.user.deleteMany({
-        where: {
-          attendanceCardNo: payload.attendanceCardNo,
-          id: { not: id },         // not the user we're currently updating
-          disabled: true,
-          firstName: 'کارت',
-          phone: null,
-          email: null,
-        },
-      });
+      try { await this.recompute.freeCard(payload.attendanceCardNo, id); } catch { /* ignore */ }
     }
     const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : undefined;
     delete payload.departmentIds;
