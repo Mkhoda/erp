@@ -30,6 +30,7 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
 
   // ── Attendance & Workforce (restricted by dept + role) ──
   { page: '/dashboard/attendance',             label: 'حضور و غیاب' },
+  { page: '/dashboard/attendance/my',          label: 'حضور من' },
   { page: '/dashboard/attendance/records',     label: 'کارکرد روزانه' },
   { page: '/dashboard/attendance/calendar',    label: 'تقویم حضور' },
   { page: '/dashboard/attendance/requests',    label: 'درخواست‌های اصلاح' },

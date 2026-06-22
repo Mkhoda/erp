@@ -677,6 +677,7 @@ model WorkSchedule {
   otMaxDaily     Int      @default(240)
   otMaxMonthly   Int      @default(3600)
   otRounding     Int      @default(15)                 // round OT to nearest N minutes
+  annualLeaveDays Int     @default(26)                 // yearly paid-leave entitlement (days)
   userRules      UserAttendanceRule[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -794,6 +795,8 @@ model AttendanceRequest {
   gregDate     DateTime
   requestedIn  DateTime?
   requestedOut DateTime?
+  // For leave/mission/remote-work declarations — the status to force on approval.
+  targetStatus AttendanceStatus?
   description  String
   attachment   String?
   status       AttnRequestStatus @default(PENDING)

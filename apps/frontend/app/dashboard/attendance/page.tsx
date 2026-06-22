@@ -6,7 +6,7 @@ import {
 } from "recharts";
 import {
   Users, Clock, AlertTriangle, Moon, CalendarCheck, CalendarX,
-  RefreshCw, Loader2, Fingerprint, ArrowLeft, TimerReset, Database, ChevronDown, Stethoscope,
+  Loader2, Fingerprint, ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -32,10 +32,6 @@ export default function AttendanceDashboardPage() {
   const [jMonth, setJMonth] = React.useState<number | null>(null);
   const [deptId, setDeptId] = React.useState("");
   const [loading, setLoading] = React.useState(true);
-  const [relinking, setRelinking] = React.useState(false);
-  const [msg, setMsg] = React.useState<string | null>(null);
-  const [diag, setDiag] = React.useState<any>(null);
-  const [diagOpen, setDiagOpen] = React.useState(false);
   const [periods, setPeriods] = React.useState<Array<{ jYear: number; jMonth: number }>>([]);
 
   const load = React.useCallback(async () => {
@@ -66,37 +62,6 @@ export default function AttendanceDashboardPage() {
     // eslint-disable-next-line
   }, []);
 
-  async function relink() {
-    setRelinking(true); setMsg(null);
-    try {
-      const res = await fetch(`${API}/attendance/maintenance/relink`, { method: "POST", headers: h });
-      const r = await res.json();
-      setMsg(`اتصال انجام شد: ${faNum(r.linked)} پانچ متصل، ${faNum(r.recomputed)} روز محاسبه شد`);
-      await load();
-      await loadDiag();
-    } catch { setMsg("خطا در بازمحاسبه (ممکن است به‌خاطر حجم زیاد طول بکشد — دوباره بزنید)"); }
-    finally { setRelinking(false); setTimeout(() => setMsg(null), 8000); }
-  }
-
-  async function provisionCards() {
-    if (!confirm("برای هر شماره کارتِ بدون کاربر، یک کاربر موقت (غیرفعال) با نام «کارت <شماره>» ساخته می‌شود و کل حضور و غیاب محاسبه می‌گردد. بعداً می‌توانید نام واقعی را در صفحه کاربران ویرایش کنید. ادامه می‌دهید؟")) return;
-    setRelinking(true); setMsg(null);
-    try {
-      const res = await fetch(`${API}/attendance/maintenance/provision-cards`, { method: "POST", headers: h });
-      const r = await res.json();
-      setMsg(`${faNum(r.createdUsers)} کاربر ساخته شد، ${faNum(r.linked)} پانچ متصل، ${faNum(r.recomputed)} روز محاسبه شد (کل خام: ${faNum(r.rawTotal)})`);
-      await load();
-      await loadDiag();
-    } catch { setMsg("خطا در عملیات (ممکن است طول بکشد — دوباره بزنید)"); }
-    finally { setRelinking(false); setTimeout(() => setMsg(null), 10000); }
-  }
-
-  const loadDiag = React.useCallback(async () => {
-    const d = await fetch(`${API}/attendance/maintenance/diagnostics`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null);
-    setDiag(d);
-    // eslint-disable-next-line
-  }, []);
-  React.useEffect(() => { loadDiag(); }, [loadDiag]);
 
   // Data-driven options — only years/months that have data.
   const yearOpts = React.useMemo(() => {
@@ -138,86 +103,8 @@ export default function AttendanceDashboardPage() {
             {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
           <Link href="/dashboard/attendance/records" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> کارکرد روزانه</Link>
-          <button onClick={provisionCards} disabled={relinking} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50" title="ساخت خودکار کاربر برای هر شماره کارت و محاسبه کامل">
-            {relinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />} ساخت کاربر از کارت‌ها
-          </button>
-          <button onClick={relink} disabled={relinking} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50" title="اتصال پانچ‌های وارد‌شده به کاربران دارای کد کارت و بازمحاسبه">
-            {relinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} اتصال و بازمحاسبه
-          </button>
         </div>
       </div>
-      {msg && <div className="text-sm text-green-600 bg-green-500/10 rounded-lg px-3 py-2">{msg}</div>}
-
-      {/* Data diagnostics — shown prominently when there is raw data but no computed days */}
-      {diag && (
-        <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
-          <button onClick={() => setDiagOpen(o => !o)} className="w-full flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Stethoscope className="w-4 h-4 text-blue-500" />
-              <span className="font-semibold text-theme-primary">بررسی وضعیت داده</span>
-              <span className="text-theme-muted">
-                خام: {faNum(diag.rawTotal)} · متصل: {faNum(diag.rawMapped)} · بدون‌کاربر: {faNum(diag.rawUnmapped)} · روزهای محاسبه‌شده: {faNum(diag.dayTotal)} · کاربران دارای کارت: {faNum(diag.usersWithCard)}
-              </span>
-            </div>
-            <ChevronDown className={`w-4 h-4 text-theme-muted transition-transform ${diagOpen ? "rotate-180" : ""}`} />
-          </button>
-
-          {diag.rawTotal > 0 && diag.dayTotal === 0 && (
-            <div className="mx-4 mb-3 text-sm text-amber-700 bg-amber-500/10 rounded-lg p-3">
-              {diag.usersWithCard === 0
-                ? "هیچ کاربری کد کارت ندارد. ابتدا در صفحه «کاربران» برای هر فرد «کد کارت» را برابر همان CardNo دستگاه بگذارید، سپس «اتصال و بازمحاسبه» را بزنید. لیست کارت‌های موجود در دستگاه را در جدول پایین می‌بینید."
-                : "کاربران دارای کارت هستند اما هیچ پانچی متصل نشده — یعنی کد کارت‌ها با CardNo دستگاه دقیقاً یکی نیستند. مقادیر ستون «کد کارت» جدول پایین را عیناً در پروفایل کاربران وارد کنید، سپس «اتصال و بازمحاسبه»."}
-            </div>
-          )}
-
-          {diagOpen && (
-            <div className="px-4 pb-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Card list from device */}
-              <div>
-                <div className="text-xs font-semibold text-theme-secondary mb-2 flex items-center gap-1"><Database className="w-3.5 h-3.5" /> کارت‌های موجود در دستگاه</div>
-                <div className="max-h-64 overflow-y-auto border border-theme rounded-lg">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-theme-card"><tr className="text-theme-muted text-right border-b border-theme">
-                      <th className="py-1.5 px-2 font-medium">کد کارت</th><th className="font-medium px-2">تعداد پانچ</th><th className="font-medium px-2">وضعیت</th>
-                    </tr></thead>
-                    <tbody>
-                      {diag.cards.map((c: any) => (
-                        <tr key={c.cardNo} className="border-b border-theme/40">
-                          <td className="py-1 px-2 text-theme-primary" dir="ltr">{c.cardNo}</td>
-                          <td className="px-2 text-theme-muted">{faNum(c.count)}</td>
-                          <td className="px-2">{c.mapped ? <span className="text-green-600">متصل</span> : <span className="text-red-500">بدون کاربر</span>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              {/* Sample raw rows — verify date parsing */}
-              <div>
-                <div className="text-xs font-semibold text-theme-secondary mb-2 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> نمونه پانچ‌های خام (بررسی تاریخ)</div>
-                <div className="max-h-64 overflow-y-auto border border-theme rounded-lg">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-theme-card"><tr className="text-theme-muted text-right border-b border-theme">
-                      <th className="py-1.5 px-2 font-medium">کارت</th><th className="font-medium px-2">mDate</th><th className="font-medium px-2">RTime</th><th className="font-medium px-2">تاریخ تشخیص</th><th className="font-medium px-2">ساعت</th>
-                    </tr></thead>
-                    <tbody>
-                      {diag.sample.map((s: any, i: number) => (
-                        <tr key={i} className="border-b border-theme/40">
-                          <td className="py-1 px-2 text-theme-primary" dir="ltr">{s.cardNo}</td>
-                          <td className="px-2 text-theme-muted" dir="ltr">{s.mDate || "—"}</td>
-                          <td className="px-2 text-theme-muted" dir="ltr">{s.rTime || "—"}</td>
-                          <td className="px-2 text-theme-primary" dir="ltr">{s.parsedJalali}</td>
-                          <td className="px-2 text-theme-primary" dir="ltr">{s.parsedTime}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>

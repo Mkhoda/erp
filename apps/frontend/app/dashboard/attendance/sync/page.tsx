@@ -3,8 +3,10 @@ import React from "react";
 import { motion } from "framer-motion";
 import {
   RefreshCw, Play, CheckCircle2, XCircle, Loader2, AlertTriangle,
-  Activity, Database, Clock,
+  Activity, Database, Clock, ChevronDown, Stethoscope, Users, TimerReset,
 } from "lucide-react";
+
+const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -75,6 +77,37 @@ export default function SyncMonitorPage() {
     } finally { setRunningId(null); }
   }
 
+  // ── Data maintenance (moved here from the dashboard) ──
+  const [diag, setDiag] = React.useState<any>(null);
+  const [diagOpen, setDiagOpen] = React.useState(false);
+  const [maintBusy, setMaintBusy] = React.useState(false);
+  const [maintMsg, setMaintMsg] = React.useState<string | null>(null);
+
+  const loadDiag = React.useCallback(async () => {
+    const d = await fetch(`${API}/attendance/maintenance/diagnostics`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null);
+    setDiag(d);
+    // eslint-disable-next-line
+  }, []);
+  React.useEffect(() => { loadDiag(); }, [loadDiag]);
+
+  async function relink() {
+    setMaintBusy(true); setMaintMsg(null);
+    try {
+      const r = await fetch(`${API}/attendance/maintenance/relink`, { method: "POST", headers: h }).then(x => x.json());
+      setMaintMsg(`${faNum(r.linked)} پانچ متصل، ${faNum(r.recomputed)} روز محاسبه شد`);
+      await loadDiag();
+    } catch { setMaintMsg("خطا در عملیات"); } finally { setMaintBusy(false); setTimeout(() => setMaintMsg(null), 8000); }
+  }
+  async function provisionCards() {
+    if (!confirm("برای هر شماره کارتِ بدون کاربر، یک کاربر موقت (غیرفعال) ساخته می‌شود و کل حضور و غیاب محاسبه می‌گردد. ادامه می‌دهید؟")) return;
+    setMaintBusy(true); setMaintMsg(null);
+    try {
+      const r = await fetch(`${API}/attendance/maintenance/provision-cards`, { method: "POST", headers: h }).then(x => x.json());
+      setMaintMsg(`${faNum(r.createdUsers)} کاربر ساخته شد، ${faNum(r.linked)} پانچ متصل، ${faNum(r.recomputed)} روز محاسبه شد (کل خام: ${faNum(r.rawTotal)})`);
+      await loadDiag();
+    } catch { setMaintMsg("خطا در عملیات"); } finally { setMaintBusy(false); setTimeout(() => setMaintMsg(null), 10000); }
+  }
+
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
 
   return (
@@ -88,6 +121,56 @@ export default function SyncMonitorPage() {
           </div>
         </div>
         <button onClick={load} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary text-sm"><RefreshCw className="w-4 h-4" /> بروزرسانی</button>
+      </div>
+
+      {/* Data maintenance */}
+      <div className="bg-theme-card border border-theme rounded-xl p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-theme-primary text-sm flex items-center gap-2"><Database className="w-4 h-4 text-blue-500" /> نگهداری و اطلاعات داده</h2>
+          <div className="flex items-center gap-2">
+            <button onClick={provisionCards} disabled={maintBusy} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50">
+              {maintBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />} ساخت کاربر از کارت‌ها
+            </button>
+            <button onClick={relink} disabled={maintBusy} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50">
+              {maintBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} اتصال و بازمحاسبه
+            </button>
+          </div>
+        </div>
+        {maintMsg && <div className="text-sm text-green-600 bg-green-500/10 rounded-lg px-3 py-2">{maintMsg}</div>}
+        {diag && (
+          <div className="border border-theme rounded-lg">
+            <button onClick={() => setDiagOpen(o => !o)} className="w-full flex items-center justify-between px-3 py-2">
+              <span className="text-xs text-theme-muted flex items-center gap-1"><Stethoscope className="w-3.5 h-3.5 text-blue-500" /> خام: {faNum(diag.rawTotal)} · متصل: {faNum(diag.rawMapped)} · بدون‌کاربر: {faNum(diag.rawUnmapped)} · روزها: {faNum(diag.dayTotal)} · کاربران دارای کارت: {faNum(diag.usersWithCard)}</span>
+              <ChevronDown className={`w-4 h-4 text-theme-muted transition-transform ${diagOpen ? "rotate-180" : ""}`} />
+            </button>
+            {diagOpen && (
+              <div className="px-3 pb-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs font-semibold text-theme-secondary mb-1">کارت‌های دستگاه</div>
+                  <div className="max-h-56 overflow-y-auto border border-theme rounded-lg">
+                    <table className="w-full text-xs text-center">
+                      <thead className="sticky top-0 bg-theme-card"><tr className="text-theme-muted border-b border-theme"><th className="py-1.5 px-2 font-medium">کد کارت</th><th className="px-2 font-medium">پانچ</th><th className="px-2 font-medium">وضعیت</th></tr></thead>
+                      <tbody>{diag.cards.map((c: any) => (
+                        <tr key={c.cardNo} className="border-b border-theme/40"><td className="py-1 px-2 text-theme-primary" dir="ltr">{c.cardNo}</td><td className="px-2 text-theme-muted">{faNum(c.count)}</td><td className="px-2">{c.mapped ? <span className="text-green-600">متصل</span> : <span className="text-red-500">بدون کاربر</span>}</td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-theme-secondary mb-1">نمونه پانچ خام</div>
+                  <div className="max-h-56 overflow-y-auto border border-theme rounded-lg">
+                    <table className="w-full text-xs text-center">
+                      <thead className="sticky top-0 bg-theme-card"><tr className="text-theme-muted border-b border-theme"><th className="py-1.5 px-2 font-medium">کارت</th><th className="px-2 font-medium">mDate</th><th className="px-2 font-medium">تاریخ</th><th className="px-2 font-medium">ساعت</th></tr></thead>
+                      <tbody>{diag.sample.map((s: any, i: number) => (
+                        <tr key={i} className="border-b border-theme/40"><td className="py-1 px-2 text-theme-primary" dir="ltr">{s.cardNo}</td><td className="px-2 text-theme-muted" dir="ltr">{s.mDate || "—"}</td><td className="px-2 text-theme-primary" dir="ltr">{s.parsedJalali}</td><td className="px-2 text-theme-primary" dir="ltr">{s.parsedTime}</td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {status.length === 0 && (

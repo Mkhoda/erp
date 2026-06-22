@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import {
-  FileSpreadsheet, FileText, Loader2, Search, X, Clock, Fingerprint, ArrowLeft, Eye,
+  FileSpreadsheet, FileText, Loader2, Search, X, Clock, Fingerprint, ArrowLeft, Eye, Pencil,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import Link from "next/link";
@@ -37,6 +37,9 @@ export default function AttendanceRecordsPage() {
   const [loading, setLoading] = React.useState(true);
   const [detail, setDetail] = React.useState<any>(null);
   const [exporting, setExporting] = React.useState<string | null>(null);
+  // Admin edit (override) form in the detail modal.
+  const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string }>({ inTime: "", outTime: "", status: "", reason: "" });
+  const [ovSaving, setOvSaving] = React.useState(false);
 
   // 0 = "all" (no filter) — default shows every computed day so data always
   // appears if it exists; the user narrows down from there.
@@ -78,10 +81,30 @@ export default function AttendanceRecordsPage() {
     // eslint-disable-next-line
   }, []);
 
+  const toHHmm = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran", hour12: false }) : "";
+
   async function openDetail(row: any) {
     const date = row.gregDate.slice(0, 10);
     const d = await fetch(`${API}/attendance/records/day?userId=${row.userId}&date=${date}`, { headers: h }).then(r => r.ok ? r.json() : null);
+    setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "" });
     setDetail({ row, ...d });
+  }
+
+  async function saveOverride() {
+    if (!detail) return;
+    setOvSaving(true);
+    try {
+      const body = {
+        userId: detail.row.userId,
+        date: detail.row.gregDate.slice(0, 10),
+        inTime: ov.inTime || undefined,
+        outTime: ov.outTime || undefined,
+        forceStatus: ov.status || undefined,
+        reason: ov.reason || "اصلاح توسط مدیر",
+      };
+      const res = await fetch(`${API}/attendance/overrides`, { method: "POST", headers: h, body: JSON.stringify(body) });
+      if (res.ok) { setDetail(null); await load(); }
+    } finally { setOvSaving(false); }
   }
 
   async function exportFile(kind: "excel" | "pdf") {
@@ -245,6 +268,26 @@ export default function AttendanceRecordsPage() {
               {(!detail.punches || detail.punches.length === 0) && <div className="text-theme-muted text-sm">پانچی ثبت نشده</div>}
             </div>
             {detail.override && <div className="mt-3 text-xs text-amber-600 bg-amber-500/10 rounded-lg p-2">اصلاح دستی توسط {detail.override.createdBy?.firstName} {detail.override.createdBy?.lastName}: {detail.override.reason}</div>}
+
+            {/* Admin edit (override) */}
+            <div className="mt-4 border-t border-theme pt-3">
+              <div className="text-sm font-medium text-theme-secondary mb-2 flex items-center gap-1"><Pencil className="w-4 h-4" /> اصلاح ساعت ورود/خروج</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className="block mb-1 text-theme-secondary text-xs">ورود</label><input type="time" dir="ltr" value={ov.inTime} onChange={e => setOv(s => ({ ...s, inTime: e.target.value }))} className="input-theme text-sm" /></div>
+                <div><label className="block mb-1 text-theme-secondary text-xs">خروج</label><input type="time" dir="ltr" value={ov.outTime} onChange={e => setOv(s => ({ ...s, outTime: e.target.value }))} className="input-theme text-sm" /></div>
+                <div><label className="block mb-1 text-theme-secondary text-xs">وضعیت (اختیاری)</label>
+                  <select value={ov.status} onChange={e => setOv(s => ({ ...s, status: e.target.value }))} className="input-theme text-sm">
+                    <option value="">— خودکار —</option>
+                    {["PRESENT","LEAVE","MISSION","REMOTE_WORK","ABSENT"].map(s => <option key={s} value={s}>{STATUS_FA[s]}</option>)}
+                  </select>
+                </div>
+                <div><label className="block mb-1 text-theme-secondary text-xs">دلیل</label><input value={ov.reason} onChange={e => setOv(s => ({ ...s, reason: e.target.value }))} className="input-theme text-sm" placeholder="دلیل اصلاح" /></div>
+              </div>
+              <button onClick={saveOverride} disabled={ovSaving} className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
+                {ovSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />} ذخیره اصلاح
+              </button>
+              <p className="mt-1 text-[11px] text-theme-muted">این اصلاح ثبت می‌شود و در پایش مجدد از بین نمی‌رود.</p>
+            </div>
           </div>
         )}
       </Modal>

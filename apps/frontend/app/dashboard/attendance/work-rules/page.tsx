@@ -109,6 +109,12 @@ export default function WorkRulesPage() {
         <p className="text-[11px] text-theme-muted mt-2">روزهای انتخاب‌نشده «آخر هفته» محسوب می‌شوند.</p>
       </Section>
 
+      <Section title="مرخصی" icon={CalendarDays}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="مرخصی استحقاقی سالانه (روز)"><input type="number" className={inputCls} value={form.annualLeaveDays ?? ""} onChange={e => set("annualLeaveDays", +e.target.value)} /></Field>
+        </div>
+      </Section>
+
       <Section title="اضافه‌کار" icon={SlidersHorizontal}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="حداقل آستانه (دقیقه)" hint="کمتر از این، اضافه‌کار حساب نمی‌شود"><input type="number" className={inputCls} value={form.otMinThreshold ?? ""} onChange={e => set("otMinThreshold", +e.target.value)} /></Field>

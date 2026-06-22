@@ -31,7 +31,7 @@ export class SchedulesService {
     const strFields = ['startTime', 'endTime', 'flexInStart', 'flexInEnd'];
     const intFields = [
       'dailyMinutes', 'weeklyMinutes', 'lunchMinutes', 'graceMinutes',
-      'otMinThreshold', 'otMaxDaily', 'otMaxMonthly', 'otRounding',
+      'otMinThreshold', 'otMaxDaily', 'otMaxMonthly', 'otRounding', 'annualLeaveDays',
     ];
     for (const k of strFields) if (k in dto) data[k] = dto[k] || null;
     for (const k of intFields) if (k in dto && dto[k] != null && dto[k] !== '') data[k] = Math.round(+dto[k]);
