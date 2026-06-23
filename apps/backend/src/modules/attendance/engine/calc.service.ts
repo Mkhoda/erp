@@ -83,6 +83,7 @@ export class CalcService {
       if (rule.dailyMinutes != null) s.dailyMinutes = rule.dailyMinutes;
       if ((rule as any).checkInEnd) s.checkInEnd = parseHHmm((rule as any).checkInEnd) ?? s.checkInEnd;
       if ((rule as any).checkOutStart) s.checkOutStart = parseHHmm((rule as any).checkOutStart) ?? s.checkOutStart;
+      if ((rule as any).checkOutEnd) s.endMin = parseHHmm((rule as any).checkOutEnd) ?? s.endMin;
       if (rule.otMaxDaily != null) s.otMaxDaily = rule.otMaxDaily;
       if (rule.otMaxMonthly != null) s.otMaxMonthly = rule.otMaxMonthly;
       s.otAllowed = rule.otAllowed;
@@ -162,17 +163,22 @@ export class CalcService {
       delayMinutes = Math.max(0, inMin - sched.checkInEnd);
       earlyLeaveMinutes = Math.max(0, sched.checkOutStart - outMin);
 
-      // Overtime is measured from the END of the required shift: a late arrival is
-      // covered separately by leave, so it must NOT eat into overtime. We add the
-      // leave-covered late minutes back before comparing against the required daily
-      // total — staying past the required end is overtime regardless of a late start.
-      // (e.g. start 08:30, required 560 → ends 17:50; leaving 18:32 ⇒ 42m OT even
-      //  if the person arrived 23m late, since that 23m is booked as leave.)
-      const extra = workedMinutes + delayMinutes - sched.dailyMinutes;
+      // Overtime is the GREATER of two measures, so it works whether a schedule is
+      // configured around a fixed end-time or a required duration:
+      //   (a) time worked past the defined end-of-shift (checkOutEnd). Leaving late
+      //       earns overtime regardless of arrival time — e.g. checkOutEnd 17:50,
+      //       leaving 18:32 ⇒ 42m, even if the person clocked in late.
+      //   (b) net minutes beyond the required daily total. A late arrival is covered
+      //       separately by leave, so it is added back and never reduces overtime —
+      //       e.g. required 420, present 563 ⇒ 143m.
+      const otPastEnd = outMin - sched.endMin;
+      const otBeyondRequired = workedMinutes + delayMinutes - sched.dailyMinutes;
+      const extra = Math.max(otPastEnd, otBeyondRequired);
       if (sched.otAllowed && extra >= sched.otMinThreshold) {
         const rounded = sched.otRounding > 0
           ? Math.floor(extra / sched.otRounding) * sched.otRounding : extra;
-        overtimeMinutes = Math.min(rounded, sched.otMaxDaily);
+        // otMaxDaily === 0 means "no daily cap" (unlimited), matching otMaxMonthly.
+        overtimeMinutes = sched.otMaxDaily > 0 ? Math.min(rounded, sched.otMaxDaily) : rounded;
       }
 
       // Night minutes = overlap with 22:00–06:00 (next day window 22:00–30:00)
