@@ -162,8 +162,13 @@ export class CalcService {
       delayMinutes = Math.max(0, inMin - sched.checkInEnd);
       earlyLeaveMinutes = Math.max(0, sched.checkOutStart - outMin);
 
-      // Overtime (only beyond required, above threshold, rounded, capped daily)
-      const extra = workedMinutes - sched.dailyMinutes;
+      // Overtime is measured from the END of the required shift: a late arrival is
+      // covered separately by leave, so it must NOT eat into overtime. We add the
+      // leave-covered late minutes back before comparing against the required daily
+      // total — staying past the required end is overtime regardless of a late start.
+      // (e.g. start 08:30, required 560 → ends 17:50; leaving 18:32 ⇒ 42m OT even
+      //  if the person arrived 23m late, since that 23m is booked as leave.)
+      const extra = workedMinutes + delayMinutes - sched.dailyMinutes;
       if (sched.otAllowed && extra >= sched.otMinThreshold) {
         const rounded = sched.otRounding > 0
           ? Math.floor(extra / sched.otRounding) * sched.otRounding : extra;
@@ -182,12 +187,13 @@ export class CalcService {
       earlyLeaveMinutes = 0;
     }
 
-    // Monthly overtime cap: clamp so the month's total OT (incl. this day) does
-    // not exceed otMaxMonthly. Days recompute ascending, so prior days reflect
-    // already-committed OT.
+    // Monthly overtime cap: clamp so the month's running OT total does not exceed
+    // otMaxMonthly. Only EARLIER days in the month count toward "used" so the cap
+    // accrues ascending and a single-day recompute stays stable (a later day's OT
+    // must never retroactively zero out an earlier day).
     if (overtimeMinutes > 0 && sched.otMaxMonthly > 0) {
       const prior = await this.prisma.attendanceDay.aggregate({
-        where: { userId, jYear, jMonth, gregDate: { not: gregDate } },
+        where: { userId, jYear, jMonth, gregDate: { lt: gregDate } },
         _sum: { overtimeMinutes: true },
       });
       const used = prior._sum.overtimeMinutes ?? 0;

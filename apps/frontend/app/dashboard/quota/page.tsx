@@ -2,6 +2,7 @@
 import React from "react";
 import { Shield, Users, RotateCcw, Settings, Plus, Trash2, CheckCircle, TrendingUp, Zap, Cpu } from "lucide-react";
 import Modal from "../../components/ui/Modal";
+import SearchSelect from "../../components/ui/SearchSelect";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -344,15 +345,22 @@ export default function QuotaPage() {
             <>
               <div>
                 <label className="block text-xs font-medium text-theme-secondary mb-1.5">کاربر</label>
-                <select value={userModal?.userId || ""} onChange={e => setUserModal(m => m ? { ...m, userId: e.target.value } : null)} className="select-theme text-sm">
-                  {users.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName} {u.phone ? `— ${u.phone}` : ""}</option>)}
-                </select>
+                <SearchSelect
+                  options={users.map((u: any) => ({ id: u.id, name: `${u.firstName} ${u.lastName}${u.phone ? ` — ${u.phone}` : ""}`, search: `${u.firstName} ${u.lastName} ${u.phone || ""}` }))}
+                  value={userModal?.userId || ""}
+                  onChange={id => setUserModal(m => m ? { ...m, userId: id } : null)}
+                  searchKey="search"
+                  placeholder="انتخاب کاربر"
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-theme-secondary mb-1.5">مدل</label>
-                <select value={userModal?.providerId || ""} onChange={e => setUserModal(m => m ? { ...m, providerId: e.target.value } : null)} className="select-theme text-sm">
-                  {providers.map(p => <option key={p.id} value={p.id}>{modelLabel(p)}</option>)}
-                </select>
+                <SearchSelect
+                  options={providers.map(p => ({ id: p.id, name: modelLabel(p) }))}
+                  value={userModal?.providerId || ""}
+                  onChange={id => setUserModal(m => m ? { ...m, providerId: id } : null)}
+                  placeholder="انتخاب مدل"
+                />
               </div>
             </>
           ) : (

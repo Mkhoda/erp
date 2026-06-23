@@ -2,54 +2,11 @@
 import React from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Copy, QrCode, Barcode as BarcodeIcon, Plus, Users, Building, Layers, Home, ClipboardList, Pencil, X, ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Copy, QrCode, Barcode as BarcodeIcon, Plus, Users, Building, Layers, Home, ClipboardList, Pencil, X } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
+import SearchSelect from '../../../components/ui/SearchSelect';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
-
-function SearchSelect({ options, value, onChange, placeholder, displayKey = 'name', valueKey = 'id' }: {
-  options: any[]; value?: string; onChange: (id: string) => void; placeholder?: string; displayKey?: string; valueKey?: string;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [q, setQ] = React.useState('');
-  const ref = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h);
-  }, []);
-  const selected = options.find(o => String(o[valueKey]) === String(value));
-  const filtered = options.filter(o => String(o[displayKey] || '').toLowerCase().includes(q.toLowerCase()));
-  return (
-    <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen(v => !v)} className="input-theme flex justify-between items-center text-sm">
-        <span className="truncate text-right">{selected ? String(selected[displayKey]) : (placeholder || 'انتخاب کنید')}</span>
-        <ChevronDown className="w-4 h-4 text-theme-muted shrink-0" />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-            className="top-full z-50 absolute inset-x-0 bg-theme-primary shadow-2xl mt-1 border border-theme rounded-xl overflow-hidden">
-            <div className="p-2 border-theme border-b">
-              <input autoFocus placeholder="جستجو..." value={q} onChange={e => setQ(e.target.value)} className="input-theme text-xs py-1.5" />
-            </div>
-            <ul className="max-h-48 overflow-auto text-sm">
-              {filtered.map(opt => (
-                <li key={String(opt[valueKey])}>
-                  <button type="button" onClick={() => { onChange(String(opt[valueKey])); setOpen(false); }}
-                    className={`flex w-full items-center px-3 py-2 text-right hover:bg-theme-hover transition-colors ${String(opt[valueKey]) === String(value) ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300' : 'text-theme-secondary'}`}>
-                    <span className="truncate">{String(opt[displayKey])}</span>
-                  </button>
-                </li>
-              ))}
-              {!filtered.length && <li className="px-3 py-2 text-theme-muted text-xs">یافت نشد</li>}
-            </ul>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 export default function AssetDetailPage() {
   const params = useParams();

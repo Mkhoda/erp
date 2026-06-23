@@ -75,6 +75,8 @@ export default function UsersPage() {
   const [saving, setSaving]                 = React.useState(false);
   const [showNewPwd, setShowNewPwd]         = React.useState(false);
   const [showPwdField, setShowPwdField]     = React.useState(false);
+  const [page, setPage]                     = React.useState(1);
+  const [pageSize, setPageSize]             = React.useState(25);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = () => ({ Authorization: `Bearer ${token}` });
@@ -111,6 +113,11 @@ export default function UsersPage() {
     const matchDept = !departmentFilter || u.userDepartments?.some(x => x.departmentId === departmentFilter);
     return matchQ && matchRole && matchDept;
   });
+
+  // Paging (same "show count" + prev/next as the attendance records grid).
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  React.useEffect(() => { setPage(1); }, [query, roleFilter, departmentFilter, showDisabled, pageSize]);
 
   // Stats
   const active    = users.filter(u => !u.disabled).length;
@@ -264,7 +271,7 @@ export default function UsersPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <EmptyStateRow icon={UsersIcon} title="کاربری یافت نشد" description={query ? "عبارت جستجو را تغییر دهید" : undefined} actionLabel={!query ? "افزودن کاربر" : undefined} onAction={!query ? onAdd : undefined} colSpan={7} />
-                  ) : filtered.map(u => (
+                  ) : paged.map(u => (
                     <tr key={u.id} className={u.disabled ? "opacity-55" : ""}>
                       {/* Name + email */}
                       <td>
@@ -342,7 +349,7 @@ export default function UsersPage() {
             <SkeletonCards count={6} />
           ) : filtered.length === 0 ? (
             <EmptyStateBox icon={UsersIcon} title="کاربری یافت نشد" actionLabel={!query ? "افزودن کاربر" : undefined} onAction={!query ? onAdd : undefined} />
-          ) : filtered.map(u => (
+          ) : paged.map(u => (
             <div key={u.id} className={`card-theme ${u.disabled ? "opacity-60" : ""}`}>
               <div className="card-theme-body">
                 {/* Avatar + name + role */}
@@ -408,6 +415,24 @@ export default function UsersPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && filtered.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
+          <div className="flex items-center gap-2 text-theme-muted">
+            <span>نمایش</span>
+            <select value={pageSize} onChange={e => setPageSize(+e.target.value)} className="input-theme text-sm w-auto py-1">
+              {[25, 50, 100, 200].map(n => <option key={n} value={n}>{n.toLocaleString("fa-IR")}</option>)}
+            </select>
+            <span>از {filtered.length.toLocaleString("fa-IR")} کاربر</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 rounded-lg bg-theme-secondary border border-theme text-theme-primary disabled:opacity-40">قبلی</button>
+            <span className="text-theme-muted">صفحه {page.toLocaleString("fa-IR")} از {totalPages.toLocaleString("fa-IR")}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 rounded-lg bg-theme-secondary border border-theme text-theme-primary disabled:opacity-40">بعدی</button>
+          </div>
         </div>
       )}
 

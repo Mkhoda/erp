@@ -20,8 +20,15 @@ export class RecomputeService {
     for (const p of pairs) {
       seen.set(`${p.userId}|${p.gregDate.toISOString()}`, p);
     }
+    // Compute per-user ascending by date so the monthly overtime cap (which only
+    // counts earlier days) accrues correctly regardless of the caller's order.
+    const ordered = [...seen.values()].sort((a, b) =>
+      a.userId === b.userId
+        ? a.gregDate.getTime() - b.gregDate.getTime()
+        : a.userId < b.userId ? -1 : 1,
+    );
     let n = 0;
-    for (const { userId, gregDate } of seen.values()) {
+    for (const { userId, gregDate } of ordered) {
       try {
         await this.calc.computeDay(userId, gregDate);
         n++;

@@ -14,6 +14,12 @@ const fmtMin = (m: number) => toFa(`${Math.floor(Math.abs(m||0)/60)}:${String(Ma
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
 
+// Current Jalali year/month (Tehran) — used to default the filters on load.
+function currentJalali() {
+  const p = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", timeZone: "Asia/Tehran" }).formatToParts(new Date());
+  return { jYear: +(p.find(x => x.type === "year")?.value || 0), jMonth: +(p.find(x => x.type === "month")?.value || 0) };
+}
+
 export default function MyAttendancePage() {
   React.useEffect(() => { document.title = "حضور من | Arzesh"; }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -24,9 +30,12 @@ export default function MyAttendancePage() {
   const [periods, setPeriods] = React.useState<Array<{ jYear: number; jMonth: number }>>([]);
   const [myReqs, setMyReqs] = React.useState<any[]>([]);
   const [leave, setLeave] = React.useState<any>(null);
-  const [jYear, setJYear] = React.useState(0);
-  const [jMonth, setJMonth] = React.useState(0);
+  const [jYear, setJYear] = React.useState(() => currentJalali().jYear);
+  const [jMonth, setJMonth] = React.useState(() => currentJalali().jMonth);
   const [loading, setLoading] = React.useState(true);
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+  React.useEffect(() => { setPage(1); }, [jYear, jMonth, pageSize, rows.length]);
   const [modal, setModal] = React.useState<any>(null); // { row }
   const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", fixIn: false, inTime: "", fixOut: false, outTime: "", description: "" });
   const [sending, setSending] = React.useState(false);
@@ -60,8 +69,8 @@ export default function MyAttendancePage() {
     // eslint-disable-next-line
   }, []);
 
-  const yearOpts = [...new Set(periods.map(p => p.jYear))].sort((a, b) => b - a);
-  const monthOpts = [...new Set(periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth))].sort((a, b) => a - b);
+  const yearOpts = [...new Set([...(jYear ? [jYear] : []), ...periods.map(p => p.jYear)])].sort((a, b) => b - a);
+  const monthOpts = [...new Set([...(jMonth ? [jMonth] : []), ...periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth)])].sort((a, b) => a - b);
 
   function openRequest(row: any) {
     const hasIn = !!row.firstCheckIn, hasOut = !!row.lastCheckOut;
@@ -156,7 +165,7 @@ export default function MyAttendancePage() {
                 <th className="px-2 font-medium">وضعیت</th><th className="px-2 font-medium">درخواست</th>
               </tr></thead>
               <tbody>
-                {rows.length === 0 ? <tr><td colSpan={8} className="py-10 text-theme-muted">رکوردی نیست</td></tr> : rows.map(r => {
+                {rows.length === 0 ? <tr><td colSpan={8} className="py-10 text-theme-muted">رکوردی نیست</td></tr> : rows.slice((page-1)*pageSize, page*pageSize).map(r => {
                   const needsResolve = r.status === "INCOMPLETE" || r.status === "ABSENT";
                   const isPending = pendingDates.has(r.gregDate.slice(0, 10));
                   return (
@@ -183,6 +192,23 @@ export default function MyAttendancePage() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        {/* Pagination */}
+        {!loading && rows.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 border-t border-theme text-sm">
+            <div className="flex items-center gap-2 text-theme-muted">
+              <span>نمایش</span>
+              <select value={pageSize} onChange={e => setPageSize(+e.target.value)} className="input-theme text-sm w-auto py-1">
+                {[25, 50, 100, 200].map(n => <option key={n} value={n}>{faNum(n)}</option>)}
+              </select>
+              <span>از {faNum(rows.length)} رکورد</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 rounded-lg bg-theme-secondary border border-theme text-theme-primary disabled:opacity-40">قبلی</button>
+              <span className="text-theme-muted">صفحه {faNum(page)} از {faNum(Math.max(1, Math.ceil(rows.length / pageSize)))}</span>
+              <button disabled={page >= Math.ceil(rows.length / pageSize)} onClick={() => setPage(p => p + 1)} className="px-3 py-1 rounded-lg bg-theme-secondary border border-theme text-theme-primary disabled:opacity-40">بعدی</button>
+            </div>
           </div>
         )}
       </div>

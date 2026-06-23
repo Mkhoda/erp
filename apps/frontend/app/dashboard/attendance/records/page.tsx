@@ -1,9 +1,10 @@
 "use client";
 import React from "react";
 import {
-  FileSpreadsheet, FileText, Loader2, Search, X, Clock, Fingerprint, ArrowLeft, Eye, Pencil,
+  FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, Pencil,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import SearchSelect from "../../../components/ui/SearchSelect";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -23,6 +24,12 @@ const toFa = (s: string) => s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d
 const fmtMin = (m: number) => { const h = Math.floor(Math.abs(m||0)/60); const mm = Math.abs(m||0)%60; return toFa(`${m<0?"-":""}${h}:${String(mm).padStart(2,"0")}`); };
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
+
+// Current Jalali year/month (Tehran) — used to default the filters on load.
+function currentJalali() {
+  const p = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", timeZone: "Asia/Tehran" }).formatToParts(new Date());
+  return { jYear: +(p.find(x => x.type === "year")?.value || 0), jMonth: +(p.find(x => x.type === "month")?.value || 0) };
+}
 
 export default function AttendanceRecordsPage() {
   React.useEffect(() => { document.title = "کارکرد روزانه | Arzesh"; }, []);
@@ -46,14 +53,12 @@ export default function AttendanceRecordsPage() {
   const [pageSize, setPageSize] = React.useState(50);
   React.useEffect(() => { setPage(1); }, [rows, pageSize]);
 
-  // 0 = "all" (no filter) — default shows every computed day so data always
-  // appears if it exists; the user narrows down from there.
-  const [jYear, setJYear] = React.useState<number>(0);
-  const [jMonth, setJMonth] = React.useState<number>(0);
+  // Default to the current Jalali month/year on load (0 = "all" once cleared).
+  const [jYear, setJYear] = React.useState<number>(() => currentJalali().jYear);
+  const [jMonth, setJMonth] = React.useState<number>(() => currentJalali().jMonth);
   const [deptId, setDeptId] = React.useState("");
   const [userId, setUserId] = React.useState("");
   const [status, setStatus] = React.useState("");
-  const [personQuery, setPersonQuery] = React.useState("");
 
   const qs = React.useCallback(() => {
     const p = new URLSearchParams();
@@ -133,13 +138,15 @@ export default function AttendanceRecordsPage() {
   }
 
   // Data-driven options: only years/months that actually have records.
-  const yearOpts = [...new Set(periods.map(p => p.jYear))].sort((a, b) => b - a);
-  const monthOpts = [...new Set(periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth))].sort((a, b) => a - b);
-  const personFiltered = users.filter((u: any) => {
-    if (!personQuery) return true;
-    const s = `${u.firstName} ${u.lastName} ${u.phone || ""} ${u.attendanceCardNo || ""}`.toLowerCase();
-    return s.includes(personQuery.toLowerCase());
-  }).slice(0, 50);
+  // Always include the currently-selected year/month so the default filter shows
+  // even before its data has loaded into `periods`.
+  const yearOpts = [...new Set([...(jYear ? [jYear] : []), ...periods.map(p => p.jYear)])].sort((a, b) => b - a);
+  const monthOpts = [...new Set([...(jMonth ? [jMonth] : []), ...periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth)])].sort((a, b) => a - b);
+  const personOptions = users.map((u: any) => ({
+    id: u.id,
+    name: `${u.firstName} ${u.lastName}${u.attendanceCardNo ? ` (${u.attendanceCardNo})` : ""}`,
+    search: `${u.firstName} ${u.lastName} ${u.phone || ""} ${u.attendanceCardNo || ""}`,
+  }));
 
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-4" dir="rtl">
@@ -181,14 +188,15 @@ export default function AttendanceRecordsPage() {
           <option value="">همه وضعیت‌ها</option>
           {Object.entries(STATUS_FA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        <div className="relative col-span-2 md:col-span-1">
-          <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-theme-muted" />
-          <input className="input-theme text-sm pr-7" placeholder="جستجوی شخص (نام/موبایل/کارت)" value={personQuery} onChange={e => setPersonQuery(e.target.value)} />
-        </div>
-        <select className="input-theme text-sm col-span-2 md:col-span-1" value={userId} onChange={e => setUserId(e.target.value)}>
-          <option value="">همه افراد</option>
-          {personFiltered.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}{u.attendanceCardNo ? ` (${u.attendanceCardNo})` : ""}</option>)}
-        </select>
+        <SearchSelect
+          className="col-span-2"
+          options={personOptions}
+          value={userId}
+          onChange={setUserId}
+          searchKey="search"
+          emptyLabel="همه افراد"
+          placeholder="جستجوی شخص (نام/موبایل/کارت)"
+        />
       </div>
 
       {/* Summary */}

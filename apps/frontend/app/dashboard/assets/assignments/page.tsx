@@ -5,6 +5,7 @@ import PageHeader from "../../../components/ui/PageHeader";
 import SkeletonTable from "../../../components/ui/SkeletonTable";
 import { EmptyStateRow } from "../../../components/ui/EmptyState";
 import Modal from "../../../components/ui/Modal";
+import SearchSelect from "../../../components/ui/SearchSelect";
 import { useConfirm } from "../../../components/ui/ConfirmDialog";
 import { useToast } from "../../../components/ui/Toast";
 
@@ -129,10 +130,14 @@ export default function AssignmentsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-sm">کاربر</label>
-              <select value={editing?.userId || ""} onChange={e => setEditing(s => ({ ...s, userId: e.target.value, departmentId: "" }))} className="select-theme text-sm">
-                <option value="">بدون کاربر</option>
-                {users.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-              </select>
+              <SearchSelect
+                options={users.map((u: any) => ({ id: u.id, name: `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.phone || u.email, search: `${u.firstName || ""} ${u.lastName || ""} ${u.phone || ""}` }))}
+                value={editing?.userId || ""}
+                onChange={id => setEditing(s => ({ ...s, userId: id, departmentId: "" }))}
+                searchKey="search"
+                emptyLabel="بدون کاربر"
+                placeholder="انتخاب کاربر"
+              />
             </div>
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-sm">بخش</label>
