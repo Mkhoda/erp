@@ -61,6 +61,7 @@ export default function UsersPage() {
 
   const [users, setUsers]                   = React.useState<User[]>([]);
   const [departments, setDepartments]       = React.useState<Array<{ id: string; name: string }>>([]);
+  const [schedules, setSchedules]           = React.useState<Array<{ id: string; name: string; isDefault: boolean }>>([]);
   const [view, setView]                     = React.useState<"list" | "grid">("list");
   const [query, setQuery]                   = React.useState("");
   const [roleFilter, setRoleFilter]         = React.useState("ALL");
@@ -93,6 +94,11 @@ export default function UsersPage() {
       const data = await r.json();
       setDepartments(Array.isArray(data) ? data : []);
     } catch { setDepartments([]); }
+    try {
+      const r2 = await fetch(`${API}/attendance/schedules-lite`, { headers: h() });
+      const d2 = await r2.json();
+      setSchedules(Array.isArray(d2) ? d2 : []);
+    } catch { setSchedules([]); }
   }
 
   React.useEffect(() => { load(); loadDeps(); }, []);
@@ -112,7 +118,7 @@ export default function UsersPage() {
   const admins    = users.filter(u => u.role === "ADMIN" || u.role === "MANAGER").length;
   const withCard  = users.filter(u => u.attendanceCardNo).length;
 
-  const DEFAULT_RULE = { employeeType: "FULL_TIME", otAllowed: true, flexEnabled: false, startTime: "", endTime: "", dailyMinutes: "", graceMinutes: "", otMaxDaily: "", otMaxMonthly: "" };
+  const DEFAULT_RULE = { employeeType: "FULL_TIME", scheduleId: "", otAllowed: true, flexEnabled: false, startTime: "", endTime: "", dailyMinutes: "", graceMinutes: "", otMaxDaily: "", otMaxMonthly: "" };
 
   function onAdd() {
     setEditing({ firstName: "", lastName: "", phone: "", email: "", password: "", role: "USER", departmentIds: [], rule: { ...DEFAULT_RULE } });
@@ -547,6 +553,13 @@ export default function UsersPage() {
                 <select value={editing?.rule?.employeeType || "FULL_TIME"} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, employeeType: e.target.value } }))} className="text-sm input-theme">
                   <option value="FULL_TIME">تمام‌وقت (اضافه‌کار و تاخیر محاسبه می‌شود)</option>
                   <option value="HOURLY">ساعتی (فقط ساعت حضور؛ بدون اضافه‌کار)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1.5 text-theme-secondary text-xs">گروه / برنامه کاری</label>
+                <select value={editing?.rule?.scheduleId || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, scheduleId: e.target.value } }))} className="text-sm input-theme">
+                  <option value="">پیش‌فرض سازمان</option>
+                  {schedules.filter(sc => !sc.isDefault).map(sc => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
                 </select>
               </div>
               <div className="flex items-center gap-4 mt-6">

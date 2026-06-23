@@ -193,6 +193,41 @@ export class RecomputeService {
     return { rawTotal, createdUsers, ...relink };
   }
 
+  // Recompute the users affected by a work-schedule change: those explicitly
+  // assigned to it, plus (if it's the default) everyone without a group.
+  async recomputeScheduleUsers(scheduleId: string, isDefault: boolean): Promise<number> {
+    const assigned = await this.prisma.userAttendanceRule.findMany({
+      where: { scheduleId },
+      select: { userId: true },
+    });
+    const ids = new Set(assigned.map((r) => r.userId));
+    if (isDefault) {
+      // Mapped users with no rule, or a rule that doesn't pin a schedule.
+      const defaults = await this.prisma.user.findMany({
+        where: {
+          attendanceCardNo: { not: null },
+          OR: [{ attendanceRule: null }, { attendanceRule: { scheduleId: null } }],
+        },
+        select: { id: true },
+      });
+      defaults.forEach((u) => ids.add(u.id));
+    }
+    let total = 0;
+    for (const userId of ids) total += (await this.relinkUser(userId)).recomputed;
+    return total;
+  }
+
+  // Recompute a set of days for all mapped users (e.g. after a holiday change).
+  async recomputeAllUsersForDays(dates: Date[]): Promise<number> {
+    const users = await this.prisma.user.findMany({
+      where: { attendanceCardNo: { not: null } },
+      select: { id: true },
+    });
+    const pairs: Array<{ userId: string; gregDate: Date }> = [];
+    for (const u of users) for (const d of dates) pairs.push({ userId: u.id, gregDate: d });
+    return this.recomputeDays(pairs);
+  }
+
   // Recompute every mapped user for a Jalali month (e.g. after editing the
   // global schedule or adding a holiday). Bounded by mapped-user count.
   async recomputeAllForMonth(jYear: number, jMonth: number): Promise<number> {

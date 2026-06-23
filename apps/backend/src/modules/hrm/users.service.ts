@@ -3,6 +3,13 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RecomputeService } from '../attendance/engine/recompute.service';
 
+// Friendly Persian names for unique fields (used in duplicate-value errors).
+const FIELD_FA: Record<string, string> = {
+  phone: 'شماره موبایل',
+  email: 'ایمیل',
+  attendanceCardNo: 'کد کارت',
+};
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -51,7 +58,7 @@ export class UsersService {
     } catch (e: any) {
       if (e?.code === 'P2002') {
         const field = e?.meta?.target?.[0] || 'فیلد';
-        throw new ConflictException(`مقدار وارد شده برای «${field}» قبلاً ثبت شده است`);
+        throw new ConflictException(`این ${FIELD_FA[field] || field} قبلاً برای کاربر دیگری ثبت شده است`);
       }
       throw e;
     }
@@ -148,7 +155,7 @@ export class UsersService {
     } catch (e: any) {
       if (e?.code === 'P2002') {
         const field = e?.meta?.target?.[0] || 'فیلد';
-        throw new ConflictException(`مقدار وارد شده برای «${field}» قبلاً ثبت شده است`);
+        throw new ConflictException(`این ${FIELD_FA[field] || field} قبلاً برای کاربر دیگری ثبت شده است`);
       }
       throw e;
     }

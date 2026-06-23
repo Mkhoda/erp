@@ -51,13 +51,17 @@ export class CalcService {
   constructor(private prisma: PrismaService) {}
 
   async getEffectiveSchedule(userId: string): Promise<EffectiveSchedule> {
-    const [base, rule] = await Promise.all([
-      this.prisma.workSchedule.findFirst({
+    const rule = await this.prisma.userAttendanceRule.findUnique({ where: { userId } });
+    // Base schedule = the user's assigned group (rule.scheduleId), else the org default.
+    let base = rule?.scheduleId
+      ? await this.prisma.workSchedule.findUnique({ where: { id: rule.scheduleId } })
+      : null;
+    if (!base) {
+      base = await this.prisma.workSchedule.findFirst({
         where: { OR: [{ isDefault: true }, { name: 'default' }] },
         orderBy: { isDefault: 'desc' },
-      }),
-      this.prisma.userAttendanceRule.findUnique({ where: { userId } }),
-    ]);
+      });
+    }
 
     const s: EffectiveSchedule = { ...DEFAULTS };
     if (base) {

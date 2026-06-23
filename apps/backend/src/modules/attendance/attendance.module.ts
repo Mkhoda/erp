@@ -21,6 +21,8 @@ import { SchedulesController } from './schedules/schedules.controller';
 import { RequestsService } from './requests/requests.service';
 import { RequestsController } from './requests/requests.controller';
 import { MyAttendanceController } from './requests/my-attendance.controller';
+import { HolidaysService } from './holidays/holidays.service';
+import { HolidaysController } from './holidays/holidays.controller';
 
 // Attendance & Workforce Management.
 // Slices 1-2: schema + integration/sync.  Slice 3: calc engine + records,
@@ -37,6 +39,7 @@ import { MyAttendanceController } from './requests/my-attendance.controller';
     SchedulesController,
     RequestsController,
     MyAttendanceController,
+    HolidaysController,
   ],
   providers: [
     PrismaService,
@@ -51,6 +54,7 @@ import { MyAttendanceController } from './requests/my-attendance.controller';
     ReportsService,
     SchedulesService,
     RequestsService,
+    HolidaysService,
   ],
   exports: [SourcesService, SyncService, RecomputeService],
 })
