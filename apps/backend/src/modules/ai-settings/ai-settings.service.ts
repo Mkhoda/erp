@@ -140,7 +140,7 @@ export class AiSettingsService {
     if (!provider) throw new NotFoundException('Provider not found');
     if (!provider.isActive) throw new BadRequestException('این مدل هوش مصنوعی غیرفعال است');
 
-    await this.quota.check(userId, provider.type);
+    await this.quota.check(userId, provider.id);
 
     const startTime = Date.now();
     let content = '';
@@ -165,7 +165,7 @@ export class AiSettingsService {
     const latencyMs = Date.now() - startTime;
     const lastPrompt = [...messages].reverse().find(m => m.role === 'user')?.content || '';
 
-    if (totalTokens > 0) this.quota.increment(userId, provider.type, totalTokens).catch(() => {});
+    if (totalTokens > 0) this.quota.increment(userId, provider.id, totalTokens).catch(() => {});
 
     await this.prisma.aiUsage.create({
       data: {

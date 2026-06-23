@@ -207,7 +207,7 @@ export default function AttendanceRecordsPage() {
         <div className="flex flex-wrap items-center gap-3 bg-blue-500/5 border border-blue-500/30 rounded-xl px-4 py-2.5 text-sm">
           <span className="text-theme-primary font-medium">مرخصی سال {faNum(leave.jYear)}:</span>
           <span className="text-blue-600">مانده {faNum(leave.remaining)} از {faNum(leave.entitlement)} روز</span>
-          <span className="text-theme-muted">· استفاده‌شده {faNum(leave.used)} · ماموریت {faNum(leave.mission)} · دورکاری {faNum(leave.remote)}</span>
+          <span className="text-theme-muted">· مرخصی {faNum(leave.used)} روز · کسر تاخیر/تعجیل {faNum(leave.tardyDays)} روز · ماموریت {faNum(leave.mission)}</span>
         </div>
       )}
 

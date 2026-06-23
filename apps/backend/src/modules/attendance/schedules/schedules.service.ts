@@ -11,7 +11,7 @@ export class SchedulesService {
     private recompute: RecomputeService,
   ) {}
 
-  private readonly STR = ['startTime', 'endTime', 'flexInStart', 'flexInEnd'];
+  private readonly STR = ['startTime', 'endTime', 'flexInStart', 'flexInEnd', 'checkInStart', 'checkInEnd', 'checkOutStart', 'checkOutEnd'];
   private readonly INT = [
     'dailyMinutes', 'weeklyMinutes', 'lunchMinutes', 'graceMinutes',
     'otMinThreshold', 'otMaxDaily', 'otMaxMonthly', 'otRounding', 'annualLeaveDays',
@@ -94,6 +94,10 @@ export class SchedulesService {
       scheduleId: dto.scheduleId || null, // assign to a group (or default when null)
       startTime: str(dto.startTime),
       endTime: str(dto.endTime),
+      checkInStart: str(dto.checkInStart),
+      checkInEnd: str(dto.checkInEnd),
+      checkOutStart: str(dto.checkOutStart),
+      checkOutEnd: str(dto.checkOutEnd),
       dailyMinutes: num(dto.dailyMinutes),
       graceMinutes: num(dto.graceMinutes),
       flexEnabled: dto.flexEnabled == null ? null : !!dto.flexEnabled,

@@ -12,8 +12,8 @@ const WEEK = [
   { d: 2, name: "سه‌شنبه" }, { d: 3, name: "چهارشنبه" }, { d: 4, name: "پنج‌شنبه" }, { d: 5, name: "جمعه" },
 ];
 const NEW_DEFAULTS = {
-  name: "", isDefault: false, startTime: "08:00", endTime: "17:00", dailyMinutes: 480, lunchMinutes: 60,
-  graceMinutes: 30, flexEnabled: false, flexInStart: "07:30", flexInEnd: "09:00", workDays: [6, 0, 1, 2, 3],
+  name: "", isDefault: false, dailyMinutes: 500, lunchMinutes: 0,
+  checkInStart: "06:30", checkInEnd: "09:00", checkOutStart: "14:50", checkOutEnd: "17:20", workDays: [6, 0, 1, 2, 3],
   otMinThreshold: 30, otRounding: 15, otMaxDaily: 240, otMaxMonthly: 3600, annualLeaveDays: 26,
 };
 
@@ -99,23 +99,14 @@ export default function WorkRulesPage() {
             </div>
           </Section>
 
-          <Section title="ساعت کاری" icon={Clock}>
+          <Section title="بازه‌های ورود و خروج" icon={Timer}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="ساعت شروع"><input type="time" className={inputCls} value={form.startTime || ""} onChange={e => set("startTime", e.target.value)} /></Field>
-              <Field label="ساعت پایان"><input type="time" className={inputCls} value={form.endTime || ""} onChange={e => set("endTime", e.target.value)} /></Field>
-              <Field label="ساعت کاری روزانه (دقیقه)" hint={hrs(form.dailyMinutes)}><input type="number" className={inputCls} value={form.dailyMinutes ?? ""} onChange={e => set("dailyMinutes", +e.target.value)} /></Field>
-              <Field label="ناهار / استراحت (دقیقه)"><input type="number" className={inputCls} value={form.lunchMinutes ?? ""} onChange={e => set("lunchMinutes", +e.target.value)} /></Field>
-            </div>
-          </Section>
-
-          <Section title="شناوری و ارفاق" icon={Timer}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="ارفاق ورود (دقیقه)" hint="تاخیر تا این مقدار نادیده گرفته می‌شود"><input type="number" className={inputCls} value={form.graceMinutes ?? ""} onChange={e => set("graceMinutes", +e.target.value)} /></Field>
-              <label className="flex items-center gap-2 text-sm text-theme-primary mt-6"><input type="checkbox" checked={!!form.flexEnabled} onChange={e => set("flexEnabled", e.target.checked)} /> شناوری فعال (ورود/خروج آزاد)</label>
-              {form.flexEnabled && <>
-                <Field label="بازه ورود مجاز — از"><input type="time" className={inputCls} value={form.flexInStart || ""} onChange={e => set("flexInStart", e.target.value)} /></Field>
-                <Field label="بازه ورود مجاز — تا"><input type="time" className={inputCls} value={form.flexInEnd || ""} onChange={e => set("flexInEnd", e.target.value)} /></Field>
-              </>}
+              <Field label="شروع بازه ورود"><input type="time" className={inputCls} value={form.checkInStart || ""} onChange={e => set("checkInStart", e.target.value)} /></Field>
+              <Field label="پایان بازه ورود" hint="ورود بعد از این = تاخیر"><input type="time" className={inputCls} value={form.checkInEnd || ""} onChange={e => set("checkInEnd", e.target.value)} /></Field>
+              <Field label="شروع بازه خروج" hint="خروج قبل از این = تعجیل"><input type="time" className={inputCls} value={form.checkOutStart || ""} onChange={e => set("checkOutStart", e.target.value)} /></Field>
+              <Field label="پایان بازه خروج"><input type="time" className={inputCls} value={form.checkOutEnd || ""} onChange={e => set("checkOutEnd", e.target.value)} /></Field>
+              <Field label="ساعت کار مورد نیاز (دقیقه)" hint={hrs(form.dailyMinutes)}><input type="number" className={inputCls} value={form.dailyMinutes ?? ""} onChange={e => set("dailyMinutes", +e.target.value)} /></Field>
+              <Field label="کسر ناهار/استراحت (دقیقه)"><input type="number" className={inputCls} value={form.lunchMinutes ?? ""} onChange={e => set("lunchMinutes", +e.target.value)} /></Field>
             </div>
           </Section>
 

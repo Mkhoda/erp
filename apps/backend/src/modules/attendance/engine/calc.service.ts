@@ -16,13 +16,15 @@ export interface EffectiveSchedule {
   endMin: number;
   dailyMinutes: number;
   lunchMinutes: number;
-  graceMinutes: number;
-  flexEnabled: boolean;
-  flexInStart: number | null;
-  flexInEnd: number | null;
+  // Window-based: arrival window [checkInStart, checkInEnd], departure window
+  // [checkOutStart, checkOutEnd]. Late = arrive after checkInEnd; early-leave =
+  // depart before checkOutStart.
+  checkInEnd: number;
+  checkOutStart: number;
   workDays: number[];
   otMinThreshold: number;
   otMaxDaily: number;
+  otMaxMonthly: number;
   otRounding: number;
   otAllowed: boolean;
 }
@@ -31,17 +33,16 @@ export interface EffectiveSchedule {
 // default WorkSchedule row exists yet, so calculations never depend on seeding.
 const DEFAULTS: EffectiveSchedule = {
   employeeType: 'FULL_TIME',
-  startMin: 8 * 60,
-  endMin: 17 * 60,
-  dailyMinutes: 480,
-  lunchMinutes: 60,
-  graceMinutes: 30,
-  flexEnabled: false,
-  flexInStart: 7 * 60 + 30,
-  flexInEnd: 9 * 60,
-  workDays: [6, 0, 1, 2, 3], // Sat..Wed (Thu/Fri weekend)
+  startMin: 6 * 60 + 30,
+  endMin: 17 * 60 + 20,
+  dailyMinutes: 500,            // 8:20 required
+  lunchMinutes: 0,
+  checkInEnd: 9 * 60,           // 09:00
+  checkOutStart: 14 * 60 + 50,  // 14:50
+  workDays: [6, 0, 1, 2, 3],    // Sat..Wed (Thu/Fri weekend)
   otMinThreshold: 30,
   otMaxDaily: 240,
+  otMaxMonthly: 3600,
   otRounding: 15,
   otAllowed: true,
 };
@@ -65,27 +66,25 @@ export class CalcService {
 
     const s: EffectiveSchedule = { ...DEFAULTS };
     if (base) {
-      s.startMin = parseHHmm(base.startTime) ?? s.startMin;
-      s.endMin = parseHHmm(base.endTime) ?? s.endMin;
+      s.startMin = parseHHmm(base.checkInStart) ?? s.startMin;
+      s.endMin = parseHHmm(base.checkOutEnd) ?? s.endMin;
       s.dailyMinutes = base.dailyMinutes;
       s.lunchMinutes = base.lunchMinutes;
-      s.graceMinutes = base.graceMinutes;
-      s.flexEnabled = base.flexEnabled;
-      s.flexInStart = parseHHmm(base.flexInStart) ?? s.flexInStart;
-      s.flexInEnd = parseHHmm(base.flexInEnd) ?? s.flexInEnd;
+      s.checkInEnd = parseHHmm((base as any).checkInEnd) ?? s.checkInEnd;
+      s.checkOutStart = parseHHmm((base as any).checkOutStart) ?? s.checkOutStart;
       s.workDays = base.workDays?.length ? base.workDays : s.workDays;
       s.otMinThreshold = base.otMinThreshold;
       s.otMaxDaily = base.otMaxDaily;
+      s.otMaxMonthly = base.otMaxMonthly;
       s.otRounding = base.otRounding;
     }
     if (rule) {
       s.employeeType = rule.employeeType as 'FULL_TIME' | 'HOURLY';
-      if (rule.startTime) s.startMin = parseHHmm(rule.startTime) ?? s.startMin;
-      if (rule.endTime) s.endMin = parseHHmm(rule.endTime) ?? s.endMin;
       if (rule.dailyMinutes != null) s.dailyMinutes = rule.dailyMinutes;
-      if (rule.graceMinutes != null) s.graceMinutes = rule.graceMinutes;
-      if (rule.flexEnabled != null) s.flexEnabled = rule.flexEnabled;
+      if ((rule as any).checkInEnd) s.checkInEnd = parseHHmm((rule as any).checkInEnd) ?? s.checkInEnd;
+      if ((rule as any).checkOutStart) s.checkOutStart = parseHHmm((rule as any).checkOutStart) ?? s.checkOutStart;
       if (rule.otMaxDaily != null) s.otMaxDaily = rule.otMaxDaily;
+      if (rule.otMaxMonthly != null) s.otMaxMonthly = rule.otMaxMonthly;
       s.otAllowed = rule.otAllowed;
     }
     // Hourly staff: presence only — never accrue overtime or lateness penalties.
@@ -158,16 +157,12 @@ export class CalcService {
 
       workedMinutes = Math.max(0, outMin - inMin - sched.lunchMinutes);
 
-      // Delay (respecting flex window)
-      if (sched.flexEnabled && sched.flexInStart != null && sched.flexInEnd != null) {
-        delayMinutes = Math.max(0, inMin - sched.flexInEnd);
-      } else {
-        delayMinutes = Math.max(0, inMin - (sched.startMin + sched.graceMinutes));
-      }
-      // Early leave
-      earlyLeaveMinutes = Math.max(0, sched.endMin - outMin);
+      // Window-based: late if arriving after the check-in window ends; early
+      // leave if departing before the check-out window starts.
+      delayMinutes = Math.max(0, inMin - sched.checkInEnd);
+      earlyLeaveMinutes = Math.max(0, sched.checkOutStart - outMin);
 
-      // Overtime (only beyond required, above threshold, rounded, capped)
+      // Overtime (only beyond required, above threshold, rounded, capped daily)
       const extra = workedMinutes - sched.dailyMinutes;
       if (sched.otAllowed && extra >= sched.otMinThreshold) {
         const rounded = sched.otRounding > 0
@@ -185,6 +180,18 @@ export class CalcService {
     if (sched.employeeType === 'HOURLY') {
       delayMinutes = 0;
       earlyLeaveMinutes = 0;
+    }
+
+    // Monthly overtime cap: clamp so the month's total OT (incl. this day) does
+    // not exceed otMaxMonthly. Days recompute ascending, so prior days reflect
+    // already-committed OT.
+    if (overtimeMinutes > 0 && sched.otMaxMonthly > 0) {
+      const prior = await this.prisma.attendanceDay.aggregate({
+        where: { userId, jYear, jMonth, gregDate: { not: gregDate } },
+        _sum: { overtimeMinutes: true },
+      });
+      const used = prior._sum.overtimeMinutes ?? 0;
+      overtimeMinutes = Math.max(0, Math.min(overtimeMinutes, sched.otMaxMonthly - used));
     }
 
     // ── Status precedence ──────────────────────────────────────────────

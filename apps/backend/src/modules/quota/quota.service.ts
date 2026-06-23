@@ -1,6 +1,9 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
+// Provider fields safe to expose alongside a quota (never the apiKey)
+const PROVIDER_SELECT = { id: true, name: true, type: true, model: true, isActive: true } as const;
+
 @Injectable()
 export class QuotaService {
   constructor(private prisma: PrismaService) {}
@@ -17,11 +20,12 @@ export class QuotaService {
     return new Date(d.getFullYear(), d.getMonth() + 1, 1);
   }
 
-  // ── Get or create quota for a user+provider ───────────────────
+  // ── Get or create quota for a user+model ──────────────────────
 
-  async getOrCreate(userId: string, providerType: string): Promise<any> {
+  async getOrCreate(userId: string, providerId: string): Promise<any> {
     let quota = await this.prisma.userQuota.findUnique({
-      where: { userId_providerType: { userId, providerType } },
+      where: { userId_providerId: { userId, providerId } },
+      include: { provider: { select: PROVIDER_SELECT } },
     });
 
     // Auto-reset if period has passed
@@ -29,21 +33,23 @@ export class QuotaService {
       quota = await this.prisma.userQuota.update({
         where: { id: quota.id },
         data: { usedTokens: 0, periodStart: this.periodStart(), periodEnd: this.periodEnd() },
+        include: { provider: { select: PROVIDER_SELECT } },
       });
     }
 
     if (!quota) {
-      // Look up default quota for this provider
-      const def = await this.prisma.defaultQuota.findUnique({ where: { providerType } });
+      // Look up default quota for this model
+      const def = await this.prisma.defaultQuota.findUnique({ where: { providerId } });
       quota = await this.prisma.userQuota.create({
         data: {
           userId,
-          providerType,
+          providerId,
           monthlyLimit: def?.monthlyLimit ?? 0,
           usedTokens: 0,
           periodStart: this.periodStart(),
           periodEnd: this.periodEnd(),
         },
+        include: { provider: { select: PROVIDER_SELECT } },
       });
     }
 
@@ -52,27 +58,29 @@ export class QuotaService {
 
   // ── Check if user can proceed ─────────────────────────────────
 
-  async check(userId: string, providerType: string): Promise<void> {
-    const quota = await this.getOrCreate(userId, providerType);
+  async check(userId: string, providerId: string): Promise<void> {
+    const quota = await this.getOrCreate(userId, providerId);
     if (quota.monthlyLimit === 0) return; // unlimited
     if (quota.usedTokens >= quota.monthlyLimit) {
+      const label = quota.provider?.name || 'این مدل';
       throw new BadRequestException(
-        `سقف ماهانه توکن برای این سرویس (${quota.monthlyLimit.toLocaleString()} توکن) تمام شده است.`,
+        `سقف ماهانه توکن برای «${label}» (${quota.monthlyLimit.toLocaleString()} توکن) تمام شده است.`,
       );
     }
   }
 
   // ── Increment usage after a request ──────────────────────────
 
-  async increment(userId: string, providerType: string, tokens: number): Promise<void> {
+  async increment(userId: string, providerId: string, tokens: number): Promise<void> {
     if (tokens <= 0) return;
+    const def = await this.prisma.defaultQuota.findUnique({ where: { providerId } });
     await this.prisma.userQuota.upsert({
-      where: { userId_providerType: { userId, providerType } },
+      where: { userId_providerId: { userId, providerId } },
       update: { usedTokens: { increment: tokens } },
       create: {
         userId,
-        providerType,
-        monthlyLimit: 0,
+        providerId,
+        monthlyLimit: def?.monthlyLimit ?? 0,
         usedTokens: tokens,
         periodStart: this.periodStart(),
         periodEnd: this.periodEnd(),
@@ -83,7 +91,10 @@ export class QuotaService {
   // ── User: list all own quotas ─────────────────────────────────
 
   async listForUser(userId: string) {
-    const quotas = await this.prisma.userQuota.findMany({ where: { userId } });
+    const quotas = await this.prisma.userQuota.findMany({
+      where: { userId },
+      include: { provider: { select: PROVIDER_SELECT } },
+    });
     // Ensure auto-reset
     const now = new Date();
     const results = [];
@@ -92,6 +103,7 @@ export class QuotaService {
         const updated = await this.prisma.userQuota.update({
           where: { id: q.id },
           data: { usedTokens: 0, periodStart: this.periodStart(), periodEnd: this.periodEnd() },
+          include: { provider: { select: PROVIDER_SELECT } },
         });
         results.push(this.enrich(updated));
       } else {
@@ -104,16 +116,22 @@ export class QuotaService {
   // ── Admin: list quotas for a specific user ────────────────────
 
   async listForAdmin(userId: string) {
-    const quotas = await this.prisma.userQuota.findMany({ where: { userId } });
+    const quotas = await this.prisma.userQuota.findMany({
+      where: { userId },
+      include: { provider: { select: PROVIDER_SELECT } },
+    });
     return quotas.map(q => this.enrich(q));
   }
 
-  // ── Admin: list all quotas with user info ─────────────────────
+  // ── Admin: list all quotas with user + model info ─────────────
 
   async listAll(page = 1, limit = 50) {
     const [quotas, total] = await Promise.all([
       this.prisma.userQuota.findMany({
-        include: { user: { select: { id: true, firstName: true, lastName: true, phone: true, role: true } } },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, phone: true, role: true } },
+          provider: { select: PROVIDER_SELECT },
+        },
         orderBy: { updatedAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -123,50 +141,59 @@ export class QuotaService {
     return { data: quotas.map(q => this.enrich(q)), total, page, limit };
   }
 
-  // ── Admin: upsert quota for a user ───────────────────────────
+  // ── Admin: upsert quota override for a user+model ─────────────
 
-  async upsert(userId: string, providerType: string, monthlyLimit: number) {
+  async upsert(userId: string, providerId: string, monthlyLimit: number) {
     const q = await this.prisma.userQuota.upsert({
-      where: { userId_providerType: { userId, providerType } },
+      where: { userId_providerId: { userId, providerId } },
       update: { monthlyLimit },
       create: {
         userId,
-        providerType,
+        providerId,
         monthlyLimit,
         usedTokens: 0,
         periodStart: this.periodStart(),
         periodEnd: this.periodEnd(),
       },
+      include: { provider: { select: PROVIDER_SELECT } },
     });
     return this.enrich(q);
   }
 
-  // ── Admin: reset usage for a user+provider ────────────────────
+  // ── Admin: reset usage for a user+model ───────────────────────
 
-  async reset(userId: string, providerType: string) {
+  async reset(userId: string, providerId: string) {
     const q = await this.prisma.userQuota.update({
-      where: { userId_providerType: { userId, providerType } },
+      where: { userId_providerId: { userId, providerId } },
       data: { usedTokens: 0, periodStart: this.periodStart(), periodEnd: this.periodEnd() },
+      include: { provider: { select: PROVIDER_SELECT } },
     });
     return this.enrich(q);
   }
 
-  // ── Default quotas ────────────────────────────────────────────
+  // ── Default quotas (per model) ────────────────────────────────
 
   async listDefaults() {
-    return this.prisma.defaultQuota.findMany({ orderBy: { providerType: 'asc' } });
+    const defaults = await this.prisma.defaultQuota.findMany({
+      include: { provider: { select: PROVIDER_SELECT } },
+      orderBy: { createdAt: 'asc' },
+    });
+    return defaults;
   }
 
-  async upsertDefault(providerType: string, monthlyLimit: number) {
+  async upsertDefault(providerId: string, monthlyLimit: number) {
+    const provider = await this.prisma.aiProvider.findUnique({ where: { id: providerId } });
+    if (!provider) throw new BadRequestException('مدل انتخاب‌شده یافت نشد');
     return this.prisma.defaultQuota.upsert({
-      where: { providerType },
+      where: { providerId },
       update: { monthlyLimit },
-      create: { providerType, monthlyLimit },
+      create: { providerId, monthlyLimit },
+      include: { provider: { select: PROVIDER_SELECT } },
     });
   }
 
-  async deleteDefault(providerType: string) {
-    return this.prisma.defaultQuota.delete({ where: { providerType } });
+  async deleteDefault(providerId: string) {
+    return this.prisma.defaultQuota.delete({ where: { providerId } });
   }
 
   // ── Admin: platform-wide stats ────────────────────────────────

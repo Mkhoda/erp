@@ -120,7 +120,7 @@ export default function MyAttendancePage() {
             <span className="text-theme-muted">از {faNum(leave.entitlement)} روز</span>
           </div>
           <div className="text-xs text-theme-muted">
-            مرخصی استفاده‌شده: {faNum(leave.used)} · ماموریت: {faNum(leave.mission)} · دورکاری: {faNum(leave.remote)}
+            مرخصی: {faNum(leave.used)} روز · کسر تاخیر/تعجیل: {faNum(leave.tardyDays)} روز · ماموریت: {faNum(leave.mission)} · دورکاری: {faNum(leave.remote)}
           </div>
         </div>
       )}

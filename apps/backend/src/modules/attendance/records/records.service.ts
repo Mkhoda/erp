@@ -116,12 +116,21 @@ export class RecordsService {
       });
     }
     const entitlement = sched?.annualLeaveDays ?? 26;
-    const [used, mission, remote] = await Promise.all([
+    const dailyReq = sched?.dailyMinutes ?? 500;
+    const [used, mission, remote, tardyAgg] = await Promise.all([
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'LEAVE' } }),
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'MISSION' } }),
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'REMOTE_WORK' } }),
+      // Delay + early-leave across the year are deducted from leave.
+      this.prisma.attendanceDay.aggregate({
+        where: { userId, jYear },
+        _sum: { delayMinutes: true, earlyLeaveMinutes: true },
+      }),
     ]);
-    return { jYear, entitlement, used, mission, remote, remaining: Math.max(0, entitlement - used) };
+    const tardyMinutes = (tardyAgg._sum.delayMinutes ?? 0) + (tardyAgg._sum.earlyLeaveMinutes ?? 0);
+    const tardyDays = dailyReq > 0 ? Math.round((tardyMinutes / dailyReq) * 100) / 100 : 0;
+    const remaining = Math.round(Math.max(0, entitlement - used - tardyDays) * 100) / 100;
+    return { jYear, entitlement, used, mission, remote, tardyMinutes, tardyDays, remaining };
   }
 
   // Day detail: computed row + every raw punch + any override (audit view).

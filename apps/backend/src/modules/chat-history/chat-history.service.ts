@@ -4,6 +4,7 @@ import { AiSettingsService } from '../ai-settings/ai-settings.service';
 
 const AUTO_COMPACT_THRESHOLD = 30;  // compact when messages exceed this
 const AUTO_EXTRACT_THRESHOLD = 12;  // extract memories when messages reach this
+const RECENT_WINDOW = 10;           // verbatim recent messages sent per request; older turns are covered by rollingContext + summary
 
 @Injectable()
 export class ChatHistoryService {
@@ -319,8 +320,11 @@ ${text.substring(0, 3000)}`,
       history.push({ role: 'assistant', content: 'متوجه شدم، ادامه می‌دهیم.' });
     }
 
-    // Add existing messages (all already stored in DB)
-    for (const m of conv.messages) {
+    // Add only the most recent messages verbatim — older turns are already
+    // represented by the rolling context + compact summary injected above.
+    // This caps tokens per request instead of resending the whole thread.
+    const recent = conv.messages.slice(-RECENT_WINDOW);
+    for (const m of recent) {
       history.push({ role: m.role, content: m.content });
     }
 

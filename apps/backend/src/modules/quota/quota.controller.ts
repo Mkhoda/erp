@@ -16,9 +16,9 @@ export class QuotaController {
     return this.service.listForUser(req.user.userId ?? req.user.id);
   }
 
-  @Get('me/:providerType')
-  myQuota(@Req() req: any, @Param('providerType') providerType: string) {
-    return this.service.getOrCreate(req.user.userId ?? req.user.id, providerType);
+  @Get('me/:providerId')
+  myQuota(@Req() req: any, @Param('providerId') providerId: string) {
+    return this.service.getOrCreate(req.user.userId ?? req.user.id, providerId);
   }
 
   // ── Admin: all quotas ─────────────────────────────────────────
@@ -44,22 +44,22 @@ export class QuotaController {
     return this.service.listForAdmin(userId);
   }
 
-  @Put('user/:userId/:providerType')
+  @Put('user/:userId/:providerId')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
   upsert(
     @Param('userId') userId: string,
-    @Param('providerType') providerType: string,
+    @Param('providerId') providerId: string,
     @Body() body: { monthlyLimit: number },
   ) {
-    return this.service.upsert(userId, providerType, body.monthlyLimit);
+    return this.service.upsert(userId, providerId, body.monthlyLimit);
   }
 
-  @Post('user/:userId/:providerType/reset')
+  @Post('user/:userId/:providerId/reset')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
-  reset(@Param('userId') userId: string, @Param('providerType') providerType: string) {
-    return this.service.reset(userId, providerType);
+  reset(@Param('userId') userId: string, @Param('providerId') providerId: string) {
+    return this.service.reset(userId, providerId);
   }
 
   // ── Default quotas ────────────────────────────────────────────
@@ -71,20 +71,20 @@ export class QuotaController {
     return this.service.listDefaults();
   }
 
-  @Put('defaults/:providerType')
+  @Put('defaults/:providerId')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
   upsertDefault(
-    @Param('providerType') providerType: string,
+    @Param('providerId') providerId: string,
     @Body() body: { monthlyLimit: number },
   ) {
-    return this.service.upsertDefault(providerType, body.monthlyLimit);
+    return this.service.upsertDefault(providerId, body.monthlyLimit);
   }
 
-  @Delete('defaults/:providerType')
+  @Delete('defaults/:providerId')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
-  deleteDefault(@Param('providerType') providerType: string) {
-    return this.service.deleteDefault(providerType);
+  deleteDefault(@Param('providerId') providerId: string) {
+    return this.service.deleteDefault(providerId);
   }
 }

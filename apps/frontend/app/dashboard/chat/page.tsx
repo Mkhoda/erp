@@ -91,7 +91,7 @@ function ChatPageInner() {
       setProviders(provs);
       if (provs.length > 0) {
         setSelectedProvider(provs[0]);
-        fetch(`${API}/quota/me/${provs[0].type}`, { headers: h() })
+        fetch(`${API}/quota/me/${provs[0].id}`, { headers: h() })
           .then(r => r.ok ? r.json() : null).then(d => { if (d) setQuota(d); }).catch(() => {});
       }
       setConvos(convList);
@@ -102,6 +102,14 @@ function ChatPageInner() {
   }, []);
 
   React.useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, sending]);
+
+  // Refresh the quota widget whenever the selected model changes
+  React.useEffect(() => {
+    if (!selectedProvider) { setQuota(null); return; }
+    fetch(`${API}/quota/me/${selectedProvider.id}`, { headers: h() })
+      .then(r => r.ok ? r.json() : null).then(d => setQuota(d)).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProvider?.id]);
 
   const loadConvo = async (id: string) => {
     setActiveId(id);
@@ -177,7 +185,7 @@ function ChatPageInner() {
       setSending(false);
       // Refresh quota after message
       if (selectedProvider) {
-        fetch(`${API}/quota/me/${selectedProvider.type}`, { headers: h() })  // quota still per type
+        fetch(`${API}/quota/me/${selectedProvider.id}`, { headers: h() })
           .then(r => r.ok ? r.json() : null).then(d => { if (d) setQuota(d); }).catch(() => {});
       }
     }

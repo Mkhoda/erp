@@ -118,7 +118,7 @@ export default function UsersPage() {
   const admins    = users.filter(u => u.role === "ADMIN" || u.role === "MANAGER").length;
   const withCard  = users.filter(u => u.attendanceCardNo).length;
 
-  const DEFAULT_RULE = { employeeType: "FULL_TIME", scheduleId: "", otAllowed: true, flexEnabled: false, startTime: "", endTime: "", dailyMinutes: "", graceMinutes: "", otMaxDaily: "", otMaxMonthly: "" };
+  const DEFAULT_RULE = { employeeType: "FULL_TIME", scheduleId: "", otAllowed: true, checkInEnd: "", checkOutStart: "", dailyMinutes: "", otMaxDaily: "", otMaxMonthly: "" };
 
   function onAdd() {
     setEditing({ firstName: "", lastName: "", phone: "", email: "", password: "", role: "USER", departmentIds: [], rule: { ...DEFAULT_RULE } });
@@ -573,20 +573,16 @@ export default function UsersPage() {
                 )}
               </div>
               <div>
-                <label className="block mb-1.5 text-theme-secondary text-xs">ساعت شروع (اختیاری)</label>
-                <input type="time" dir="ltr" value={editing?.rule?.startTime || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, startTime: e.target.value } }))} className="text-sm input-theme" />
+                <label className="block mb-1.5 text-theme-secondary text-xs">پایان بازه ورود (اختیاری)</label>
+                <input type="time" dir="ltr" value={editing?.rule?.checkInEnd || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, checkInEnd: e.target.value } }))} className="text-sm input-theme" />
               </div>
               <div>
-                <label className="block mb-1.5 text-theme-secondary text-xs">ساعت پایان (اختیاری)</label>
-                <input type="time" dir="ltr" value={editing?.rule?.endTime || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, endTime: e.target.value } }))} className="text-sm input-theme" />
+                <label className="block mb-1.5 text-theme-secondary text-xs">شروع بازه خروج (اختیاری)</label>
+                <input type="time" dir="ltr" value={editing?.rule?.checkOutStart || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, checkOutStart: e.target.value } }))} className="text-sm input-theme" />
               </div>
               <div>
-                <label className="block mb-1.5 text-theme-secondary text-xs">ساعت کاری روزانه (دقیقه)</label>
-                <input type="number" dir="ltr" value={editing?.rule?.dailyMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, dailyMinutes: e.target.value } }))} className="text-sm input-theme" placeholder="پیش‌فرض سازمان" />
-              </div>
-              <div>
-                <label className="block mb-1.5 text-theme-secondary text-xs">میزان ارفاق ورود (دقیقه)</label>
-                <input type="number" dir="ltr" value={editing?.rule?.graceMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, graceMinutes: e.target.value } }))} className="text-sm input-theme" placeholder="پیش‌فرض سازمان" />
+                <label className="block mb-1.5 text-theme-secondary text-xs">ساعت کار مورد نیاز (دقیقه)</label>
+                <input type="number" dir="ltr" value={editing?.rule?.dailyMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, dailyMinutes: e.target.value } }))} className="text-sm input-theme" placeholder="پیش‌فرض/گروه" />
               </div>
               {editing?.rule?.employeeType !== "HOURLY" && <>
                 <div>

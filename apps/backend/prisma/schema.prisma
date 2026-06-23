@@ -361,6 +361,8 @@ model AiProvider {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  userQuotas   UserQuota[]
+  defaultQuota DefaultQuota?
 }
 
 // AI usage tracking — records each API call for token consumption analytics
@@ -386,31 +388,33 @@ model AiUsage {
   @@index([createdAt])
 }
 
-// Per-user token quota per AI provider
+// Per-user token quota per AI model (AiProvider)
 model UserQuota {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  providerType String   // "openai" | "anthropic" | "agnes" | ...
-  monthlyLimit Int      // 0 = unlimited
-  usedTokens   Int      @default(0)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerId   String     // references a specific configured AiProvider (model)
+  provider     AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  monthlyLimit Int        // 0 = unlimited
+  usedTokens   Int        @default(0)
   periodStart  DateTime
   periodEnd    DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  @@unique([userId, providerType])
+  @@unique([userId, providerId])
   @@index([userId])
-  @@index([providerType])
+  @@index([providerId])
 }
 
-// Platform-wide default quotas per provider (auto-assigned to new users)
+// Platform-wide default quota per AI model (auto-assigned to users on first use)
 model DefaultQuota {
-  id           String   @id @default(cuid())
-  providerType String   @unique
-  monthlyLimit Int      // 0 = unlimited
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id           String     @id @default(cuid())
+  providerId   String     @unique
+  provider     AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  monthlyLimit Int        // 0 = unlimited
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }
 
 // Personal to-do items per user
@@ -665,13 +669,19 @@ model WorkSchedule {
   isDefault      Boolean  @default(false)
   startTime      String   @default("08:00")           // "HH:mm"
   endTime        String   @default("17:00")
-  dailyMinutes   Int      @default(480)
+  dailyMinutes   Int      @default(500)                 // required work (8:20)
   weeklyMinutes  Int      @default(2640)
-  lunchMinutes   Int      @default(60)
+  lunchMinutes   Int      @default(0)
+  // Window-based attendance: arrival allowed in [checkInStart, checkInEnd],
+  // departure expected in [checkOutStart, checkOutEnd].
+  checkInStart   String   @default("06:30")
+  checkInEnd     String   @default("09:00")
+  checkOutStart  String   @default("14:50")
+  checkOutEnd    String   @default("17:20")
   flexEnabled    Boolean  @default(false)
   flexInStart    String?  @default("07:30")
   flexInEnd      String?  @default("09:00")
-  graceMinutes   Int      @default(30)
+  graceMinutes   Int      @default(0)
   workDays       Int[]    @default([6, 0, 1, 2, 3])    // JS getDay(): Sat..Wed (Thu/Fri weekend)
   otMinThreshold Int      @default(30)
   otMaxDaily     Int      @default(240)
@@ -700,6 +710,10 @@ model UserAttendanceRule {
   startTime    String?
   endTime      String?
   dailyMinutes Int?
+  checkInStart  String?
+  checkInEnd    String?
+  checkOutStart String?
+  checkOutEnd   String?
   graceMinutes Int?
   flexEnabled  Boolean?
   otAllowed    Boolean       @default(true)

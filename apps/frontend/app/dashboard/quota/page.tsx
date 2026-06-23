@@ -1,20 +1,21 @@
 "use client";
 import React from "react";
-import { Shield, Users, RotateCcw, Settings, Plus, Trash2, CheckCircle, TrendingUp, Zap } from "lucide-react";
+import { Shield, Users, RotateCcw, Settings, Plus, Trash2, CheckCircle, TrendingUp, Zap, Cpu } from "lucide-react";
 import Modal from "../../components/ui/Modal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
-const PROVIDER_LABELS: Record<string, string> = {
-  agnes: "Agnes AI", openai: "OpenAI", anthropic: "Anthropic",
-  gemini: "Google Gemini", deepseek: "DeepSeek", groq: "Groq",
-  openrouter: "OpenRouter", custom: "سفارشی",
-};
 const PROVIDER_COLORS: Record<string, string> = {
   agnes: "#6366f1", openai: "#10a37f", anthropic: "#d97757",
   gemini: "#4285f4", deepseek: "#4d6bfe", groq: "#f55036",
   openrouter: "#7c3aed", custom: "#6b7280",
 };
+
+type Provider = { id: string; name: string; type: string; model: string | null; isActive?: boolean };
+
+const providerColor = (type?: string) => PROVIDER_COLORS[type || ""] || "#888";
+const modelLabel = (p?: { name?: string; model?: string | null; type?: string } | null) =>
+  p ? `${p.name}${p.model ? ` — ${p.model}` : ""}` : "—";
 
 function StatusDot({ status }: { status: string }) {
   if (status === "unlimited") return <span className="inline-block w-2 h-2 rounded-full bg-blue-400" title="نامحدود" />;
@@ -39,31 +40,46 @@ function QuotaBar({ used, limit, pct }: { used: number; limit: number; pct: numb
   );
 }
 
+function ModelBadge({ provider }: { provider?: Provider | null }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="rounded w-2 h-2" style={{ background: providerColor(provider?.type) }} />
+      <span className="text-xs">{provider ? provider.name : "مدل حذف‌شده"}</span>
+      {provider?.model && <span className="text-[10px] text-theme-muted">· {provider.model}</span>}
+    </div>
+  );
+}
+
 export default function QuotaPage() {
   const [quotas, setQuotas] = React.useState<any[]>([]);
   const [users, setUsers] = React.useState<any[]>([]);
+  const [providers, setProviders] = React.useState<Provider[]>([]);
   const [defaults, setDefaults] = React.useState<any[]>([]);
   const [stats, setStats] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [tab, setTab] = React.useState<"users" | "defaults" | "stats">("users");
-  const [editModal, setEditModal] = React.useState<{ userId: string; providerType: string; current: number } | null>(null);
-  const [defModal, setDefModal] = React.useState<{ providerType: string; current: number } | null>(null);
+  // userModal: per-user override. isNew toggles the user/model pickers.
+  const [userModal, setUserModal] = React.useState<{ userId: string; providerId: string; isNew: boolean } | null>(null);
+  const [defModal, setDefModal] = React.useState<{ providerId: string; isNew: boolean } | null>(null);
   const [limitInput, setLimitInput] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
   const token = () => localStorage.getItem("token");
+  const auth = () => ({ Authorization: `Bearer ${token()}` });
 
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [qRes, uRes, dRes, sRes] = await Promise.all([
-        fetch(`${API}/quota?limit=200`, { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`${API}/users`, { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`${API}/quota/defaults`, { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch(`${API}/quota/stats`, { headers: { Authorization: `Bearer ${token()}` } }),
+      const [qRes, uRes, pRes, dRes, sRes] = await Promise.all([
+        fetch(`${API}/quota?limit=200`, { headers: auth() }),
+        fetch(`${API}/users`, { headers: auth() }),
+        fetch(`${API}/ai-settings/providers/active`, { headers: auth() }),
+        fetch(`${API}/quota/defaults`, { headers: auth() }),
+        fetch(`${API}/quota/stats`, { headers: auth() }),
       ]);
       if (qRes.ok) { const d = await qRes.json(); setQuotas(d.data || []); }
       if (uRes.ok) setUsers(await uRes.json());
+      if (pRes.ok) setProviders(await pRes.json());
       if (dRes.ok) setDefaults(await dRes.json());
       if (sRes.ok) setStats(await sRes.json());
     } finally { setLoading(false); }
@@ -72,32 +88,30 @@ export default function QuotaPage() {
   React.useEffect(() => { load(); }, [load]);
 
   const saveQuota = async () => {
-    if (!editModal) return;
+    if (!userModal || !userModal.userId || !userModal.providerId) return;
     setSaving(true);
-    await fetch(`${API}/quota/user/${editModal.userId}/${editModal.providerType}`, {
+    await fetch(`${API}/quota/user/${userModal.userId}/${userModal.providerId}`, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+      headers: { ...auth(), "Content-Type": "application/json" },
       body: JSON.stringify({ monthlyLimit: +limitInput }),
     });
     setSaving(false);
-    setEditModal(null);
+    setUserModal(null);
     load();
   };
 
-  const resetQuota = async (userId: string, providerType: string) => {
-    if (!confirm("ریست شود؟")) return;
-    await fetch(`${API}/quota/user/${userId}/${providerType}/reset`, {
-      method: "POST", headers: { Authorization: `Bearer ${token()}` },
-    });
+  const resetQuota = async (userId: string, providerId: string) => {
+    if (!confirm("مصرف این مدل برای این کاربر ریست شود؟")) return;
+    await fetch(`${API}/quota/user/${userId}/${providerId}/reset`, { method: "POST", headers: auth() });
     load();
   };
 
   const saveDefault = async () => {
-    if (!defModal) return;
+    if (!defModal || !defModal.providerId) return;
     setSaving(true);
-    await fetch(`${API}/quota/defaults/${defModal.providerType}`, {
+    await fetch(`${API}/quota/defaults/${defModal.providerId}`, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+      headers: { ...auth(), "Content-Type": "application/json" },
       body: JSON.stringify({ monthlyLimit: +limitInput }),
     });
     setSaving(false);
@@ -105,15 +119,15 @@ export default function QuotaPage() {
     load();
   };
 
-  const deleteDefault = async (providerType: string) => {
-    if (!confirm("حذف شود؟")) return;
-    await fetch(`${API}/quota/defaults/${providerType}`, {
-      method: "DELETE", headers: { Authorization: `Bearer ${token()}` },
-    });
+  const deleteDefault = async (providerId: string) => {
+    if (!confirm("پیش‌فرض این مدل حذف شود؟")) return;
+    await fetch(`${API}/quota/defaults/${providerId}`, { method: "DELETE", headers: auth() });
     load();
   };
 
   const userMap = new Map(users.map((u: any) => [u.id, u]));
+  // Models without a default yet — offered first when adding a new default
+  const modelsWithoutDefault = providers.filter(p => !defaults.some(d => d.providerId === p.id));
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -122,7 +136,7 @@ export default function QuotaPage() {
           <h1 className="flex items-center gap-2 font-bold text-theme-primary text-xl">
             <Shield className="w-5 h-5 text-blue-600" /> مدیریت سقف توکن
           </h1>
-          <p className="mt-1 text-theme-muted text-sm">کنترل و پایش مصرف توکن کاربران</p>
+          <p className="mt-1 text-theme-muted text-sm">کنترل و پایش مصرف توکن کاربران به تفکیک مدل</p>
         </div>
       </div>
 
@@ -148,7 +162,7 @@ export default function QuotaPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-theme-hover p-1 rounded-xl w-fit">
-        {[["users", "کاربران"], ["defaults", "پیش‌فرض‌ها"], ["stats", "برترین مصرف‌کنندگان"]].map(([k, l]) => (
+        {[["users", "کاربران"], ["defaults", "پیش‌فرض مدل‌ها"], ["stats", "برترین مصرف‌کنندگان"]].map(([k, l]) => (
           <button key={k} onClick={() => setTab(k as any)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === k ? "bg-theme-card text-theme-primary shadow-sm" : "text-theme-muted hover:text-theme-secondary"}`}>
             {l}
@@ -158,73 +172,78 @@ export default function QuotaPage() {
 
       {/* User quotas tab */}
       {tab === "users" && (
-        <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-theme">
-            <span className="font-medium text-theme-primary text-sm">{quotas.length} رکورد quota</span>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-theme-muted text-sm">سقف اختصاصی هر کاربر برای یک مدل — در نبود رکورد، از پیش‌فرض همان مدل پیروی می‌شود</p>
+            <button onClick={() => { setUserModal({ userId: users[0]?.id || "", providerId: providers[0]?.id || "", isNew: true }); setLimitInput("1000000"); }}
+              disabled={providers.length === 0 || users.length === 0}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-3 py-2 rounded-xl text-white text-sm transition-colors">
+              <Plus className="w-4 h-4" /> افزودن محدودیت کاربر
+            </button>
           </div>
-          {loading ? (
-            <div className="p-8 text-center text-theme-muted text-sm">در حال بارگذاری...</div>
-          ) : quotas.length === 0 ? (
-            <div className="p-8 text-center text-theme-muted text-sm">هنوز هیچ quota ثبت نشده — بعد از اولین chat ایجاد می‌شود</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-theme-hover">
-                  <tr>
-                    {["کاربر", "سرویس", "وضعیت", "مصرف", "سقف ماهانه", "اقدام"].map(h => (
-                      <th key={h} className="px-4 py-3 text-right font-medium text-theme-muted text-xs">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-theme">
-                  {quotas.map((q: any) => {
-                    const u = userMap.get(q.userId) as any;
-                    const name = u ? `${u.firstName} ${u.lastName}` : q.userId.slice(0, 8);
-                    return (
-                      <tr key={q.id} className="hover:bg-theme-hover transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-theme-primary text-xs">{name}</div>
-                          <div className="text-[10px] text-theme-muted">{u?.phone}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <div className="rounded w-2 h-2" style={{ background: PROVIDER_COLORS[q.providerType] || "#888" }} />
-                            <span className="text-xs">{PROVIDER_LABELS[q.providerType] || q.providerType}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <StatusDot status={q.status} />
-                            <span className="text-xs text-theme-muted capitalize">
-                              {q.status === "unlimited" ? "نامحدود" : q.status === "critical" ? "بحرانی" : q.status === "warning" ? "هشدار" : "عادی"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 min-w-[140px]">
-                          <QuotaBar used={q.usedTokens} limit={q.monthlyLimit} pct={q.usagePercent} />
-                        </td>
-                        <td className="px-4 py-3 text-xs text-theme-secondary">
-                          {q.monthlyLimit === 0 ? "نامحدود" : q.monthlyLimit.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => { setEditModal({ userId: q.userId, providerType: q.providerType, current: q.monthlyLimit }); setLimitInput(String(q.monthlyLimit)); }}
-                              className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 text-theme-muted hover:text-blue-600 transition-colors">
-                              <Settings className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => resetQuota(q.userId, q.providerType)}
-                              className="p-1.5 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-950/30 text-theme-muted hover:text-orange-600 transition-colors" title="ریست مصرف">
-                              <RotateCcw className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
+            <div className="p-4 border-b border-theme">
+              <span className="font-medium text-theme-primary text-sm">{quotas.length} رکورد محدودیت</span>
             </div>
-          )}
+            {loading ? (
+              <div className="p-8 text-center text-theme-muted text-sm">در حال بارگذاری...</div>
+            ) : quotas.length === 0 ? (
+              <div className="p-8 text-center text-theme-muted text-sm">هنوز محدودیتی ثبت نشده — بعد از اولین استفاده یا با دکمه «افزودن» ایجاد می‌شود</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-theme-hover">
+                    <tr>
+                      {["کاربر", "مدل", "وضعیت", "مصرف", "سقف ماهانه", "اقدام"].map(h => (
+                        <th key={h} className="px-4 py-3 text-right font-medium text-theme-muted text-xs">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-theme">
+                    {quotas.map((q: any) => {
+                      const u = userMap.get(q.userId) as any;
+                      const name = u ? `${u.firstName} ${u.lastName}` : q.userId.slice(0, 8);
+                      return (
+                        <tr key={q.id} className="hover:bg-theme-hover transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-theme-primary text-xs">{name}</div>
+                            <div className="text-[10px] text-theme-muted">{u?.phone}</div>
+                          </td>
+                          <td className="px-4 py-3"><ModelBadge provider={q.provider} /></td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5">
+                              <StatusDot status={q.status} />
+                              <span className="text-xs text-theme-muted capitalize">
+                                {q.status === "unlimited" ? "نامحدود" : q.status === "critical" ? "بحرانی" : q.status === "warning" ? "هشدار" : "عادی"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 min-w-[140px]">
+                            <QuotaBar used={q.usedTokens} limit={q.monthlyLimit} pct={q.usagePercent} />
+                          </td>
+                          <td className="px-4 py-3 text-xs text-theme-secondary">
+                            {q.monthlyLimit === 0 ? "نامحدود" : q.monthlyLimit.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => { setUserModal({ userId: q.userId, providerId: q.providerId, isNew: false }); setLimitInput(String(q.monthlyLimit)); }}
+                                className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 text-theme-muted hover:text-blue-600 transition-colors" title="ویرایش سقف">
+                                <Settings className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => resetQuota(q.userId, q.providerId)}
+                                className="p-1.5 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-950/30 text-theme-muted hover:text-orange-600 transition-colors" title="ریست مصرف">
+                                <RotateCcw className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -232,34 +251,42 @@ export default function QuotaPage() {
       {tab === "defaults" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-theme-muted text-sm">quota پیش‌فرض که به کاربران جدید اختصاص می‌یابد</p>
-            <button onClick={() => { setDefModal({ providerType: "openai", current: 0 }); setLimitInput("1000000"); }}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-xl text-white text-sm transition-colors">
+            <p className="text-theme-muted text-sm">سقف پیش‌فرض هر مدل که هنگام اولین استفاده به کاربران اعمال می‌شود</p>
+            <button onClick={() => { setDefModal({ providerId: modelsWithoutDefault[0]?.id || providers[0]?.id || "", isNew: true }); setLimitInput("1000000"); }}
+              disabled={providers.length === 0}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-3 py-2 rounded-xl text-white text-sm transition-colors">
               <Plus className="w-4 h-4" /> افزودن
             </button>
           </div>
-          {defaults.length === 0 ? (
+          {providers.length === 0 ? (
             <div className="bg-theme-card p-8 border border-theme rounded-xl text-center text-theme-muted text-sm">
-              هیچ quota پیش‌فرضی تعریف نشده — بدون quota پیش‌فرض، کاربران دسترسی نامحدود دارند
+              هیچ مدل فعالی در «تنظیمات AI» تعریف نشده — ابتدا یک مدل اضافه کنید
+            </div>
+          ) : defaults.length === 0 ? (
+            <div className="bg-theme-card p-8 border border-theme rounded-xl text-center text-theme-muted text-sm">
+              هیچ پیش‌فرضی تعریف نشده — بدون پیش‌فرض، کاربران روی این مدل‌ها دسترسی نامحدود دارند
             </div>
           ) : (
             <div className="gap-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
               {defaults.map((d: any) => (
                 <div key={d.id} className="bg-theme-card p-4 border border-theme rounded-xl">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="rounded-lg w-8 h-8 flex items-center justify-center text-white text-xs font-bold"
-                        style={{ background: PROVIDER_COLORS[d.providerType] || "#888" }}>
-                        {(PROVIDER_LABELS[d.providerType] || d.providerType).slice(0, 2)}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="rounded-lg w-8 h-8 flex items-center justify-center text-white text-xs font-bold shrink-0"
+                        style={{ background: providerColor(d.provider?.type) }}>
+                        <Cpu className="w-4 h-4" />
                       </div>
-                      <span className="font-medium text-theme-primary text-sm">{PROVIDER_LABELS[d.providerType] || d.providerType}</span>
+                      <div className="min-w-0">
+                        <div className="font-medium text-theme-primary text-sm truncate">{d.provider?.name || "مدل حذف‌شده"}</div>
+                        {d.provider?.model && <div className="text-[10px] text-theme-muted truncate">{d.provider.model}</div>}
+                      </div>
                     </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => { setDefModal({ providerType: d.providerType, current: d.monthlyLimit }); setLimitInput(String(d.monthlyLimit)); }}
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={() => { setDefModal({ providerId: d.providerId, isNew: false }); setLimitInput(String(d.monthlyLimit)); }}
                         className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 text-theme-muted hover:text-blue-600 transition-colors">
                         <Settings className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => deleteDefault(d.providerType)}
+                      <button onClick={() => deleteDefault(d.providerId)}
                         className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-theme-muted hover:text-red-600 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -301,19 +328,40 @@ export default function QuotaPage() {
         </div>
       )}
 
-      {/* Edit quota modal */}
+      {/* User quota modal */}
       <Modal
-        open={!!editModal}
-        onClose={() => setEditModal(null)}
-        title="ویرایش سقف توکن"
+        open={!!userModal}
+        onClose={() => setUserModal(null)}
+        title={userModal?.isNew ? "افزودن محدودیت کاربر" : "ویرایش سقف توکن"}
         size="sm"
         footer={<>
-          <button onClick={() => setEditModal(null)} className="btn-theme-secondary text-sm">انصراف</button>
-          <button onClick={saveQuota} disabled={saving} className="btn-theme-primary text-sm disabled:opacity-50">ذخیره</button>
+          <button onClick={() => setUserModal(null)} className="btn-theme-secondary text-sm">انصراف</button>
+          <button onClick={saveQuota} disabled={saving || !userModal?.userId || !userModal?.providerId} className="btn-theme-primary text-sm disabled:opacity-50">ذخیره</button>
         </>}
       >
         <div className="space-y-3">
-          <div className="text-sm text-theme-muted">سرویس: <span className="font-medium text-theme-primary">{PROVIDER_LABELS[editModal?.providerType || ""] || editModal?.providerType}</span></div>
+          {userModal?.isNew ? (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-theme-secondary mb-1.5">کاربر</label>
+                <select value={userModal?.userId || ""} onChange={e => setUserModal(m => m ? { ...m, userId: e.target.value } : null)} className="select-theme text-sm">
+                  {users.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName} {u.phone ? `— ${u.phone}` : ""}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-theme-secondary mb-1.5">مدل</label>
+                <select value={userModal?.providerId || ""} onChange={e => setUserModal(m => m ? { ...m, providerId: e.target.value } : null)} className="select-theme text-sm">
+                  {providers.map(p => <option key={p.id} value={p.id}>{modelLabel(p)}</option>)}
+                </select>
+              </div>
+            </>
+          ) : (
+            <div className="text-sm text-theme-muted">
+              کاربر: <span className="font-medium text-theme-primary">{(() => { const u = userMap.get(userModal?.userId) as any; return u ? `${u.firstName} ${u.lastName}` : userModal?.userId?.slice(0, 8); })()}</span>
+              <span className="mx-2">·</span>
+              مدل: <span className="font-medium text-theme-primary">{modelLabel(providers.find(p => p.id === userModal?.providerId) || quotas.find(q => q.providerId === userModal?.providerId)?.provider)}</span>
+            </div>
+          )}
           <div className="text-xs text-theme-muted">عدد ۰ = نامحدود</div>
           <input type="number" value={limitInput} onChange={e => setLimitInput(e.target.value)} min={0} className="input-theme text-sm" placeholder="مثلاً 1000000" />
         </div>
@@ -323,19 +371,29 @@ export default function QuotaPage() {
       <Modal
         open={!!defModal}
         onClose={() => setDefModal(null)}
-        title="quota پیش‌فرض"
+        title={defModal?.isNew ? "افزودن پیش‌فرض مدل" : "ویرایش پیش‌فرض مدل"}
         size="sm"
         footer={<>
           <button onClick={() => setDefModal(null)} className="btn-theme-secondary text-sm">انصراف</button>
-          <button onClick={saveDefault} disabled={saving} className="btn-theme-primary text-sm disabled:opacity-50">ذخیره</button>
+          <button onClick={saveDefault} disabled={saving || !defModal?.providerId} className="btn-theme-primary text-sm disabled:opacity-50">ذخیره</button>
         </>}
       >
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-theme-secondary mb-1.5">سرویس</label>
-            <select value={defModal?.providerType || ""} onChange={e => setDefModal(d => d ? { ...d, providerType: e.target.value } : null)} className="select-theme text-sm">
-              {Object.entries(PROVIDER_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
+            <label className="block text-xs font-medium text-theme-secondary mb-1.5">مدل</label>
+            {defModal?.isNew ? (
+              <select value={defModal?.providerId || ""} onChange={e => setDefModal(d => d ? { ...d, providerId: e.target.value } : null)} className="select-theme text-sm">
+                {providers.map(p => (
+                  <option key={p.id} value={p.id} disabled={defaults.some(d => d.providerId === p.id)}>
+                    {modelLabel(p)}{defaults.some(d => d.providerId === p.id) ? " (تعریف‌شده)" : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="text-sm font-medium text-theme-primary">
+                {modelLabel(providers.find(p => p.id === defModal?.providerId) || defaults.find(d => d.providerId === defModal?.providerId)?.provider)}
+              </div>
+            )}
           </div>
           <div className="text-xs text-theme-muted">عدد ۰ = نامحدود</div>
           <input type="number" value={limitInput} onChange={e => setLimitInput(e.target.value)} min={0} className="input-theme text-sm" placeholder="مثلاً 1000000" />
