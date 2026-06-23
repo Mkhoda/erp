@@ -92,13 +92,26 @@ export class RecomputeService {
       where: { cardNo: user.attendanceCardNo, userId: null },
       data: { userId },
     });
-    const punches = await this.prisma.rawAttendanceRecord.findMany({
+    // Recompute EVERY day from the user's first punch to today — this also
+    // materializes absent days (workdays with no punch → status ABSENT) so they
+    // become visible and resolvable.
+    const first = await this.prisma.rawAttendanceRecord.findFirst({
       where: { userId },
+      orderBy: { punchAt: 'asc' },
       select: { punchAt: true },
     });
-    const pairs = punches.map((p) => ({ userId, gregDate: workDateOf(p.punchAt) }));
-    const recomputed = await this.recomputeDays(pairs);
+    if (!first) return { linked: r.count, recomputed: 0 };
+    const recomputed = await this.recomputeUserRange(userId, workDateOf(first.punchAt), workDateOf(new Date()));
     return { linked: r.count, recomputed };
+  }
+
+  // Recompute every calendar day in [from, to] for one user (fills gaps/absences).
+  async recomputeUserRange(userId: string, from: Date, to: Date): Promise<number> {
+    const pairs: Array<{ userId: string; gregDate: Date }> = [];
+    for (let d = new Date(from); d <= to; d = new Date(d.getTime() + 86400000)) {
+      pairs.push({ userId, gregDate: new Date(d) });
+    }
+    return this.recomputeDays(pairs);
   }
 
   /**

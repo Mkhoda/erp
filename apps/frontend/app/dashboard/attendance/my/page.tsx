@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
-import { Loader2, Fingerprint, Pencil, X, Clock, CheckCircle2, XCircle, AlertTriangle, Send } from "lucide-react";
+import { Loader2, Fingerprint, Pencil, AlertTriangle, Send, Hourglass } from "lucide-react";
+import Modal from "../../../components/ui/Modal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
@@ -26,8 +27,15 @@ export default function MyAttendancePage() {
   const [jMonth, setJMonth] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [modal, setModal] = React.useState<any>(null); // { row }
-  const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", inTime: "", outTime: "", description: "" });
+  const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", fixIn: false, inTime: "", fixOut: false, outTime: "", description: "" });
   const [sending, setSending] = React.useState(false);
+
+  // Days that already have an open (pending) request — block re-submitting.
+  const pendingDates = React.useMemo(
+    () => new Set(myReqs.filter((q: any) => q.status === "PENDING").map((q: any) => q.gregDate.slice(0, 10))),
+    [myReqs],
+  );
+  const toHHmm = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran", hour12: false }) : "";
 
   const qs = () => { const p = new URLSearchParams(); if (jYear) p.set("jYear", String(jYear)); if (jMonth) p.set("jMonth", String(jMonth)); return p.toString(); };
 
@@ -54,7 +62,14 @@ export default function MyAttendancePage() {
   const monthOpts = [...new Set(periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth))].sort((a, b) => a - b);
 
   function openRequest(row: any) {
-    setReqForm({ kind: "FIX", inTime: "", outTime: "", description: "" });
+    const hasIn = !!row.firstCheckIn, hasOut = !!row.lastCheckOut;
+    setReqForm({
+      kind: "FIX",
+      // Pre-fill existing times; default to correcting the MISSING side.
+      fixIn: !hasIn, inTime: toHHmm(row.firstCheckIn),
+      fixOut: !hasOut, outTime: toHHmm(row.lastCheckOut),
+      description: "",
+    });
     setModal({ row });
   }
 
@@ -63,11 +78,16 @@ export default function MyAttendancePage() {
     try {
       const k = reqForm.kind;
       const body: any = { date: modal.row.gregDate.slice(0, 10), description: reqForm.description };
-      if (k === "FIX") { body.type = "FULL_DAY_FIX"; body.inTime = reqForm.inTime || undefined; body.outTime = reqForm.outTime || undefined; }
-      else if (k === "EXPLANATION") { body.type = "EXPLANATION"; }
+      if (k === "FIX") {
+        const inT = reqForm.fixIn ? reqForm.inTime : undefined;
+        const outT = reqForm.fixOut ? reqForm.outTime : undefined;
+        body.type = inT && outT ? "FULL_DAY_FIX" : outT ? "CHECK_OUT_FIX" : "CHECK_IN_FIX";
+        body.inTime = inT; body.outTime = outT;
+      } else if (k === "EXPLANATION") { body.type = "EXPLANATION"; }
       else { body.type = "LEAVE"; body.targetStatus = k; } // LEAVE | MISSION | REMOTE_WORK
       const res = await fetch(`${API}/attendance/me/requests`, { method: "POST", headers: h, body: JSON.stringify(body) });
       if (res.ok) { setModal(null); await load(); }
+      else { const e = await res.json().catch(() => ({})); alert(e.message || "خطا در ثبت درخواست"); }
     } finally { setSending(false); }
   }
 
@@ -101,6 +121,16 @@ export default function MyAttendancePage() {
         </div>
       )}
 
+      {(() => {
+        const unresolved = rows.filter(r => (r.status === "INCOMPLETE" || r.status === "ABSENT") && !pendingDates.has(r.gregDate.slice(0, 10)));
+        return unresolved.length > 0 ? (
+          <div className="flex items-center gap-2 text-sm text-orange-700 bg-orange-500/10 rounded-xl px-4 py-3">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{faNum(unresolved.length)} روز نیاز به تعیین وضعیت دارد (ناقص یا غیبت). با دکمه‌ی ✏️ روبه‌روی هر روز، اصلاح یا مرخصی/ماموریت ثبت کنید.</span>
+          </div>
+        ) : null;
+      })()}
+
       <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
         {loading ? <div className="flex items-center justify-center h-56"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div> : (
           <div className="overflow-x-auto">
@@ -112,18 +142,26 @@ export default function MyAttendancePage() {
               </tr></thead>
               <tbody>
                 {rows.length === 0 ? <tr><td colSpan={8} className="py-10 text-theme-muted">رکوردی نیست</td></tr> : rows.map(r => {
-                  const incomplete = r.status === "INCOMPLETE" || r.status === "ABSENT";
+                  const needsResolve = r.status === "INCOMPLETE" || r.status === "ABSENT";
+                  const isPending = pendingDates.has(r.gregDate.slice(0, 10));
                   return (
-                    <tr key={r.id} className={`border-b border-theme/40 ${incomplete ? "bg-orange-500/5" : ""}`}>
+                    <tr key={r.id} className={`border-b border-theme/40 ${needsResolve && !isPending ? "bg-orange-500/5" : ""}`}>
                       <td className="py-1.5 px-2 text-theme-primary" dir="ltr">{faDate(r.gregDate)}</td>
                       <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.firstCheckIn)}</td>
                       <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.lastCheckOut)}</td>
                       <td className="px-2 text-theme-primary" dir="ltr">{fmtMin(r.workedMinutes)}</td>
                       <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
                       <td className="px-2 text-amber-600" dir="ltr">{r.delayMinutes ? fmtMin(r.delayMinutes) : "—"}</td>
-                      <td className="px-2"><span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[r.status] || ""}`}>{incomplete && <AlertTriangle className="w-3 h-3" />}{STATUS_FA[r.status] || r.status}</span></td>
+                      <td className="px-2"><span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[r.status] || ""}`}>{needsResolve && <AlertTriangle className="w-3 h-3" />}{STATUS_FA[r.status] || r.status}</span></td>
                       <td className="px-2">
-                        <button onClick={() => openRequest(r)} title="درخواست اصلاح/مرخصی" className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-blue-500 hover:bg-blue-500/10"><Pencil className="w-4 h-4" /></button>
+                        {isPending ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-amber-600" title="درخواست در حال بررسی"><Hourglass className="w-3.5 h-3.5" /> در انتظار</span>
+                        ) : (
+                          <button onClick={() => openRequest(r)} title={needsResolve ? "نیاز به تعیین وضعیت" : "درخواست اصلاح/مرخصی"}
+                            className={`inline-flex items-center justify-center w-7 h-7 rounded-lg ${needsResolve ? "text-orange-600 hover:bg-orange-500/10" : "text-blue-500 hover:bg-blue-500/10"}`}>
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -153,42 +191,58 @@ export default function MyAttendancePage() {
         )}
       </div>
 
-      {/* Request modal */}
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModal(null)}>
-          <div className="bg-theme-card border border-theme rounded-2xl p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-theme-primary">درخواست برای {faDate(modal.row.gregDate)}</h3>
-              <button onClick={() => setModal(null)} className="text-theme-muted hover:text-theme-primary"><X className="w-5 h-5" /></button>
+      {/* Request modal (unified full-screen Modal) */}
+      <Modal
+        open={!!modal}
+        onClose={() => setModal(null)}
+        title={modal ? `درخواست برای ${faDate(modal.row.gregDate)}` : ""}
+        subtitle={modal ? `وضعیت فعلی: ${STATUS_FA[modal.row.status] || modal.row.status} · ورود ${faTime(modal.row.firstCheckIn)} · خروج ${faTime(modal.row.lastCheckOut)}` : undefined}
+        size="md"
+        footer={modal && (
+          <div className="flex items-center justify-end gap-2">
+            <button onClick={() => setModal(null)} className="btn-theme-secondary text-sm">انصراف</button>
+            <button onClick={submitRequest} disabled={sending} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} ثبت درخواست
+            </button>
+          </div>
+        )}
+      >
+        {modal && (
+          <div className="space-y-3">
+            <div>
+              <label className="block mb-1 text-theme-secondary text-xs">نوع درخواست</label>
+              <select value={reqForm.kind} onChange={e => setReqForm((s: any) => ({ ...s, kind: e.target.value }))} className="input-theme text-sm">
+                <option value="FIX">اصلاح ساعت ورود/خروج</option>
+                <option value="LEAVE">مرخصی (کل روز)</option>
+                <option value="MISSION">ماموریت (کل روز)</option>
+                <option value="REMOTE_WORK">دورکاری (کل روز)</option>
+                <option value="EXPLANATION">توضیح</option>
+              </select>
             </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block mb-1 text-theme-secondary text-xs">نوع درخواست</label>
-                <select value={reqForm.kind} onChange={e => setReqForm((s: any) => ({ ...s, kind: e.target.value }))} className="input-theme text-sm">
-                  <option value="FIX">اصلاح ساعت ورود/خروج</option>
-                  <option value="LEAVE">مرخصی (کل روز)</option>
-                  <option value="MISSION">ماموریت (کل روز)</option>
-                  <option value="REMOTE_WORK">دورکاری (کل روز)</option>
-                  <option value="EXPLANATION">توضیح</option>
-                </select>
-              </div>
-              {reqForm.kind === "FIX" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block mb-1 text-theme-secondary text-xs">ساعت ورود</label><input type="time" dir="ltr" value={reqForm.inTime} onChange={e => setReqForm((s: any) => ({ ...s, inTime: e.target.value }))} className="input-theme text-sm" /></div>
-                  <div><label className="block mb-1 text-theme-secondary text-xs">ساعت خروج</label><input type="time" dir="ltr" value={reqForm.outTime} onChange={e => setReqForm((s: any) => ({ ...s, outTime: e.target.value }))} className="input-theme text-sm" /></div>
+            {reqForm.kind === "FIX" && (
+              <div className="space-y-2">
+                <p className="text-[11px] text-theme-muted">فقط بخشی که می‌خواهید اصلاح شود را تیک بزنید؛ بخش بدون تیک دست‌نخورده می‌ماند.</p>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm text-theme-primary w-32 shrink-0">
+                    <input type="checkbox" checked={reqForm.fixIn} onChange={e => setReqForm((s: any) => ({ ...s, fixIn: e.target.checked }))} /> اصلاح ورود
+                  </label>
+                  <input type="time" dir="ltr" disabled={!reqForm.fixIn} value={reqForm.inTime} onChange={e => setReqForm((s: any) => ({ ...s, inTime: e.target.value }))} className="input-theme text-sm disabled:opacity-50" />
                 </div>
-              )}
-              <div>
-                <label className="block mb-1 text-theme-secondary text-xs">توضیحات</label>
-                <textarea value={reqForm.description} onChange={e => setReqForm((s: any) => ({ ...s, description: e.target.value }))} className="input-theme text-sm" rows={2} placeholder="دلیل درخواست..." />
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm text-theme-primary w-32 shrink-0">
+                    <input type="checkbox" checked={reqForm.fixOut} onChange={e => setReqForm((s: any) => ({ ...s, fixOut: e.target.checked }))} /> اصلاح خروج
+                  </label>
+                  <input type="time" dir="ltr" disabled={!reqForm.fixOut} value={reqForm.outTime} onChange={e => setReqForm((s: any) => ({ ...s, outTime: e.target.value }))} className="input-theme text-sm disabled:opacity-50" />
+                </div>
               </div>
-              <button onClick={submitRequest} disabled={sending} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50">
-                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} ثبت درخواست
-              </button>
+            )}
+            <div>
+              <label className="block mb-1 text-theme-secondary text-xs">توضیحات</label>
+              <textarea value={reqForm.description} onChange={e => setReqForm((s: any) => ({ ...s, description: e.target.value }))} className="input-theme text-sm" rows={2} placeholder="دلیل درخواست..." />
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

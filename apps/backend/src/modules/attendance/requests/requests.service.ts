@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RecomputeService } from '../engine/recompute.service';
 import { parseWorkDate } from '../scope.util';
@@ -28,12 +28,18 @@ export class RequestsService {
   ) {}
 
   // ── Employee self-service ──────────────────────────────────────────────
-  create(userId: string, dto: any) {
+  async create(userId: string, dto: any) {
+    const gregDate = parseWorkDate(dto.date);
+    // One open request per day.
+    const existing = await this.prisma.attendanceRequest.findFirst({
+      where: { userId, gregDate, status: 'PENDING' },
+    });
+    if (existing) throw new ConflictException('برای این روز یک درخواست در حال بررسی دارید');
     return this.prisma.attendanceRequest.create({
       data: {
         userId,
         type: (dto.type as any) || 'FULL_DAY_FIX',
-        gregDate: parseWorkDate(dto.date),
+        gregDate,
         requestedIn: buildInstant(dto.date, dto.inTime),
         requestedOut: buildInstant(dto.date, dto.outTime),
         targetStatus: (dto.targetStatus as any) || null,

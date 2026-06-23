@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
-import { Loader2, CheckCircle2, XCircle, ClipboardCheck, Clock } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, ClipboardCheck, ArrowLeftRight } from "lucide-react";
+import Modal from "../../../components/ui/Modal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 const STATUS_FA: Record<string,string> = { LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری" };
@@ -18,6 +19,8 @@ export default function ApprovalsPage() {
   const [statusF, setStatusF] = React.useState("PENDING");
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [sel, setSel] = React.useState<any>(null); // { req, day }
+  const [note, setNote] = React.useState("");
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -29,10 +32,18 @@ export default function ApprovalsPage() {
   }, [statusF]);
   React.useEffect(() => { load(); }, [load]);
 
+  async function openRow(q: any) {
+    setNote(""); setSel({ req: q, day: null });
+    const date = q.gregDate.slice(0, 10);
+    const d = await fetch(`${API}/attendance/records/day?userId=${q.userId}&date=${date}`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null);
+    setSel({ req: q, day: d?.day || null });
+  }
+
   async function decide(id: string, decision: "APPROVE" | "REJECT") {
     setBusy(id);
     try {
-      await fetch(`${API}/attendance/requests/${id}/decision`, { method: "PATCH", headers: h, body: JSON.stringify({ decision }) });
+      await fetch(`${API}/attendance/requests/${id}/decision`, { method: "PATCH", headers: h, body: JSON.stringify({ decision, note: note || undefined }) });
+      setSel(null);
       await load();
     } finally { setBusy(null); }
   }
@@ -63,7 +74,7 @@ export default function ApprovalsPage() {
               </tr></thead>
               <tbody>
                 {rows.length === 0 ? <tr><td colSpan={8} className="py-10 text-theme-muted">درخواستی نیست</td></tr> : rows.map(q => (
-                  <tr key={q.id} className="border-b border-theme/40 hover:bg-theme-hover">
+                  <tr key={q.id} onClick={() => openRow(q)} className="border-b border-theme/40 hover:bg-theme-hover cursor-pointer">
                     <td className="py-1.5 px-2 text-theme-primary whitespace-nowrap">{q.user ? `${q.user.firstName} ${q.user.lastName}` : "—"}</td>
                     <td className="px-2 text-theme-muted" dir="ltr">{faDate(q.gregDate)}</td>
                     <td className="px-2 text-theme-muted">{q.targetStatus ? STATUS_FA[q.targetStatus] : TYPE_FA[q.type] || q.type}</td>
@@ -72,12 +83,9 @@ export default function ApprovalsPage() {
                     <td className="px-2 text-theme-muted text-xs max-w-[180px] truncate" title={q.description}>{q.description || "—"}</td>
                     <td className="px-2"><span className={`text-xs px-2 py-0.5 rounded-full ${q.status === "APPROVED" ? "bg-green-500/15 text-green-600" : q.status === "REJECTED" ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600"}`}>{REQ_STATUS_FA[q.status] || q.status}</span></td>
                     <td className="px-2">
-                      {q.status === "PENDING" ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => decide(q.id, "APPROVE")} disabled={busy === q.id} title="تایید" className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-green-600 hover:bg-green-500/10 disabled:opacity-50">{busy === q.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}</button>
-                          <button onClick={() => decide(q.id, "REJECT")} disabled={busy === q.id} title="رد" className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-red-600 hover:bg-red-500/10 disabled:opacity-50"><XCircle className="w-4 h-4" /></button>
-                        </div>
-                      ) : <span className="text-theme-muted text-xs">—</span>}
+                      <button onClick={(e) => { e.stopPropagation(); openRow(q); }} className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-theme-secondary border border-theme text-theme-primary hover:bg-theme-hover">
+                        <ArrowLeftRight className="w-3.5 h-3.5" /> بررسی
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -86,6 +94,61 @@ export default function ApprovalsPage() {
           </div>
         )}
       </div>
+
+      {/* Review modal: current vs requested */}
+      <Modal
+        open={!!sel}
+        onClose={() => setSel(null)}
+        title={sel ? `بررسی درخواست — ${sel.req.user ? `${sel.req.user.firstName} ${sel.req.user.lastName}` : ""}` : ""}
+        subtitle={sel ? faDate(sel.req.gregDate) : undefined}
+        size="md"
+        footer={sel && sel.req.status === "PENDING" && (
+          <div className="flex items-center justify-end gap-2">
+            <button onClick={() => decide(sel.req.id, "REJECT")} disabled={busy === sel.req.id} className="flex items-center gap-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm disabled:opacity-50"><XCircle className="w-4 h-4" /> رد</button>
+            <button onClick={() => decide(sel.req.id, "APPROVE")} disabled={busy === sel.req.id} className="flex items-center gap-1 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm disabled:opacity-50">{busy === sel.req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} تایید</button>
+          </div>
+        )}
+      >
+        {sel && (
+          <div className="space-y-4">
+            <div className="text-sm text-theme-muted">نوع: <span className="text-theme-primary">{sel.req.targetStatus ? STATUS_FA[sel.req.targetStatus] : TYPE_FA[sel.req.type] || sel.req.type}</span></div>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Current */}
+              <div className="border border-theme rounded-lg p-3">
+                <div className="text-xs font-semibold text-theme-secondary mb-2">وضعیت فعلی</div>
+                <Row label="ورود" value={faTime(sel.day?.firstCheckIn)} />
+                <Row label="خروج" value={faTime(sel.day?.lastCheckOut)} />
+                <Row label="وضعیت" value={sel.day ? (STATUS_FA[sel.day.status] || sel.day.status) : "—"} />
+              </div>
+              {/* Requested */}
+              <div className="border border-blue-500/40 bg-blue-500/5 rounded-lg p-3">
+                <div className="text-xs font-semibold text-blue-600 mb-2">درخواست</div>
+                <Row label="ورود" value={sel.req.requestedIn ? faTime(sel.req.requestedIn) : "بدون تغییر"} changed={!!sel.req.requestedIn} />
+                <Row label="خروج" value={sel.req.requestedOut ? faTime(sel.req.requestedOut) : "بدون تغییر"} changed={!!sel.req.requestedOut} />
+                <Row label="وضعیت" value={sel.req.targetStatus ? STATUS_FA[sel.req.targetStatus] : "بدون تغییر"} changed={!!sel.req.targetStatus} />
+              </div>
+            </div>
+            {sel.req.description && <div className="text-sm"><span className="text-theme-muted">توضیح کارمند: </span><span className="text-theme-primary">{sel.req.description}</span></div>}
+            {sel.req.status === "PENDING" ? (
+              <div>
+                <label className="block mb-1 text-theme-secondary text-xs">یادداشت تصمیم (اختیاری)</label>
+                <input value={note} onChange={e => setNote(e.target.value)} className="input-theme text-sm" placeholder="مثلاً تایید شد / مدرک ناقص" />
+              </div>
+            ) : (
+              <div className="text-sm text-theme-muted">این درخواست قبلاً {REQ_STATUS_FA[sel.req.status]} است{sel.req.decisionNote ? ` — ${sel.req.decisionNote}` : ""}.</div>
+            )}
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function Row({ label, value, changed }: { label: string; value: string; changed?: boolean }) {
+  return (
+    <div className="flex items-center justify-between text-sm py-0.5">
+      <span className="text-theme-muted text-xs">{label}</span>
+      <span className={changed ? "text-blue-600 font-medium" : "text-theme-primary"} dir="ltr">{value}</span>
     </div>
   );
 }

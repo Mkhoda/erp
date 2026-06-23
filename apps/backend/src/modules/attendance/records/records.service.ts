@@ -67,17 +67,20 @@ export class RecordsService {
   // Aggregated totals for the current filter (drives the records summary bar).
   async summary(f: RecordFilter) {
     const where = this.buildWhere(f);
-    const [agg, byStatus] = await Promise.all([
+    const [agg, byStatus, byDate] = await Promise.all([
       this.prisma.attendanceDay.aggregate({
         where,
         _sum: { workedMinutes: true, overtimeMinutes: true, delayMinutes: true, earlyLeaveMinutes: true, nightMinutes: true },
         _count: true,
       }),
       this.prisma.attendanceDay.groupBy({ by: ['status'], where, _count: true }),
+      this.prisma.attendanceDay.groupBy({ by: ['gregDate'], where }),
     ]);
     const statusCounts: Record<string, number> = {};
     for (const r of byStatus) statusCounts[r.status] = r._count;
     return {
+      records: agg._count,
+      distinctDays: byDate.length,
       days: agg._count,
       workedMinutes: agg._sum.workedMinutes ?? 0,
       overtimeMinutes: agg._sum.overtimeMinutes ?? 0,

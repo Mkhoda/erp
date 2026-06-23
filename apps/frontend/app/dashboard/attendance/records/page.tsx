@@ -40,6 +40,10 @@ export default function AttendanceRecordsPage() {
   // Admin edit (override) form in the detail modal.
   const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string }>({ inTime: "", outTime: "", status: "", reason: "" });
   const [ovSaving, setOvSaving] = React.useState(false);
+  // Pagination
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+  React.useEffect(() => { setPage(1); }, [rows, pageSize]);
 
   // 0 = "all" (no filter) — default shows every computed day so data always
   // appears if it exists; the user narrows down from there.
@@ -184,7 +188,7 @@ export default function AttendanceRecordsPage() {
       {/* Summary */}
       {summary && (
         <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-          <SumCard label="روزها" value={faNum(summary.days)} />
+          <SumCard label="روزهای دارای داده" value={faNum(summary.distinctDays ?? summary.days)} />
           <SumCard label="کارکرد" value={fmtMin(summary.workedMinutes)} />
           <SumCard label="اضافه‌کار" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
           <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
@@ -210,9 +214,9 @@ export default function AttendanceRecordsPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr><td colSpan={12} className="py-10 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
-                ) : rows.map((r, i) => (
+                ) : rows.slice((page-1)*pageSize, page*pageSize).map((r, i) => (
                   <tr key={r.id} className="border-b border-theme/40 hover:bg-theme-hover">
-                    <td className="py-1.5 px-2 text-theme-muted">{faNum(i+1)}</td>
+                    <td className="py-1.5 px-2 text-theme-muted">{faNum((page-1)*pageSize + i + 1)}</td>
                     <td className="px-2 text-theme-primary whitespace-nowrap">{r.user ? `${r.user.firstName} ${r.user.lastName}` : "—"}</td>
                     <td className="px-2 text-theme-muted" dir="ltr">{r.user?.attendanceCardNo || "—"}</td>
                     <td className="px-2 text-theme-muted whitespace-nowrap">{r.user?.department?.name || "—"}</td>
@@ -233,6 +237,23 @@ export default function AttendanceRecordsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {/* Pagination */}
+        {!loading && rows.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 border-t border-theme text-sm">
+            <div className="flex items-center gap-2 text-theme-muted">
+              <span>نمایش</span>
+              <select value={pageSize} onChange={e => setPageSize(+e.target.value)} className="input-theme text-sm w-auto py-1">
+                {[25, 50, 100, 200].map(n => <option key={n} value={n}>{faNum(n)}</option>)}
+              </select>
+              <span>از {faNum(rows.length)} رکورد</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 rounded-lg bg-theme-secondary border border-theme text-theme-primary disabled:opacity-40">قبلی</button>
+              <span className="text-theme-muted">صفحه {faNum(page)} از {faNum(Math.max(1, Math.ceil(rows.length / pageSize)))}</span>
+              <button disabled={page >= Math.ceil(rows.length / pageSize)} onClick={() => setPage(p => p + 1)} className="px-3 py-1 rounded-lg bg-theme-secondary border border-theme text-theme-primary disabled:opacity-40">بعدی</button>
+            </div>
           </div>
         )}
       </div>
