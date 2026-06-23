@@ -23,6 +23,7 @@ export default function MyAttendancePage() {
   const [summary, setSummary] = React.useState<any>(null);
   const [periods, setPeriods] = React.useState<Array<{ jYear: number; jMonth: number }>>([]);
   const [myReqs, setMyReqs] = React.useState<any[]>([]);
+  const [leave, setLeave] = React.useState<any>(null);
   const [jYear, setJYear] = React.useState(0);
   const [jMonth, setJMonth] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
@@ -42,12 +43,13 @@ export default function MyAttendancePage() {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [d, s, r] = await Promise.all([
+      const [d, s, r, lb] = await Promise.all([
         fetch(`${API}/attendance/me/days?${qs()}`, { headers: h }).then(x => x.ok ? x.json() : []),
         fetch(`${API}/attendance/me/summary?${qs()}`, { headers: h }).then(x => x.ok ? x.json() : null),
         fetch(`${API}/attendance/me/requests`, { headers: h }).then(x => x.ok ? x.json() : []),
+        fetch(`${API}/attendance/me/leave-balance${jYear ? `?jYear=${jYear}` : ""}`, { headers: h }).then(x => x.ok ? x.json() : null),
       ]);
-      setRows(Array.isArray(d) ? d : []); setSummary(s); setMyReqs(Array.isArray(r) ? r : []);
+      setRows(Array.isArray(d) ? d : []); setSummary(s); setMyReqs(Array.isArray(r) ? r : []); setLeave(lb);
     } finally { setLoading(false); }
     // eslint-disable-next-line
   }, [jYear, jMonth]);
@@ -109,6 +111,19 @@ export default function MyAttendancePage() {
           </select>
         </div>
       </div>
+
+      {leave && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-l from-blue-500/10 to-transparent border border-blue-500/30 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-theme-primary font-medium">
+            مرخصی سال {faNum(leave.jYear)}:
+            <span className="text-blue-600">مانده {faNum(leave.remaining)}</span>
+            <span className="text-theme-muted">از {faNum(leave.entitlement)} روز</span>
+          </div>
+          <div className="text-xs text-theme-muted">
+            مرخصی استفاده‌شده: {faNum(leave.used)} · ماموریت: {faNum(leave.mission)} · دورکاری: {faNum(leave.remote)}
+          </div>
+        </div>
+      )}
 
       {summary && (
         <div className="grid grid-cols-3 md:grid-cols-6 gap-2">

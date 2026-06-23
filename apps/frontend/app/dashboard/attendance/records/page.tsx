@@ -40,6 +40,7 @@ export default function AttendanceRecordsPage() {
   // Admin edit (override) form in the detail modal.
   const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string }>({ inTime: "", outTime: "", status: "", reason: "" });
   const [ovSaving, setOvSaving] = React.useState(false);
+  const [leave, setLeave] = React.useState<any>(null);
   // Pagination
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
@@ -73,6 +74,11 @@ export default function AttendanceRecordsPage() {
       ]);
       setRows(Array.isArray(r) ? r : []);
       setSummary(s);
+      // Leave balance only makes sense for a specific person + year.
+      const lbYear = jYear || (Array.isArray(r) && r[0] ? r[0].jYear : 0);
+      if (userId && lbYear) {
+        setLeave(await fetch(`${API}/attendance/records/leave-balance?userId=${userId}&jYear=${lbYear}`, { headers: h }).then(x => x.ok ? x.json() : null));
+      } else setLeave(null);
     } finally { setLoading(false); }
     // eslint-disable-next-line
   }, [qs]);
@@ -194,6 +200,14 @@ export default function AttendanceRecordsPage() {
           <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
           <SumCard label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" />
           <SumCard label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" />
+        </div>
+      )}
+
+      {leave && (
+        <div className="flex flex-wrap items-center gap-3 bg-blue-500/5 border border-blue-500/30 rounded-xl px-4 py-2.5 text-sm">
+          <span className="text-theme-primary font-medium">مرخصی سال {faNum(leave.jYear)}:</span>
+          <span className="text-blue-600">مانده {faNum(leave.remaining)} از {faNum(leave.entitlement)} روز</span>
+          <span className="text-theme-muted">· استفاده‌شده {faNum(leave.used)} · ماموریت {faNum(leave.mission)} · دورکاری {faNum(leave.remote)}</span>
         </div>
       )}
 

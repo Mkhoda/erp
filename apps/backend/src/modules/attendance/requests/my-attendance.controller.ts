@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/comm
 import { JwtAuthGuard } from '../../auth/jwt.guard';
 import { RecordsService } from '../records/records.service';
 import { RequestsService } from './requests.service';
+import { toJalaliParts, workDateOf } from '../engine/jalali.util';
 
 // Employee self-service — every authenticated user sees only their own data.
 @UseGuards(JwtAuthGuard)
@@ -38,6 +39,12 @@ export class MyAttendanceController {
   @Get('periods')
   periods(@Req() req: any) {
     return this.records.periods({ userId: this.uid(req) });
+  }
+
+  @Get('leave-balance')
+  leaveBalance(@Req() req: any, @Query('jYear') jYear?: string) {
+    const now = toJalaliParts(workDateOf(new Date()));
+    return this.records.leaveBalance(this.uid(req), jYear ? +jYear : now.jYear);
   }
 
   @Get('requests')

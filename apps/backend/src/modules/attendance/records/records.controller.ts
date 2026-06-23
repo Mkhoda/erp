@@ -52,4 +52,9 @@ export class RecordsController {
   async day(@Query('userId') userId: string, @Query('date') date: string) {
     return this.records.dayDetail(userId, parseWorkDate(date));
   }
+
+  @Get('leave-balance')
+  async leaveBalance(@Query('userId') userId: string, @Query('jYear') jYear: string) {
+    return this.records.leaveBalance(userId, +jYear);
+  }
 }

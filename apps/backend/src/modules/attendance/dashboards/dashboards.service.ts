@@ -93,6 +93,24 @@ export class DashboardsService {
         .slice(0, 8),
     );
 
+    // Per-department breakdown (status mix) — aggregated in JS over the month.
+    const dayRows = await this.prisma.attendanceDay.findMany({
+      where,
+      select: { status: true, overtimeMinutes: true, user: { select: { department: { select: { name: true } } } } },
+    });
+    const deptMap = new Map<string, { dept: string; present: number; absent: number; late: number; leave: number; overtimeMinutes: number }>();
+    for (const d of dayRows) {
+      const name = d.user?.department?.name || 'بدون دپارتمان';
+      const e = deptMap.get(name) || { dept: name, present: 0, absent: 0, late: 0, leave: 0, overtimeMinutes: 0 };
+      if (d.status === 'PRESENT') e.present++;
+      else if (d.status === 'ABSENT') e.absent++;
+      else if (d.status === 'LATE') e.late++;
+      else if (d.status === 'LEAVE' || d.status === 'MISSION' || d.status === 'REMOTE_WORK') e.leave++;
+      e.overtimeMinutes += d.overtimeMinutes || 0;
+      deptMap.set(name, e);
+    }
+    const byDepartment = [...deptMap.values()].sort((a, b) => (b.present + b.absent + b.late) - (a.present + a.absent + a.late));
+
     return {
       jYear,
       jMonth,
@@ -110,6 +128,7 @@ export class DashboardsService {
       trend,
       topOvertime: topOt,
       topDelay,
+      byDepartment,
     };
   }
 

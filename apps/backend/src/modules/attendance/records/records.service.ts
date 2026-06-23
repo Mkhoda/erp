@@ -102,6 +102,28 @@ export class RecordsService {
     return rows.map((r) => ({ jYear: r.jYear, jMonth: r.jMonth }));
   }
 
+  // Leave balance for a user in a Jalali year: entitlement (from the user's
+  // effective schedule/group) vs used (full-day LEAVE) → remaining.
+  async leaveBalance(userId: string, jYear: number) {
+    const rule = await this.prisma.userAttendanceRule.findUnique({ where: { userId } });
+    let sched = rule?.scheduleId
+      ? await this.prisma.workSchedule.findUnique({ where: { id: rule.scheduleId } })
+      : null;
+    if (!sched) {
+      sched = await this.prisma.workSchedule.findFirst({
+        where: { OR: [{ isDefault: true }, { name: 'default' }] },
+        orderBy: { isDefault: 'desc' },
+      });
+    }
+    const entitlement = sched?.annualLeaveDays ?? 26;
+    const [used, mission, remote] = await Promise.all([
+      this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'LEAVE' } }),
+      this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'MISSION' } }),
+      this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'REMOTE_WORK' } }),
+    ]);
+    return { jYear, entitlement, used, mission, remote, remaining: Math.max(0, entitlement - used) };
+  }
+
   // Day detail: computed row + every raw punch + any override (audit view).
   async dayDetail(userId: string, gregDate: Date) {
     const dayEnd = new Date(gregDate.getTime() + 24 * 60 * 60 * 1000);

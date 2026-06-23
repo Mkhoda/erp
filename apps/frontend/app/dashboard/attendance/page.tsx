@@ -6,7 +6,7 @@ import {
 } from "recharts";
 import {
   Users, Clock, AlertTriangle, Moon, CalendarCheck, CalendarX,
-  Loader2, Fingerprint, ArrowLeft,
+  Loader2, Fingerprint, ArrowLeft, Filter, CalendarDays, Plane,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -77,12 +77,14 @@ export default function AttendanceDashboardPage() {
   const trend = (data?.trend || []).map((t: any) => ({ روز: t.jDay, حاضر: t.present, اضافه‌کار: Math.round(t.overtimeMinutes/60*10)/10, تاخیر: Math.round(t.delayMinutes/60*10)/10 }));
   const topOt = (data?.topOvertime || []).map((u: any) => ({ name: u.name, ساعت: Math.round(u.value/60*10)/10 }));
   const topDelay = (data?.topDelay || []).map((u: any) => ({ name: u.name, دقیقه: u.value }));
+  const byDept = (data?.byDepartment || []).map((d: any) => ({ name: d.dept, حاضر: d.present, غیبت: d.absent, تاخیر: d.late, "مرخصی/ماموریت": d.leave }));
   const t = data?.totals || {};
   const today = data?.todayCounts || {};
+  const sc = data?.statusCounts || {};
 
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-5" dir="rtl">
-      {/* Header + filters */}
+    <div className="max-w-6xl mx-auto p-4 space-y-4" dir="rtl">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center"><Fingerprint className="w-5 h-5 text-white" /></div>
@@ -91,19 +93,22 @@ export default function AttendanceDashboardPage() {
             <p className="text-sm text-theme-muted">{jMonth ? `${J_MONTHS[jMonth-1]} ${faY(jYear||0)}` : "—"}</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select className="input-theme text-sm w-auto" value={jYear ?? ""} onChange={e => setJYear(+e.target.value)}>
-            {yearOpts.map(y => <option key={y} value={y}>{faY(y)}</option>)}
-          </select>
-          <select className="input-theme text-sm w-auto" value={jMonth ?? ""} onChange={e => setJMonth(+e.target.value)}>
-            {monthOpts.map(m => <option key={m} value={m}>{J_MONTHS[m-1]}</option>)}
-          </select>
-          <select className="input-theme text-sm w-auto" value={deptId} onChange={e => setDeptId(e.target.value)}>
-            <option value="">همه دپارتمان‌ها</option>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <Link href="/dashboard/attendance/records" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> کارکرد روزانه</Link>
-        </div>
+        <Link href="/dashboard/attendance/records" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> کارکرد روزانه</Link>
+      </div>
+
+      {/* Filter bar */}
+      <div className="bg-theme-card border border-theme rounded-xl p-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-theme-muted flex items-center gap-1"><Filter className="w-3.5 h-3.5" /> فیلتر:</span>
+        <select className="input-theme text-sm w-auto" value={jYear ?? ""} onChange={e => setJYear(+e.target.value)}>
+          {yearOpts.map(y => <option key={y} value={y}>سال {faY(y)}</option>)}
+        </select>
+        <select className="input-theme text-sm w-auto" value={jMonth ?? ""} onChange={e => setJMonth(+e.target.value)}>
+          {monthOpts.map(m => <option key={m} value={m}>{J_MONTHS[m-1]}</option>)}
+        </select>
+        <select className="input-theme text-sm w-auto" value={deptId} onChange={e => setDeptId(e.target.value)}>
+          <option value="">همه دپارتمان‌ها</option>
+          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
       </div>
 
       {loading ? (
@@ -112,14 +117,24 @@ export default function AttendanceDashboardPage() {
         <div className="bg-theme-card border border-theme rounded-xl p-8 text-center text-theme-muted">داده‌ای یافت نشد</div>
       ) : (
         <>
-          {/* Stat cards */}
+          {/* Today */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <Stat icon={Users} color="bg-blue-500" label="کاربران دارای کارت" value={faNum(data.mappedUsers)} />
             <Stat icon={CalendarCheck} color="bg-green-500" label="حاضر امروز" value={faNum(today.PRESENT || 0)} />
             <Stat icon={CalendarX} color="bg-red-500" label="غایب امروز" value={faNum(today.ABSENT || 0)} />
-            <Stat icon={Clock} color="bg-violet-500" label="مجموع اضافه‌کار" value={fmtHours(t.overtimeMinutes)} />
-            <Stat icon={AlertTriangle} color="bg-amber-500" label="مجموع تاخیر" value={fmtHours(t.delayMinutes)} />
-            <Stat icon={Moon} color="bg-slate-500" label="مجموع شب‌کاری" value={fmtHours(t.nightMinutes)} />
+            <Stat icon={Clock} color="bg-violet-500" label="اضافه‌کار ماه" value={fmtHours(t.overtimeMinutes)} />
+            <Stat icon={AlertTriangle} color="bg-amber-500" label="تاخیر ماه" value={fmtHours(t.delayMinutes)} />
+            <Stat icon={Moon} color="bg-slate-500" label="شب‌کاری ماه" value={fmtHours(t.nightMinutes)} />
+          </div>
+
+          {/* Monthly status counts */}
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+            <Stat icon={CalendarCheck} color="bg-green-500" label="روز حاضر" value={faNum(sc.PRESENT || 0)} />
+            <Stat icon={AlertTriangle} color="bg-amber-500" label="روز تاخیر" value={faNum(sc.LATE || 0)} />
+            <Stat icon={CalendarX} color="bg-red-500" label="روز غیبت" value={faNum(sc.ABSENT || 0)} />
+            <Stat icon={AlertTriangle} color="bg-orange-500" label="روز ناقص" value={faNum(sc.INCOMPLETE || 0)} />
+            <Stat icon={CalendarDays} color="bg-blue-500" label="روز مرخصی" value={faNum(sc.LEAVE || 0)} />
+            <Stat icon={Plane} color="bg-violet-500" label="روز ماموریت" value={faNum((sc.MISSION || 0) + (sc.REMOTE_WORK || 0))} />
           </div>
 
           {/* Charts row 1 */}
@@ -177,6 +192,25 @@ export default function AttendanceDashboardPage() {
               </ResponsiveContainer>
             </Card>
           </div>
+
+          {/* Department breakdown */}
+          {byDept.length > 0 && (
+            <Card title="وضعیت به تفکیک دپارتمان">
+              <ResponsiveContainer width="100%" height={Math.max(220, byDept.length * 38)}>
+                <BarChart data={byDept} layout="vertical" margin={{ right: 16 }} barCategoryGap={8}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="حاضر" stackId="a" fill="#10b981" />
+                  <Bar dataKey="تاخیر" stackId="a" fill="#f59e0b" />
+                  <Bar dataKey="غیبت" stackId="a" fill="#ef4444" />
+                  <Bar dataKey="مرخصی/ماموریت" stackId="a" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
         </>
       )}
     </div>
