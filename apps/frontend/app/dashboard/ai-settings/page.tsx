@@ -23,21 +23,23 @@ type Provider = {
 
 type TestResult = { success: boolean; latencyMs: number; model?: string; provider?: string; details?: any; error?: string };
 
-const PROVIDER_INFO: Record<string, { label: string; color: string; defaultUrl: string; docUrl: string; defaultModel: string }> = {
-  agnes:      { label: "Agnes AI",      color: "#6366f1", defaultUrl: "https://apihub.agnes-ai.com/v1",                   docUrl: "https://agnes-ai.com/doc/overview",       defaultModel: "agnes-2.0-flash" },
-  openai:     { label: "OpenAI",        color: "#10a37f", defaultUrl: "https://api.openai.com/v1",                        docUrl: "https://platform.openai.com/docs",        defaultModel: "gpt-4o" },
-  anthropic:  { label: "Anthropic",     color: "#d97757", defaultUrl: "https://api.anthropic.com/v1",                     docUrl: "https://docs.anthropic.com",              defaultModel: "claude-sonnet-4-20250514" },
-  gemini:     { label: "Google Gemini", color: "#4285f4", defaultUrl: "https://generativelanguage.googleapis.com/v1beta", docUrl: "https://ai.google.dev/docs",              defaultModel: "gemini-pro" },
-  deepseek:   { label: "DeepSeek",      color: "#4d6bfe", defaultUrl: "https://api.deepseek.com/v1",                      docUrl: "https://platform.deepseek.com/api-docs",  defaultModel: "deepseek-chat" },
-  groq:       { label: "Groq",          color: "#f55036", defaultUrl: "https://api.groq.com/openai/v1",                   docUrl: "https://console.groq.com/docs",           defaultModel: "llama-3.3-70b-versatile" },
-  openrouter: { label: "OpenRouter",    color: "#7c3aed", defaultUrl: "https://openrouter.ai/api/v1",                     docUrl: "https://openrouter.ai/docs",              defaultModel: "openai/gpt-4o-mini" },
-  custom:     { label: "سفارشی",        color: "#6b7280", defaultUrl: "",                                                 docUrl: "",                                        defaultModel: "" },
+const PROVIDER_INFO: Record<string, { label: string; color: string; defaultUrl: string; docUrl: string; defaultModel: string; defaultApiKey?: string; noApiKey?: boolean }> = {
+  agnes:      { label: "Agnes AI",            color: "#6366f1", defaultUrl: "https://apihub.agnes-ai.com/v1",                   docUrl: "https://agnes-ai.com/doc/overview",       defaultModel: "agnes-2.0-flash" },
+  openai:     { label: "OpenAI",              color: "#10a37f", defaultUrl: "https://api.openai.com/v1",                        docUrl: "https://platform.openai.com/docs",        defaultModel: "gpt-4o" },
+  anthropic:  { label: "Anthropic",           color: "#d97757", defaultUrl: "https://api.anthropic.com/v1",                     docUrl: "https://docs.anthropic.com",              defaultModel: "claude-sonnet-4-20250514" },
+  gemini:     { label: "Google Gemini",       color: "#4285f4", defaultUrl: "https://generativelanguage.googleapis.com/v1beta", docUrl: "https://ai.google.dev/docs",              defaultModel: "gemini-pro" },
+  deepseek:   { label: "DeepSeek",            color: "#4d6bfe", defaultUrl: "https://api.deepseek.com/v1",                      docUrl: "https://platform.deepseek.com/api-docs",  defaultModel: "deepseek-chat" },
+  groq:       { label: "Groq",                color: "#f55036", defaultUrl: "https://api.groq.com/openai/v1",                   docUrl: "https://console.groq.com/docs",           defaultModel: "llama-3.3-70b-versatile" },
+  openrouter: { label: "OpenRouter",          color: "#7c3aed", defaultUrl: "https://openrouter.ai/api/v1",                     docUrl: "https://openrouter.ai/docs",              defaultModel: "openai/gpt-4o-mini" },
+  ollama:     { label: "Ollama (سرور داخلی)", color: "#ff6b35", defaultUrl: "http://192.168.30.13:11434/v1",                    docUrl: "",                                        defaultModel: "llama3",            defaultApiKey: "ollama", noApiKey: true },
+  whisper:    { label: "Whisper (تبدیل صدا)", color: "#0ea5e9", defaultUrl: "http://192.168.30.13:8001",                        docUrl: "",                                        defaultModel: "",                  defaultApiKey: "-",      noApiKey: true },
+  custom:     { label: "سفارشی",              color: "#6b7280", defaultUrl: "",                                                 docUrl: "",                                        defaultModel: "" },
 };
 
 const emptyForm = (type = "openai") => ({
   name:     PROVIDER_INFO[type]?.label || "",
   type,
-  apiKey:   "",
+  apiKey:   PROVIDER_INFO[type]?.defaultApiKey || "",
   apiUrl:   PROVIDER_INFO[type]?.defaultUrl || "",
   model:    PROVIDER_INFO[type]?.defaultModel || "",
   isActive: true,
@@ -82,13 +84,17 @@ export default function AiSettingsPage() {
   };
 
   const onTypeChange = (type: string) => {
-    setForm(f => ({
-      ...f,
-      type,
-      name:   f.name === emptyForm(f.type).name ? (PROVIDER_INFO[type]?.label || "") : f.name,
-      apiUrl: f.apiUrl === emptyForm(f.type).apiUrl ? (PROVIDER_INFO[type]?.defaultUrl || "") : f.apiUrl,
-      model:  f.model === emptyForm(f.type).defaultModel ? (PROVIDER_INFO[type]?.defaultModel || "") : f.model,
-    }));
+    setForm(f => {
+      const prev = emptyForm(f.type);
+      return {
+        ...f,
+        type,
+        name:   f.name   === prev.name   ? (PROVIDER_INFO[type]?.label        || "") : f.name,
+        apiUrl: f.apiUrl === prev.apiUrl  ? (PROVIDER_INFO[type]?.defaultUrl   || "") : f.apiUrl,
+        model:  f.model  === prev.model   ? (PROVIDER_INFO[type]?.defaultModel || "") : f.model,
+        apiKey: f.apiKey === prev.apiKey  ? (PROVIDER_INFO[type]?.defaultApiKey || "") : f.apiKey,
+      };
+    });
   };
 
   const handleSave = async () => {
@@ -298,7 +304,7 @@ export default function AiSettingsPage() {
           <button onClick={() => setModal(null)} className="btn-theme-secondary text-sm">انصراف</button>
           <button
             onClick={handleSave}
-            disabled={saving || (!form.apiKey && modal?.mode === "create")}
+            disabled={saving || (modal?.mode === "create" && !form.apiKey && !PROVIDER_INFO[form.type]?.noApiKey)}
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded-xl text-white text-sm transition-colors"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -328,12 +334,18 @@ export default function AiSettingsPage() {
           </div>
           <div>
             <label className="block mb-1.5 font-medium text-theme-secondary text-xs">کلید API</label>
-            <div className="relative">
-              <input type={showKey ? "text" : "password"} value={form.apiKey} onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} className="input-theme text-sm font-mono pl-10" placeholder={modal?.mode === "edit" ? "خالی بذار = تغییر نده" : "sk-..."} />
-              <button type="button" onClick={() => setShowKey(v => !v)} className="top-1/2 left-3 absolute text-theme-muted -translate-y-1/2">
-                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+            {PROVIDER_INFO[form.type]?.noApiKey ? (
+              <p className="text-xs text-theme-muted bg-theme-hover px-3 py-2 rounded-xl">
+                این سرویس روی شبکه داخلی است و نیاز به کلید API ندارد.
+              </p>
+            ) : (
+              <div className="relative">
+                <input type={showKey ? "text" : "password"} value={form.apiKey} onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} className="input-theme text-sm font-mono pl-10" placeholder={modal?.mode === "edit" ? "خالی بذار = تغییر نده" : "sk-..."} />
+                <button type="button" onClick={() => setShowKey(v => !v)} className="top-1/2 left-3 absolute text-theme-muted -translate-y-1/2">
+                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <label className="block mb-1.5 font-medium text-theme-secondary text-xs">آدرس API (اختیاری)</label>

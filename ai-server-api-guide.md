@@ -262,7 +262,7 @@ export async function chat(message: string): Promise<string> {
 |---|---|---|
 | OpenWebUI | 3000 | چت UI |
 | Ollama | 11434 | LLM API |
-| Whisper | 8001 | STT فارسی |
+| Whisper | 8001 | STT فارسی |kd
 | Qdrant | 6333 | Vector DB |
 | Dashboard | 8888 | مانیتورینگ |
 
