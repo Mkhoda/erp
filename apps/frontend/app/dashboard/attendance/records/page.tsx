@@ -45,7 +45,7 @@ export default function AttendanceRecordsPage() {
   const [detail, setDetail] = React.useState<any>(null);
   const [exporting, setExporting] = React.useState<string | null>(null);
   // Admin edit (override) form in the detail modal.
-  const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string }>({ inTime: "", outTime: "", status: "", reason: "" });
+  const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string }>({ inTime: "", outTime: "", status: "", reason: "", leaveHours: "" });
   const [ovSaving, setOvSaving] = React.useState(false);
   const [leave, setLeave] = React.useState<any>(null);
   // Pagination
@@ -101,7 +101,7 @@ export default function AttendanceRecordsPage() {
   async function openDetail(row: any) {
     const date = row.gregDate.slice(0, 10);
     const d = await fetch(`${API}/attendance/records/day?userId=${row.userId}&date=${date}`, { headers: h }).then(r => r.ok ? r.json() : null);
-    setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "" });
+    setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "", leaveHours: "" });
     setDetail({ row, ...d });
   }
 
@@ -115,6 +115,7 @@ export default function AttendanceRecordsPage() {
         inTime: ov.inTime || undefined,
         outTime: ov.outTime || undefined,
         forceStatus: ov.status || undefined,
+        leaveMinutes: ov.leaveHours ? Math.round(Number(ov.leaveHours) * 60) : undefined,
         reason: ov.reason || "اصلاح توسط مدیر",
       };
       const res = await fetch(`${API}/attendance/overrides`, { method: "POST", headers: h, body: JSON.stringify(body) });
@@ -213,10 +214,14 @@ export default function AttendanceRecordsPage() {
       )}
 
       {leave && (
-        <div className="flex flex-wrap items-center gap-3 bg-blue-500/5 border border-blue-500/30 rounded-xl px-4 py-2.5 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-blue-500/5 border border-blue-500/30 rounded-xl px-4 py-2.5 text-sm">
           <span className="text-theme-primary font-medium">مرخصی سال {faNum(leave.jYear)}:</span>
-          <span className="text-blue-600">مانده {faNum(leave.remaining)} از {faNum(leave.entitlement)} روز</span>
-          <span className="text-theme-muted">· مرخصی {faNum(leave.used)} روز · کسر تاخیر/تعجیل {faNum(leave.tardyDays)} روز · ماموریت {faNum(leave.mission)}</span>
+          <span className="text-blue-600 font-semibold">مانده {faNum(leave.remainingDays)} روز</span>
+          <span className="text-theme-muted">از {faNum(leave.entitlement)}</span>
+          <span className="text-theme-muted">· روزانه {faNum(leave.fullDays)} روز</span>
+          <span className="text-theme-muted">· ساعتی {fmtMin(leave.hourlyLeaveMinutes)}</span>
+          <span className="text-amber-600">· کسر تاخیر/تعجیل {fmtMin(leave.tardyMinutes)}</span>
+          <span className="text-theme-muted">· ماموریت {faNum(leave.mission)}</span>
         </div>
       )}
 
@@ -301,6 +306,7 @@ export default function AttendanceRecordsPage() {
               <Info label="تاخیر" value={fmtMin(detail.row.delayMinutes)} />
               <Info label="تعجیل" value={fmtMin(detail.row.earlyLeaveMinutes)} />
               <Info label="شب‌کاری" value={fmtMin(detail.row.nightMinutes)} />
+              {detail.row.leaveMinutes > 0 && <Info label="مرخصی" value={fmtMin(detail.row.leaveMinutes)} />}
             </div>
             <div className="text-sm font-medium text-theme-secondary mb-2 flex items-center gap-1">
               <Clock className="w-4 h-4" /> پانچ‌های خام ({faNum(detail.punches?.length || 0)})
@@ -328,7 +334,8 @@ export default function AttendanceRecordsPage() {
                     {["PRESENT","LEAVE","MISSION","REMOTE_WORK","ABSENT"].map(s => <option key={s} value={s}>{STATUS_FA[s]}</option>)}
                   </select>
                 </div>
-                <div><label className="block mb-1 text-theme-secondary text-xs">دلیل</label><input value={ov.reason} onChange={e => setOv(s => ({ ...s, reason: e.target.value }))} className="input-theme text-sm" placeholder="دلیل اصلاح" /></div>
+                <div><label className="block mb-1 text-theme-secondary text-xs">مرخصی ساعتی (ساعت)</label><input type="number" step="0.5" min="0" dir="ltr" value={ov.leaveHours} onChange={e => setOv(s => ({ ...s, leaveHours: e.target.value }))} className="input-theme text-sm" placeholder="مثلاً 2" /></div>
+                <div className="sm:col-span-2"><label className="block mb-1 text-theme-secondary text-xs">دلیل</label><input value={ov.reason} onChange={e => setOv(s => ({ ...s, reason: e.target.value }))} className="input-theme text-sm" placeholder="دلیل اصلاح" /></div>
               </div>
               <button onClick={saveOverride} disabled={ovSaving} className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
                 {ovSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />} ذخیره اصلاح

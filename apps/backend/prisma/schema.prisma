@@ -634,6 +634,7 @@ model AttendanceDay {
   delayMinutes      Int              @default(0)
   earlyLeaveMinutes Int              @default(0)
   nightMinutes      Int              @default(0)
+  leaveMinutes      Int              @default(0)        // approved leave for the day (hourly or full)
   status            AttendanceStatus
   isHolidayWork     Boolean          @default(false)
   shiftId           String?
@@ -654,6 +655,7 @@ model AttendanceOverride {
   newCheckIn  DateTime?
   newCheckOut DateTime?
   forceStatus AttendanceStatus?
+  leaveMinutes Int?                                     // hourly-leave minutes granted for the day
   reason      String
   createdById String
   createdBy   User              @relation("AttnOverrideBy", fields: [createdById], references: [id])
@@ -835,6 +837,7 @@ model AttendanceRequest {
   requestedOut DateTime?
   // For leave/mission/remote-work declarations — the status to force on approval.
   targetStatus AttendanceStatus?
+  leaveMinutes Int?                                     // hourly-leave duration (minutes)
   description  String
   attachment   String?
   status       AttnRequestStatus @default(PENDING)

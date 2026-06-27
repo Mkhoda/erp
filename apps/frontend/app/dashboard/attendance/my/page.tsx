@@ -95,6 +95,7 @@ export default function MyAttendancePage() {
         body.type = inT && outT ? "FULL_DAY_FIX" : outT ? "CHECK_OUT_FIX" : "CHECK_IN_FIX";
         body.inTime = inT; body.outTime = outT;
       } else if (k === "EXPLANATION") { body.type = "EXPLANATION"; }
+      else if (k === "HOURLY_LEAVE") { body.type = "LEAVE"; body.leaveMinutes = Math.round((Number(reqForm.leaveHours) || 0) * 60); }
       else { body.type = "LEAVE"; body.targetStatus = k; } // LEAVE | MISSION | REMOTE_WORK
       const res = await fetch(`${API}/attendance/me/requests`, { method: "POST", headers: h, body: JSON.stringify(body) });
       if (res.ok) { setModal(null); await load(); }
@@ -122,14 +123,18 @@ export default function MyAttendancePage() {
       </div>
 
       {leave && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-l from-blue-500/10 to-transparent border border-blue-500/30 rounded-xl px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-theme-primary font-medium">
-            مرخصی سال {faNum(leave.jYear)}:
-            <span className="text-blue-600">مانده {faNum(leave.remaining)}</span>
-            <span className="text-theme-muted">از {faNum(leave.entitlement)} روز</span>
+        <div className="bg-gradient-to-l from-blue-500/10 to-transparent border border-blue-500/30 rounded-xl px-4 py-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-theme-primary font-medium">مرخصی سال {faNum(leave.jYear)}:</span>
+            <span className="text-blue-600 font-semibold">مانده {faNum(leave.remainingDays)} روز</span>
+            <span className="text-theme-muted">از {faNum(leave.entitlement)} روز ({fmtMin(leave.remainingMinutes)} ساعت)</span>
           </div>
-          <div className="text-xs text-theme-muted">
-            مرخصی: {faNum(leave.used)} روز · کسر تاخیر/تعجیل: {faNum(leave.tardyDays)} روز · ماموریت: {faNum(leave.mission)} · دورکاری: {faNum(leave.remote)}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-theme-muted">
+            <span>مرخصی روزانه: <b className="text-theme-primary">{faNum(leave.fullDays)} روز</b></span>
+            <span>مرخصی ساعتی: <b className="text-theme-primary">{fmtMin(leave.hourlyLeaveMinutes)}</b></span>
+            <span>کسر تاخیر/تعجیل: <b className="text-amber-600">{fmtMin(leave.tardyMinutes)}</b></span>
+            <span>ماموریت: <b className="text-theme-primary">{faNum(leave.mission)}</b></span>
+            <span>دورکاری: <b className="text-theme-primary">{faNum(leave.remote)}</b></span>
           </div>
         </div>
       )}
@@ -258,12 +263,20 @@ export default function MyAttendancePage() {
               <label className="block mb-1 text-theme-secondary text-xs">نوع درخواست</label>
               <select value={reqForm.kind} onChange={e => setReqForm((s: any) => ({ ...s, kind: e.target.value }))} className="input-theme text-sm">
                 <option value="FIX">اصلاح ساعت ورود/خروج</option>
+                <option value="HOURLY_LEAVE">مرخصی ساعتی</option>
                 <option value="LEAVE">مرخصی (کل روز)</option>
                 <option value="MISSION">ماموریت (کل روز)</option>
                 <option value="REMOTE_WORK">دورکاری (کل روز)</option>
                 <option value="EXPLANATION">توضیح</option>
               </select>
             </div>
+            {reqForm.kind === "HOURLY_LEAVE" && (
+              <div>
+                <label className="block mb-1 text-theme-secondary text-xs">مدت مرخصی (ساعت)</label>
+                <input type="number" step="0.5" min="0" dir="ltr" value={reqForm.leaveHours ?? ""} onChange={e => setReqForm((s: any) => ({ ...s, leaveHours: e.target.value }))} className="input-theme text-sm" placeholder="مثلاً 2" />
+                <p className="mt-1 text-[11px] text-theme-muted">بیشتر از ۳ ساعت = کل روز مرخصی و ساعات حضور اضافه‌کار محاسبه می‌شود.</p>
+              </div>
+            )}
             {reqForm.kind === "FIX" && (
               <div className="space-y-2">
                 <p className="text-[11px] text-theme-muted">فقط بخشی که می‌خواهید اصلاح شود را تیک بزنید؛ بخش بدون تیک دست‌نخورده می‌ماند.</p>

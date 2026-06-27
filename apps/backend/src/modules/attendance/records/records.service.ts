@@ -117,20 +117,39 @@ export class RecordsService {
     }
     const entitlement = sched?.annualLeaveDays ?? 26;
     const dailyReq = sched?.dailyMinutes ?? 500;
-    const [used, mission, remote, tardyAgg] = await Promise.all([
+    const [fullDays, mission, remote, tardyAgg, hourlyAgg] = await Promise.all([
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'LEAVE' } }),
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'MISSION' } }),
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'REMOTE_WORK' } }),
-      // Delay + early-leave across the year are deducted from leave.
+      // Delay + early-leave across the year are deducted from leave (hourly).
       this.prisma.attendanceDay.aggregate({
         where: { userId, jYear },
         _sum: { delayMinutes: true, earlyLeaveMinutes: true },
       }),
+      // Hourly leave = leaveMinutes on non-full-leave days (full-leave days are
+      // counted as whole days separately to avoid double counting).
+      this.prisma.attendanceDay.aggregate({
+        where: { userId, jYear, status: { not: 'LEAVE' } },
+        _sum: { leaveMinutes: true },
+      }),
     ]);
     const tardyMinutes = (tardyAgg._sum.delayMinutes ?? 0) + (tardyAgg._sum.earlyLeaveMinutes ?? 0);
-    const tardyDays = dailyReq > 0 ? Math.round((tardyMinutes / dailyReq) * 100) / 100 : 0;
-    const remaining = Math.round(Math.max(0, entitlement - used - tardyDays) * 100) / 100;
-    return { jYear, entitlement, used, mission, remote, tardyMinutes, tardyDays, remaining };
+    const hourlyLeaveMinutes = hourlyAgg._sum.leaveMinutes ?? 0;
+
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const entitlementMin = entitlement * dailyReq;
+    const usedMin = fullDays * dailyReq + hourlyLeaveMinutes + tardyMinutes;
+    const remainingMin = Math.max(0, entitlementMin - usedMin);
+    return {
+      jYear, entitlement, dailyReq, mission, remote,
+      fullDays,                                   // whole-day leaves
+      hourlyLeaveMinutes,                         // partial (hourly) leave minutes
+      tardyMinutes,                               // delay + early-leave minutes
+      usedMinutes: usedMin,
+      usedDays: r2(usedMin / dailyReq),
+      remainingMinutes: remainingMin,
+      remainingDays: r2(remainingMin / dailyReq),
+    };
   }
 
   // Day detail: computed row + every raw punch + any override (audit view).

@@ -185,6 +185,8 @@ export class CalcService {
     let delayMinutes = 0;
     let earlyLeaveMinutes = 0;
     let nightMinutes = 0;
+    let leaveMinutes = 0;
+    let forceLeaveFull = false;
     let status: AttendanceStatus;
 
     const hasPunch = firstIn != null;
@@ -232,6 +234,28 @@ export class CalcService {
       earlyLeaveMinutes = 0;
     }
 
+    // ── Approved hourly leave ──────────────────────────────────────────
+    // > 3h of leave in a day ⇒ the whole day is leave and any present time
+    // becomes overtime. ≤ 3h ⇒ partial leave that counts toward the required
+    // hours (so it can produce overtime and excuses the shortfall).
+    const grantedLeave = override?.leaveMinutes ?? 0;
+    if (grantedLeave > 0) {
+      if (grantedLeave > 180) {
+        forceLeaveFull = true;
+        leaveMinutes = sched.dailyMinutes;
+        delayMinutes = 0;
+        earlyLeaveMinutes = 0;
+        overtimeMinutes = workedMinutes; // present hours → overtime
+      } else {
+        leaveMinutes = grantedLeave;
+        const extra = workedMinutes + delayMinutes + leaveMinutes - sched.dailyMinutes;
+        if (sched.otAllowed && extra >= sched.otMinThreshold) {
+          const rounded = sched.otRounding > 0 ? Math.floor(extra / sched.otRounding) * sched.otRounding : extra;
+          overtimeMinutes = Math.max(overtimeMinutes, sched.otMaxDaily > 0 ? Math.min(rounded, sched.otMaxDaily) : rounded);
+        }
+      }
+    }
+
     // Monthly overtime cap: clamp so the month's running OT total does not exceed
     // otMaxMonthly. Only EARLIER days in the month count toward "used" so the cap
     // accrues ascending and a single-day recompute stays stable (a later day's OT
@@ -249,6 +273,8 @@ export class CalcService {
     const holidayWork = !!holiday || isWeekend;
     if (override?.forceStatus) {
       status = override.forceStatus;
+    } else if (forceLeaveFull) {
+      status = AttendanceStatus.LEAVE;
     } else if (holiday) {
       status = holiday === HolidayType.COMPANY ? AttendanceStatus.COMPANY_HOLIDAY : AttendanceStatus.HOLIDAY;
     } else if (isWeekend) {
@@ -279,13 +305,13 @@ export class CalcService {
       create: {
         userId, gregDate, jYear, jMonth, jDay,
         firstCheckIn: firstIn, lastCheckOut: lastOut,
-        workedMinutes, overtimeMinutes, delayMinutes, earlyLeaveMinutes, nightMinutes,
+        workedMinutes, overtimeMinutes, delayMinutes, earlyLeaveMinutes, nightMinutes, leaveMinutes,
         status, isHolidayWork, hasOverride: !!override,
       },
       update: {
         jYear, jMonth, jDay,
         firstCheckIn: firstIn, lastCheckOut: lastOut,
-        workedMinutes, overtimeMinutes, delayMinutes, earlyLeaveMinutes, nightMinutes,
+        workedMinutes, overtimeMinutes, delayMinutes, earlyLeaveMinutes, nightMinutes, leaveMinutes,
         status, isHolidayWork, hasOverride: !!override, computedAt: new Date(),
       },
     });
