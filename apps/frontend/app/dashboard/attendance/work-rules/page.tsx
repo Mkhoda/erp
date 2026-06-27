@@ -144,6 +144,120 @@ export default function WorkRulesPage() {
           </div>
         </>
       )}
+
+      <OverridesManager groups={list} />
     </div>
+  );
+}
+
+// ── Per-group / per-weekday schedule overrides within a date range ──────────
+function OverridesManager({ groups }: { groups: any[] }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const blank = { title: "", scheduleIds: [] as string[], weekdays: [] as number[], startDate: "", endDate: "", isOff: false, checkInStart: "", checkInEnd: "", checkOutStart: "", checkOutEnd: "", dailyMinutes: "", lunchMinutes: "" };
+  const [rows, setRows] = React.useState<any[]>([]);
+  const [form, setForm] = React.useState<any>({ ...blank });
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState<string | null>(null);
+
+  const groupName = (id: string) => groups.find(g => g.id === id)?.name || (groups.find(g => g.id === id)?.isDefault ? "پیش‌فرض" : id.slice(0, 6));
+  const dayName = (d: number) => WEEK.find(w => w.d === d)?.name || d;
+  const load = React.useCallback(async () => {
+    setRows(await fetch(`${API}/attendance/schedule-overrides`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => []));
+    // eslint-disable-next-line
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+
+  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
+  const toggle = (k: "scheduleIds" | "weekdays", v: any) => setForm((f: any) => ({ ...f, [k]: f[k].includes(v) ? f[k].filter((x: any) => x !== v) : [...f[k], v] }));
+
+  async function add() {
+    if (!form.startDate) { setMsg("تاریخ شروع الزامی است"); return; }
+    setSaving(true); setMsg(null);
+    try {
+      const res = await fetch(`${API}/attendance/schedule-overrides`, { method: "POST", headers: h, body: JSON.stringify(form) });
+      if (res.ok) { setForm({ ...blank }); setMsg("ثبت شد — روزهای متاثر در حال بازمحاسبه است"); await load(); }
+      else setMsg("خطا در ثبت");
+    } finally { setSaving(false); setTimeout(() => setMsg(null), 6000); }
+  }
+  async function del(id: string) {
+    if (!confirm("حذف این بازه؟")) return;
+    await fetch(`${API}/attendance/schedule-overrides/${id}`, { method: "DELETE", headers: h });
+    await load();
+  }
+
+  return (
+    <Section title="استثناهای روز (ساعت کاری متفاوت برای روز/گروه خاص)" icon={CalendarDays}>
+      <p className="text-[11px] text-theme-muted mb-3">برای روزهای خاصِ هفته در یک بازهٔ تاریخی و گروه‌های انتخابی، ساعت ورود/خروج و ساعت موظف را تغییر می‌دهد. فیلدهای خالی از برنامهٔ پایه ارث می‌برند.</p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="عنوان (اختیاری)"><input className={inputCls} value={form.title} onChange={e => set("title", e.target.value)} placeholder="مثلاً پنجشنبه‌های تابستان" /></Field>
+        <div />
+        <Field label="تاریخ شروع (شمسی)"><input dir="ltr" className={inputCls} value={form.startDate} onChange={e => set("startDate", e.target.value)} placeholder="1404/04/01" /></Field>
+        <Field label="تاریخ پایان (اختیاری)"><input dir="ltr" className={inputCls} value={form.endDate} onChange={e => set("endDate", e.target.value)} placeholder="1404/06/31" /></Field>
+      </div>
+
+      <div className="mt-3">
+        <span className="text-sm text-theme-muted mb-1 block">گروه‌ها <span className="text-[11px] text-theme-muted">(خالی = همه)</span></span>
+        <div className="flex flex-wrap gap-1.5">
+          {groups.map(g => { const on = form.scheduleIds.includes(g.id); return (
+            <button key={g.id} type="button" onClick={() => toggle("scheduleIds", g.id)} className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${on ? "bg-blue-500 text-white border-blue-500" : "bg-theme-primary text-theme-secondary border-theme"}`}>{g.isDefault ? "پیش‌فرض" : g.name}</button>
+          ); })}
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <span className="text-sm text-theme-muted mb-1 block">روزهای هفته <span className="text-[11px] text-theme-muted">(خالی = همهٔ روزهای بازه)</span></span>
+        <div className="flex flex-wrap gap-1.5">
+          {WEEK.map(w => { const on = form.weekdays.includes(w.d); return (
+            <button key={w.d} type="button" onClick={() => toggle("weekdays", w.d)} className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${on ? "bg-blue-600 text-white border-blue-600" : "bg-theme-primary text-theme-secondary border-theme"}`}>{w.name}</button>
+          ); })}
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm text-theme-primary mt-3">
+        <input type="checkbox" checked={form.isOff} onChange={e => set("isOff", e.target.checked)} /> این روز تعطیل/غیرکاری باشد
+      </label>
+
+      {!form.isOff && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+          <Field label="شروع ورود"><input type="time" className={inputCls} value={form.checkInStart} onChange={e => set("checkInStart", e.target.value)} /></Field>
+          <Field label="پایان ورود"><input type="time" className={inputCls} value={form.checkInEnd} onChange={e => set("checkInEnd", e.target.value)} /></Field>
+          <Field label="شروع خروج"><input type="time" className={inputCls} value={form.checkOutStart} onChange={e => set("checkOutStart", e.target.value)} /></Field>
+          <Field label="پایان خروج"><input type="time" className={inputCls} value={form.checkOutEnd} onChange={e => set("checkOutEnd", e.target.value)} /></Field>
+          <Field label="ساعت موظف (دقیقه)"><input type="number" className={inputCls} value={form.dailyMinutes} onChange={e => set("dailyMinutes", e.target.value)} /></Field>
+          <Field label="کسر ناهار (دقیقه)"><input type="number" className={inputCls} value={form.lunchMinutes} onChange={e => set("lunchMinutes", e.target.value)} /></Field>
+        </div>
+      )}
+
+      <div className="flex items-center justify-end gap-3 mt-3">
+        {msg && <span className="text-sm text-theme-muted">{msg}</span>}
+        <button onClick={add} disabled={saving} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} افزودن استثنا
+        </button>
+      </div>
+
+      {rows.length > 0 && (
+        <div className="mt-4 overflow-x-auto border border-theme rounded-lg">
+          <table className="w-full text-sm text-center">
+            <thead><tr className="text-theme-muted border-b border-theme bg-theme-secondary/30">
+              <th className="py-2 px-2 font-medium">عنوان</th><th className="px-2 font-medium">گروه‌ها</th><th className="px-2 font-medium">روزها</th><th className="px-2 font-medium">بازه</th><th className="px-2 font-medium">تنظیمات</th><th className="px-2 font-medium">حذف</th>
+            </tr></thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.id} className="border-b border-theme/40">
+                  <td className="py-1.5 px-2 text-theme-primary">{r.title || "—"}</td>
+                  <td className="px-2 text-theme-muted text-xs">{(!r.scheduleIds?.length) ? "همه" : r.scheduleIds.map(groupName).join("، ")}</td>
+                  <td className="px-2 text-theme-muted text-xs">{(!r.weekdays?.length) ? "همه" : r.weekdays.map(dayName).join("، ")}</td>
+                  <td className="px-2 text-theme-muted text-xs" dir="ltr">{new Date(r.startDate).toLocaleDateString("fa-IR", { timeZone: "UTC" })} — {new Date(r.endDate).toLocaleDateString("fa-IR", { timeZone: "UTC" })}</td>
+                  <td className="px-2 text-theme-muted text-xs">{r.isOff ? "تعطیل" : [r.checkInEnd && `ورود تا ${r.checkInEnd}`, r.checkOutEnd && `خروج تا ${r.checkOutEnd}`, r.dailyMinutes != null && `موظف ${r.dailyMinutes}`].filter(Boolean).join(" · ") || "—"}</td>
+                  <td className="px-2"><button onClick={() => del(r.id)} className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-red-600 hover:bg-red-500/10"><Trash2 className="w-4 h-4" /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
   );
 }

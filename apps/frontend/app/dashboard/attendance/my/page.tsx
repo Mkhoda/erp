@@ -135,12 +135,13 @@ export default function MyAttendancePage() {
       )}
 
       {summary && (
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+        <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
           <Sum label="روزها" value={faNum(summary.days)} />
           <Sum label="کارکرد" value={fmtMin(summary.workedMinutes)} />
-          <Sum label="اضافه‌کار" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
           <Sum label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
           <Sum label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" />
+          <Sum label="کسری" value={fmtMin((summary.delayMinutes || 0) + (summary.earlyLeaveMinutes || 0))} cls="text-orange-600" />
+          <Sum label="اضافه‌کار" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
           <Sum label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" />
         </div>
       )}
@@ -161,11 +162,12 @@ export default function MyAttendancePage() {
             <table className="w-full text-sm text-center">
               <thead><tr className="text-theme-muted border-b border-theme bg-theme-secondary/30">
                 <th className="py-2 px-2 font-medium">تاریخ</th><th className="px-2 font-medium">ورود</th><th className="px-2 font-medium">خروج</th>
-                <th className="px-2 font-medium">کارکرد</th><th className="px-2 font-medium">اضافه‌کار</th><th className="px-2 font-medium">تاخیر</th>
+                <th className="px-2 font-medium">کارکرد</th><th className="px-2 font-medium">تاخیر</th><th className="px-2 font-medium">تعجیل</th>
+                <th className="px-2 font-medium">کسری</th><th className="px-2 font-medium">اضافه‌کار</th>
                 <th className="px-2 font-medium">وضعیت</th><th className="px-2 font-medium">درخواست</th>
               </tr></thead>
               <tbody>
-                {rows.length === 0 ? <tr><td colSpan={8} className="py-10 text-theme-muted">رکوردی نیست</td></tr> : rows.slice((page-1)*pageSize, page*pageSize).map(r => {
+                {rows.length === 0 ? <tr><td colSpan={10} className="py-10 text-theme-muted">رکوردی نیست</td></tr> : rows.slice((page-1)*pageSize, page*pageSize).map(r => {
                   const needsResolve = r.status === "INCOMPLETE" || r.status === "ABSENT";
                   const isPending = pendingDates.has(r.gregDate.slice(0, 10));
                   return (
@@ -174,8 +176,10 @@ export default function MyAttendancePage() {
                       <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.firstCheckIn)}</td>
                       <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.lastCheckOut)}</td>
                       <td className="px-2 text-theme-primary" dir="ltr">{fmtMin(r.workedMinutes)}</td>
-                      <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
                       <td className="px-2 text-amber-600" dir="ltr">{r.delayMinutes ? fmtMin(r.delayMinutes) : "—"}</td>
+                      <td className="px-2 text-yellow-600" dir="ltr">{r.earlyLeaveMinutes ? fmtMin(r.earlyLeaveMinutes) : "—"}</td>
+                      <td className="px-2 text-orange-600 font-medium" dir="ltr">{(r.delayMinutes + r.earlyLeaveMinutes) ? fmtMin(r.delayMinutes + r.earlyLeaveMinutes) : "—"}</td>
+                      <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
                       <td className="px-2"><span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[r.status] || ""}`}>{needsResolve && <AlertTriangle className="w-3 h-3" />}{STATUS_FA[r.status] || r.status}</span></td>
                       <td className="px-2">
                         {isPending ? (

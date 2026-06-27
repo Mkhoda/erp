@@ -82,7 +82,9 @@ export default function SearchSelect({
     : (hasValue ? "" : (emptyLabel || placeholder || "انتخاب کنید"));
 
   return (
-    <div className={`relative ${className || ""}`} ref={ref}>
+    // Lift the whole control above sibling cards/tables while the panel is open,
+    // otherwise the absolutely-positioned dropdown renders behind them.
+    <div className={`relative ${open ? "z-[60]" : ""} ${className || ""}`} ref={ref}>
       <button type="button" disabled={disabled} onClick={() => setOpen(v => !v)}
         className={`input-theme flex justify-between items-center gap-1 text-sm disabled:opacity-50 ${buttonClassName || ""}`}>
         <span className={`truncate text-right ${selected ? "" : "text-theme-muted"}`}>{buttonLabel}</span>
@@ -100,7 +102,7 @@ export default function SearchSelect({
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-            className="top-full z-50 absolute inset-x-0 bg-theme-primary shadow-2xl mt-1 border border-theme rounded-xl overflow-hidden">
+            className="top-full z-[60] absolute inset-x-0 bg-theme-primary shadow-2xl mt-1 border border-theme rounded-xl overflow-hidden">
             <div className="p-2 border-theme border-b relative">
               <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-theme-muted pointer-events-none" />
               <input autoFocus placeholder="جستجو..." value={q}

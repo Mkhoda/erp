@@ -11,6 +11,7 @@ import {
 
 // Effective rules for a user on a given day (global default + user override).
 export interface EffectiveSchedule {
+  scheduleId: string | null;   // resolved work-schedule (group) id, for holiday scoping
   employeeType: 'FULL_TIME' | 'HOURLY';
   startMin: number;
   endMin: number;
@@ -32,6 +33,7 @@ export interface EffectiveSchedule {
 // Hardcoded fallback matching the WorkSchedule schema defaults — used when no
 // default WorkSchedule row exists yet, so calculations never depend on seeding.
 const DEFAULTS: EffectiveSchedule = {
+  scheduleId: null,
   employeeType: 'FULL_TIME',
   startMin: 6 * 60 + 30,
   endMin: 17 * 60 + 20,
@@ -66,6 +68,7 @@ export class CalcService {
 
     const s: EffectiveSchedule = { ...DEFAULTS };
     if (base) {
+      s.scheduleId = base.id;
       s.startMin = parseHHmm(base.checkInStart) ?? s.startMin;
       s.endMin = parseHHmm(base.checkOutEnd) ?? s.endMin;
       s.dailyMinutes = base.dailyMinutes;
@@ -94,16 +97,49 @@ export class CalcService {
   }
 
   // Holiday lookup for a Gregorian work date (covers ranges + yearly recurring).
-  private async holidayFor(gregDate: Date): Promise<HolidayType | null> {
+  // A holiday applies when it has no group scope (empty scheduleIds = all groups)
+  // or its scope includes the user's resolved schedule.
+  private async holidayFor(gregDate: Date, scheduleId: string | null): Promise<HolidayType | null> {
+    const scope = scheduleId
+      ? [{ scheduleIds: { isEmpty: true } }, { scheduleIds: { has: scheduleId } }]
+      : [{ scheduleIds: { isEmpty: true } }];
     const fixed = await this.prisma.holiday.findFirst({
-      where: { startDate: { lte: gregDate }, endDate: { gte: gregDate }, recurring: false },
+      where: { startDate: { lte: gregDate }, endDate: { gte: gregDate }, recurring: false, OR: scope },
     });
     if (fixed) return fixed.type;
     const { jMonth, jDay } = toJalaliParts(gregDate);
     const rec = await this.prisma.holiday.findFirst({
-      where: { recurring: true, jMonth, jDay },
+      where: { recurring: true, jMonth, jDay, OR: scope },
     });
     return rec ? rec.type : null;
+  }
+
+  // Apply a matching ScheduleOverride to the effective schedule for this day.
+  // Matches on date range, weekday scope, and group scope. Returns true if the
+  // override marks the day as non-working. null fields inherit the base schedule.
+  private async applyDayOverride(s: EffectiveSchedule, gregDate: Date, dow: number): Promise<boolean> {
+    const groupScope = s.scheduleId
+      ? [{ scheduleIds: { isEmpty: true } }, { scheduleIds: { has: s.scheduleId } }]
+      : [{ scheduleIds: { isEmpty: true } }];
+    const ov = await this.prisma.scheduleOverride.findFirst({
+      where: {
+        startDate: { lte: gregDate },
+        endDate: { gte: gregDate },
+        AND: [
+          { OR: groupScope },
+          { OR: [{ weekdays: { isEmpty: true } }, { weekdays: { has: dow } }] },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!ov) return false;
+    if (ov.checkInStart)  s.startMin       = parseHHmm(ov.checkInStart)  ?? s.startMin;
+    if (ov.checkInEnd)    s.checkInEnd      = parseHHmm(ov.checkInEnd)    ?? s.checkInEnd;
+    if (ov.checkOutStart) s.checkOutStart   = parseHHmm(ov.checkOutStart) ?? s.checkOutStart;
+    if (ov.checkOutEnd)   s.endMin          = parseHHmm(ov.checkOutEnd)   ?? s.endMin;
+    if (ov.dailyMinutes != null) s.dailyMinutes = ov.dailyMinutes;
+    if (ov.lunchMinutes != null) s.lunchMinutes = ov.lunchMinutes;
+    return ov.isOff;
   }
 
   private overlapMinutes(aStart: number, aEnd: number, bStart: number, bEnd: number): number {
@@ -119,7 +155,11 @@ export class CalcService {
     const dayStart = gregDate; // UTC midnight of the Tehran calendar day
     const dayEnd = new Date(gregDate.getTime() + 24 * 60 * 60 * 1000);
 
-    const [punches, override, sched, holiday] = await Promise.all([
+    // Resolve the schedule first — holiday scoping + day-overrides depend on group.
+    const sched = await this.getEffectiveSchedule(userId);
+    const dow = dayOfWeek(gregDate);
+    const forcedOff = await this.applyDayOverride(sched, gregDate, dow);
+    const [punches, override, holiday] = await Promise.all([
       this.prisma.rawAttendanceRecord.findMany({
         where: { userId, punchAt: { gte: dayStart, lt: dayEnd } },
         orderBy: { punchAt: 'asc' },
@@ -128,12 +168,11 @@ export class CalcService {
         where: { userId, gregDate },
         orderBy: { createdAt: 'desc' },
       }),
-      this.getEffectiveSchedule(userId),
-      this.holidayFor(gregDate),
+      this.holidayFor(gregDate, sched.scheduleId),
     ]);
 
     const { jYear, jMonth, jDay } = toJalaliParts(gregDate);
-    const isWeekend = !sched.workDays.includes(dayOfWeek(gregDate));
+    const isWeekend = forcedOff || !sched.workDays.includes(dow);
 
     // Resolve check-in / check-out, letting an override replace either side.
     let firstIn: Date | null = punches.length ? punches[0].punchAt : null;

@@ -201,12 +201,13 @@ export default function AttendanceRecordsPage() {
 
       {/* Summary */}
       {summary && (
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+        <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
           <SumCard label="روزهای دارای داده" value={faNum(summary.distinctDays ?? summary.days)} />
           <SumCard label="کارکرد" value={fmtMin(summary.workedMinutes)} />
-          <SumCard label="اضافه‌کار" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
           <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
           <SumCard label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" />
+          <SumCard label="کسری" value={fmtMin((summary.delayMinutes || 0) + (summary.earlyLeaveMinutes || 0))} cls="text-orange-600" />
+          <SumCard label="اضافه‌کار" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
           <SumCard label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" />
         </div>
       )}
@@ -230,12 +231,13 @@ export default function AttendanceRecordsPage() {
                 <th className="py-2 px-2 font-medium">#</th><th className="font-medium px-2">نام</th>
                 <th className="font-medium px-2">کد کارت</th><th className="font-medium px-2">دپارتمان</th>
                 <th className="font-medium px-2">تاریخ</th><th className="font-medium px-2">ورود</th><th className="font-medium px-2">خروج</th>
-                <th className="font-medium px-2">کارکرد</th><th className="font-medium px-2">اضافه‌کار</th><th className="font-medium px-2">تاخیر</th>
+                <th className="font-medium px-2">کارکرد</th><th className="font-medium px-2">تاخیر</th><th className="font-medium px-2">تعجیل</th>
+                <th className="font-medium px-2">کسری</th><th className="font-medium px-2">اضافه‌کار</th>
                 <th className="font-medium px-2">وضعیت</th><th className="font-medium px-2">جزئیات</th>
               </tr></thead>
               <tbody>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={12} className="py-10 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
+                  <tr><td colSpan={14} className="py-10 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
                 ) : rows.slice((page-1)*pageSize, page*pageSize).map((r, i) => (
                   <tr key={r.id} className="border-b border-theme/40 hover:bg-theme-hover">
                     <td className="py-1.5 px-2 text-theme-muted">{faNum((page-1)*pageSize + i + 1)}</td>
@@ -246,8 +248,10 @@ export default function AttendanceRecordsPage() {
                     <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.firstCheckIn)}</td>
                     <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.lastCheckOut)}</td>
                     <td className="px-2 text-theme-primary" dir="ltr">{fmtMin(r.workedMinutes)}</td>
-                    <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
                     <td className="px-2 text-amber-600" dir="ltr">{r.delayMinutes ? fmtMin(r.delayMinutes) : "—"}</td>
+                    <td className="px-2 text-yellow-600" dir="ltr">{r.earlyLeaveMinutes ? fmtMin(r.earlyLeaveMinutes) : "—"}</td>
+                    <td className="px-2 text-orange-600 font-medium" dir="ltr">{(r.delayMinutes + r.earlyLeaveMinutes) ? fmtMin(r.delayMinutes + r.earlyLeaveMinutes) : "—"}</td>
+                    <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
                     <td className="px-2"><span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[r.status] || "bg-theme-secondary"}`}>{STATUS_FA[r.status] || r.status}</span></td>
                     <td className="px-2">
                       <button onClick={() => openDetail(r)} title="مشاهده جزئیات و پانچ‌ها"

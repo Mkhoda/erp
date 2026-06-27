@@ -50,6 +50,7 @@ export class HolidaysService {
         jMonth: recurring ? jp.jMonth : null,
         jDay: recurring ? jp.jDay : null,
         note: dto.note || null,
+        scheduleIds: Array.isArray(dto.scheduleIds) ? dto.scheduleIds.filter(Boolean) : [],
       },
     });
     this.recompute.recomputeAllUsersForDays(this.daysOf(start, end)).catch(() => undefined);
@@ -74,6 +75,7 @@ export class HolidaysService {
         jMonth: recurring ? jp.jMonth : null,
         jDay: recurring ? jp.jDay : null,
         note: dto.note ?? existing.note,
+        scheduleIds: Array.isArray(dto.scheduleIds) ? dto.scheduleIds.filter(Boolean) : existing.scheduleIds,
       },
     });
     this.recompute.recomputeAllUsersForDays(this.daysOf(start, end)).catch(() => undefined);

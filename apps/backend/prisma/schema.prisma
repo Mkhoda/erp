@@ -764,16 +764,39 @@ model ShiftCalendarDay {
 }
 
 model Holiday {
-  id        String      @id @default(cuid())
-  title     String
-  type      HolidayType
-  startDate DateTime
-  endDate   DateTime                                   // single day → start == end
-  recurring Boolean     @default(false)                // repeats yearly by jMonth/jDay
-  jMonth    Int?
-  jDay      Int?
-  note      String?
-  createdAt DateTime    @default(now())
+  id          String      @id @default(cuid())
+  title       String
+  type        HolidayType
+  startDate   DateTime
+  endDate     DateTime                                 // single day → start == end
+  recurring   Boolean     @default(false)              // repeats yearly by jMonth/jDay
+  jMonth      Int?
+  jDay        Int?
+  note        String?
+  scheduleIds String[]    @default([])                 // bound work-schedule (group) ids; empty = all groups
+  createdAt   DateTime    @default(now())
+
+  @@index([startDate, endDate])
+}
+
+// Per-group, per-weekday overrides of working hours within a date range. Applied
+// on top of the resolved WorkSchedule for matching days (e.g. "every Wednesday
+// in Q1, the امریه group works 08:00–13:00"). null fields inherit the base.
+model ScheduleOverride {
+  id            String   @id @default(cuid())
+  title         String?
+  scheduleIds   String[] @default([])   // affected groups; empty = all groups
+  weekdays      Int[]    @default([])    // JS getDay() 0..6; empty = every day in range
+  startDate     DateTime                 // range start (work date, inclusive)
+  endDate       DateTime                 // range end (inclusive)
+  isOff         Boolean  @default(false) // mark matched days as non-working
+  checkInStart  String?
+  checkInEnd    String?
+  checkOutStart String?
+  checkOutEnd   String?
+  dailyMinutes  Int?
+  lunchMinutes  Int?
+  createdAt     DateTime @default(now())
 
   @@index([startDate, endDate])
 }

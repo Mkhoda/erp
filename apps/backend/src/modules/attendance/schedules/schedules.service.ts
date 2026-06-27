@@ -1,6 +1,18 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import * as moment from 'moment-jalaali';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RecomputeService } from '../engine/recompute.service';
+
+// Accept a Jalali ("1404/01/13") or Gregorian ("2025-04-02") date → UTC-midnight.
+function parseFlexDate(s: string): Date {
+  const m = String(s || '').trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (m && +m[1] >= 1300 && +m[1] <= 1700) {
+    const g = moment(`${m[1]}/${m[2]}/${m[3]}`, 'jYYYY/jM/jD');
+    if (g.isValid()) return new Date(Date.UTC(g.year(), g.month(), g.date()));
+  }
+  const d = new Date(s);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
 
 // Manages work schedules (the org default + named groups like "امریه") and
 // per-user overrides. Any change triggers a recompute of affected users.
@@ -79,6 +91,65 @@ export class SchedulesService {
   // Back-compat single-default endpoints.
   updateDefault(dto: any) {
     return this.getDefault().then((s) => this.update(s.id, dto));
+  }
+
+  // ── Schedule day-overrides (per group / weekday / date range) ──────────
+  listOverrides() {
+    return this.prisma.scheduleOverride.findMany({ orderBy: { startDate: 'desc' } });
+  }
+
+  private overrideData(dto: any) {
+    const num = (v: any) => (v == null || v === '' ? null : Math.round(+v));
+    const str = (v: any) => (v == null || v === '' ? null : String(v));
+    return {
+      title: str(dto.title),
+      scheduleIds: Array.isArray(dto.scheduleIds) ? dto.scheduleIds.filter(Boolean) : [],
+      weekdays: Array.isArray(dto.weekdays) ? dto.weekdays.map((d: any) => +d).filter((d: number) => d >= 0 && d <= 6) : [],
+      isOff: !!dto.isOff,
+      checkInStart: str(dto.checkInStart),
+      checkInEnd: str(dto.checkInEnd),
+      checkOutStart: str(dto.checkOutStart),
+      checkOutEnd: str(dto.checkOutEnd),
+      dailyMinutes: num(dto.dailyMinutes),
+      lunchMinutes: num(dto.lunchMinutes),
+    };
+  }
+
+  // Days inside [start,end] whose weekday matches (empty weekdays = all days).
+  private matchingDays(start: Date, end: Date, weekdays: number[]): Date[] {
+    const out: Date[] = [];
+    for (let d = new Date(start); d <= end; d = new Date(d.getTime() + 86400000)) {
+      if (!weekdays.length || weekdays.includes(d.getUTCDay())) out.push(new Date(d));
+    }
+    return out;
+  }
+
+  async createOverride(dto: any) {
+    const start = parseFlexDate(dto.startDate);
+    const end = dto.endDate ? parseFlexDate(dto.endDate) : start;
+    const ov = await this.prisma.scheduleOverride.create({ data: { ...this.overrideData(dto), startDate: start, endDate: end } });
+    this.recompute.recomputeAllUsersForDays(this.matchingDays(start, end, ov.weekdays)).catch(() => undefined);
+    return ov;
+  }
+
+  async updateOverride(id: string, dto: any) {
+    const existing = await this.prisma.scheduleOverride.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('بازه یافت نشد');
+    const start = dto.startDate ? parseFlexDate(dto.startDate) : existing.startDate;
+    const end = dto.endDate ? parseFlexDate(dto.endDate) : existing.endDate;
+    const ov = await this.prisma.scheduleOverride.update({ where: { id }, data: { ...this.overrideData(dto), startDate: start, endDate: end } });
+    // Recompute both the old and new affected days.
+    const days = [...this.matchingDays(existing.startDate, existing.endDate, existing.weekdays), ...this.matchingDays(start, end, ov.weekdays)];
+    this.recompute.recomputeAllUsersForDays(days).catch(() => undefined);
+    return ov;
+  }
+
+  async removeOverride(id: string) {
+    const existing = await this.prisma.scheduleOverride.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('بازه یافت نشد');
+    await this.prisma.scheduleOverride.delete({ where: { id } });
+    this.recompute.recomputeAllUsersForDays(this.matchingDays(existing.startDate, existing.endDate, existing.weekdays)).catch(() => undefined);
+    return { ok: true };
   }
 
   // ── Per-user rule ──────────────────────────────────────────────────────

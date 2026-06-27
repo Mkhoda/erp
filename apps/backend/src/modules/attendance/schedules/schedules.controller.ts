@@ -49,6 +49,31 @@ export class SchedulesController {
     return this.schedules.updateDefault(body);
   }
 
+  // ── Schedule day-overrides (per group / weekday / date range) ──
+  @Get('schedule-overrides')
+  @Page('/dashboard/attendance/work-rules')
+  listOverrides() {
+    return this.schedules.listOverrides();
+  }
+
+  @Post('schedule-overrides')
+  @Page('/dashboard/attendance/work-rules')
+  createOverride(@Body() body: any) {
+    return this.schedules.createOverride(body);
+  }
+
+  @Put('schedule-overrides/:id')
+  @Page('/dashboard/attendance/work-rules')
+  updateOverride(@Param('id') id: string, @Body() body: any) {
+    return this.schedules.updateOverride(id, body);
+  }
+
+  @Delete('schedule-overrides/:id')
+  @Page('/dashboard/attendance/work-rules')
+  removeOverride(@Param('id') id: string) {
+    return this.schedules.removeOverride(id);
+  }
+
   // ── Per-user rule (used from the users panel) ──
   // Schedules list is needed by the users panel (manager allowed to read).
   @Get('schedules-lite')
