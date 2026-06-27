@@ -284,10 +284,12 @@ export default function WorkRulesPage() {
 
       {/* ── Agenda tab ── */}
       {tab === "agenda" && (
-        <AgendaTab group={group} holidays={holidays} overrides={overrides} groupName={groupName} onDelete={async (kind, id) => {
-          await fetch(`${API}/attendance/${kind === "holiday" ? "holidays" : "schedule-overrides"}/${id}`, { method: "DELETE", headers: h });
-          await loadAll();
-        }} />
+        <AgendaTab group={group} holidays={holidays} overrides={overrides} groupName={groupName}
+          onEdit={(kind, record) => setDayModal({ dateStr: isoToJStr(record.startDate), editKind: kind, editRecord: record, holiday: kind === "holiday" ? record : null, override: kind === "override" ? record : null })}
+          onDelete={async (kind, id) => {
+            await fetch(`${API}/attendance/${kind === "holiday" ? "holidays" : "schedule-overrides"}/${id}`, { method: "DELETE", headers: h });
+            await loadAll();
+          }} />
       )}
 
       {/* ── Day-action modal ── */}
@@ -304,12 +306,17 @@ export default function WorkRulesPage() {
   );
 
   function openDay(day: number) {
-    setDayModal({ jy: vy, jm: vm, jd: day, dateStr: `${vy}/${vm}/${day}` });
+    const info = dayInfo(day);
+    setDayModal({ dateStr: `${vy}/${vm}/${day}`, holiday: info.holiday || null, override: info.override || null });
   }
 }
 
+// ISO (UTC-midnight) → Jalali "jy/jm/jd" string for the date inputs.
+const isoToJStr = (iso: string) => { const d = new Date(iso); const j = toJalali(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()); return `${j.jy}/${j.jm}/${j.jd}`; };
+const faDigits = (s: string) => s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]);
+
 // ── Agenda (list of holidays + overrides) ──────────────────────────────────
-function AgendaTab({ group, holidays, overrides, groupName, onDelete }: any) {
+function AgendaTab({ group, holidays, overrides, groupName, onDelete, onEdit }: any) {
   const faD = (iso: string) => new Date(iso).toLocaleDateString("fa-IR", { timeZone: "UTC" });
   const forGroup = (ids?: string[]) => !ids?.length || (group && ids.includes(group.id));
   const hol = holidays.filter((x: any) => forGroup(x.scheduleIds));
@@ -329,7 +336,7 @@ function AgendaTab({ group, holidays, overrides, groupName, onDelete }: any) {
                 <td className="px-2 text-theme-primary" dir="ltr">{faD(r.startDate)}</td>
                 <td className="px-2 text-theme-primary" dir="ltr">{faD(r.endDate)}</td>
                 <td className="px-2 text-theme-muted text-xs">{(!r.scheduleIds?.length) ? "همه" : r.scheduleIds.map(groupName).join("، ")}</td>
-                <td className="px-2"><button onClick={() => onDelete("holiday", r.id)} className="inline-flex w-7 h-7 items-center justify-center rounded-lg text-red-600 hover:bg-red-500/10"><Trash2 className="w-4 h-4" /></button></td>
+                <td className="px-2"><div className="flex items-center justify-center gap-1"><button onClick={() => onEdit("holiday", r)} className="px-2 py-1 rounded text-blue-600 hover:bg-blue-500/10 text-xs">ویرایش</button><button onClick={() => onDelete("holiday", r.id)} className="inline-flex w-7 h-7 items-center justify-center rounded-lg text-red-600 hover:bg-red-500/10"><Trash2 className="w-4 h-4" /></button></div></td>
               </tr>
             ))}
           </tbody>
@@ -347,7 +354,7 @@ function AgendaTab({ group, holidays, overrides, groupName, onDelete }: any) {
                 <td className="px-2 text-theme-muted text-xs" dir="ltr">{faD(r.startDate)} — {faD(r.endDate)}</td>
                 <td className="px-2 text-theme-muted text-xs">{r.isOff ? "تعطیل" : [r.checkInEnd && `ورود تا ${r.checkInEnd}`, r.checkOutEnd && `خروج تا ${r.checkOutEnd}`, r.dailyMinutes != null && `موظف ${r.dailyMinutes}`].filter(Boolean).join(" · ") || "—"}</td>
                 <td className="px-2 text-theme-muted text-xs">{(!r.scheduleIds?.length) ? "همه" : r.scheduleIds.map(groupName).join("، ")}</td>
-                <td className="px-2"><button onClick={() => onDelete("override", r.id)} className="inline-flex w-7 h-7 items-center justify-center rounded-lg text-red-600 hover:bg-red-500/10"><Trash2 className="w-4 h-4" /></button></td>
+                <td className="px-2"><div className="flex items-center justify-center gap-1"><button onClick={() => onEdit("override", r)} className="px-2 py-1 rounded text-blue-600 hover:bg-blue-500/10 text-xs">ویرایش</button><button onClick={() => onDelete("override", r.id)} className="inline-flex w-7 h-7 items-center justify-center rounded-lg text-red-600 hover:bg-red-500/10"><Trash2 className="w-4 h-4" /></button></div></td>
               </tr>
             ))}
           </tbody>
@@ -357,10 +364,12 @@ function AgendaTab({ group, holidays, overrides, groupName, onDelete }: any) {
   );
 }
 
-// ── Day action modal: holiday (3 types) or hours override, day or range ─────
+// ── Day action modal: view/edit existing + create holiday or hours override ──
 function DayActionModal({ open, ctx, group, onClose, onSaved, authHeaders }: any) {
   const [mode, setMode] = React.useState<"holiday" | "override">("holiday");
+  const [editId, setEditId] = React.useState<string | null>(null);
   const [allGroups, setAllGroups] = React.useState(false);
+  const [startStr, setStartStr] = React.useState("");
   const [endStr, setEndStr] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   // holiday fields
@@ -372,29 +381,70 @@ function DayActionModal({ open, ctx, group, onClose, onSaved, authHeaders }: any
   const [weekdays, setWeekdays] = React.useState<number[]>([]);
   const [ov, setOv] = React.useState<any>({ checkInStart: "", checkInEnd: "", checkOutStart: "", checkOutEnd: "", dailyMinutes: "" });
 
+  const resetCreate = React.useCallback(() => {
+    setEditId(null); setMode("holiday"); setAllGroups(false); setStartStr(ctx?.dateStr || ""); setEndStr("");
+    setHTitle(""); setHType("OFFICIAL"); setRecurring(false);
+    setIsOff(false); setWeekdays([]); setOv({ checkInStart: "", checkInEnd: "", checkOutStart: "", checkOutEnd: "", dailyMinutes: "" });
+  }, [ctx]);
   React.useEffect(() => {
-    if (open) { setMode("holiday"); setAllGroups(false); setEndStr(""); setHTitle(""); setHType("OFFICIAL"); setRecurring(false); setIsOff(false); setWeekdays([]); setOv({ checkInStart: "", checkInEnd: "", checkOutStart: "", checkOutEnd: "", dailyMinutes: "" }); }
+    if (!open) return;
+    if (ctx?.editKind) startEdit(ctx.editKind, ctx.editRecord); else resetCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!ctx) return null;
   const scheduleIds = allGroups || !group ? [] : [group.id];
 
+  function startEdit(kind: "holiday" | "override", r: any) {
+    setEditId(r.id); setMode(kind); setAllGroups(!r.scheduleIds?.length);
+    setStartStr(isoToJStr(r.startDate)); setEndStr(isoToJStr(r.endDate));
+    if (kind === "holiday") { setHTitle(r.title || ""); setHType(r.type); setRecurring(!!r.recurring); }
+    else { setIsOff(!!r.isOff); setWeekdays(r.weekdays || []); setOv({ checkInStart: r.checkInStart || "", checkInEnd: r.checkInEnd || "", checkOutStart: r.checkOutStart || "", checkOutEnd: r.checkOutEnd || "", dailyMinutes: r.dailyMinutes ?? "" }); }
+  }
+  async function del(kind: "holiday" | "override", id: string) {
+    if (!confirm("حذف شود؟")) return;
+    await fetch(`${API}/attendance/${kind === "holiday" ? "holidays" : "schedule-overrides"}/${id}`, { method: "DELETE", headers: authHeaders });
+    await onSaved();
+  }
+
   async function save() {
     setSaving(true);
     try {
+      const start = startStr || ctx.dateStr;
       if (mode === "holiday") {
-        await fetch(`${API}/attendance/holidays`, { method: "POST", headers: authHeaders, body: JSON.stringify({ title: hTitle || (TYPE_FA[hType] + " " + ctx.dateStr), type: hType, startDate: ctx.dateStr, endDate: endStr || ctx.dateStr, recurring, scheduleIds }) });
+        const body = JSON.stringify({ title: hTitle || (TYPE_FA[hType] + " " + start), type: hType, startDate: start, endDate: endStr || start, recurring, scheduleIds });
+        await fetch(`${API}/attendance/holidays${editId ? "/" + editId : ""}`, { method: editId ? "PATCH" : "POST", headers: authHeaders, body });
       } else {
-        await fetch(`${API}/attendance/schedule-overrides`, { method: "POST", headers: authHeaders, body: JSON.stringify({ startDate: ctx.dateStr, endDate: endStr || ctx.dateStr, weekdays, isOff, scheduleIds, ...ov }) });
+        const body = JSON.stringify({ startDate: start, endDate: endStr || start, weekdays, isOff, scheduleIds, ...ov });
+        await fetch(`${API}/attendance/schedule-overrides${editId ? "/" + editId : ""}`, { method: editId ? "PUT" : "POST", headers: authHeaders, body });
       }
       await onSaved();
     } finally { setSaving(false); }
   }
 
+  const existing: Array<{ kind: "holiday" | "override"; r: any; label: string }> = [
+    ...(ctx.holiday ? [{ kind: "holiday" as const, r: ctx.holiday, label: `تعطیلی ${TYPE_FA[ctx.holiday.type] || ""}: ${ctx.holiday.title || ""}` }] : []),
+    ...(ctx.override ? [{ kind: "override" as const, r: ctx.override, label: ctx.override.isOff ? "تعطیلِ ساعتی" : "ساعت کاری ویژه" }] : []),
+  ];
+
   return (
-    <Modal open={open} onClose={onClose} title={`ثبت برای ${ctx.dateStr.replace(/[0-9]/g, (d: string) => "۰۱۲۳۴۵۶۷۸۹"[+d])}`} size="md"
-      footer={<><button onClick={onClose} className="btn-theme-secondary text-sm">انصراف</button><button onClick={save} disabled={saving} className="btn-theme-primary text-sm disabled:opacity-50">{saving ? "..." : "ثبت"}</button></>}>
+    <Modal open={open} onClose={onClose} title={`${editId ? "ویرایش" : "ثبت"} برای ${faDigits(ctx.dateStr)}`} size="md"
+      footer={<><button onClick={onClose} className="btn-theme-secondary text-sm">بستن</button>{editId && <button onClick={resetCreate} className="btn-theme-secondary text-sm">مورد جدید</button>}<button onClick={save} disabled={saving} className="btn-theme-primary text-sm disabled:opacity-50">{saving ? "..." : editId ? "ذخیره تغییر" : "ثبت"}</button></>}>
       <div className="space-y-3">
+        {existing.length > 0 && (
+          <div className="border border-theme rounded-lg divide-y divide-theme">
+            {existing.map((it, i) => (
+              <div key={i} className="flex items-center justify-between px-3 py-2 text-sm">
+                <span className={`text-theme-secondary ${editId === it.r.id ? "font-bold text-blue-600" : ""}`}>{it.label}</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => startEdit(it.kind, it.r)} className="px-2 py-1 rounded text-blue-600 hover:bg-blue-500/10 text-xs">ویرایش</button>
+                  <button onClick={() => del(it.kind, it.r.id)} className="inline-flex w-6 h-6 items-center justify-center rounded text-red-600 hover:bg-red-500/10"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-1 bg-theme-secondary p-1 rounded-lg w-fit">
           {([["holiday", "تعطیلی"], ["override", "تغییر ساعت کاری"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setMode(k)} className={`px-3 py-1.5 rounded-md text-sm ${mode === k ? "bg-blue-600 text-white" : "text-theme-muted"}`}>{l}</button>
@@ -402,9 +452,10 @@ function DayActionModal({ open, ctx, group, onClose, onSaved, authHeaders }: any
         </div>
 
         <div className="grid grid-cols-2 gap-3">
+          <Field label="از تاریخ"><input dir="ltr" className={inputCls} value={startStr} onChange={e => setStartStr(e.target.value)} placeholder="1405/04/01" /></Field>
           <Field label="تا تاریخ (اختیاری — بازه)"><input dir="ltr" className={inputCls} value={endStr} onChange={e => setEndStr(e.target.value)} placeholder="مثلاً 1405/04/10" /></Field>
-          <label className="flex items-center gap-2 text-sm text-theme-primary mt-7"><input type="checkbox" checked={allGroups} onChange={e => setAllGroups(e.target.checked)} /> برای همهٔ گروه‌ها</label>
         </div>
+        <label className="flex items-center gap-2 text-sm text-theme-primary"><input type="checkbox" checked={allGroups} onChange={e => setAllGroups(e.target.checked)} /> برای همهٔ گروه‌ها</label>
         {!allGroups && group && <p className="text-[11px] text-theme-muted">اعمال برای گروه: <b>{group.isDefault ? "پیش‌فرض" : group.name}</b></p>}
 
         {mode === "holiday" ? (
