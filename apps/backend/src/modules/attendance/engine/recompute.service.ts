@@ -130,22 +130,16 @@ export class RecomputeService {
   async relinkAndRecomputeAll(): Promise<{ linked: number; recomputed: number; users: number }> {
     const users = await this.prisma.user.findMany({
       where: { attendanceCardNo: { not: null } },
-      select: { id: true, attendanceCardNo: true },
+      select: { id: true },
     });
     let linked = 0;
     let recomputed = 0;
+    // Per-user relink fills EVERY day from the first punch to today (materializing
+    // absent days), so the grid stays current up to today — not just punch-days.
     for (const u of users) {
-      const r = await this.prisma.rawAttendanceRecord.updateMany({
-        where: { cardNo: u.attendanceCardNo!, userId: null },
-        data: { userId: u.id },
-      });
-      linked += r.count;
-      const punches = await this.prisma.rawAttendanceRecord.findMany({
-        where: { userId: u.id },
-        select: { punchAt: true },
-      });
-      const pairs = punches.map((p) => ({ userId: u.id, gregDate: workDateOf(p.punchAt) }));
-      recomputed += await this.recomputeDays(pairs);
+      const r = await this.relinkUser(u.id);
+      linked += r.linked;
+      recomputed += r.recomputed;
     }
     return { linked, recomputed, users: users.length };
   }

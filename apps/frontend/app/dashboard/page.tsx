@@ -11,36 +11,34 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
-// ── Jalali calendar (pure math, no dependency) ─────────────────────────────
-function toJalali(gy: number, gm: number, gd: number) {
-  const g_d_no = [31,28+(gy%4===0&&(gy%100!==0||gy%400===0)?1:0),31,30,31,30,31,31,30,31,30,31];
-  let jy = gy - 1600, jm = 0, jd = 0;
-  let g_d_no2 = 365*gy + Math.floor((gy+3)/4) - Math.floor((gy+99)/100) + Math.floor((gy+399)/400);
-  for (let i=0;i<gm-1;i++) g_d_no2 += g_d_no[i];
-  g_d_no2 += gd - 1;
-  let j_d_no = g_d_no2 - 79;
-  const j_np = Math.floor(j_d_no/12053); j_d_no %= 12053;
-  jy = 979 + 33*j_np + 4*Math.floor(j_d_no/1461);
-  j_d_no %= 1461;
-  if (j_d_no >= 366) { jy += Math.floor((j_d_no-1)/365); j_d_no = (j_d_no-1)%365; }
-  const il = [0,31,60,91,121,152,182,213,244,274,305,335];
-  for (let i=11;i>=0;i--) { if (j_d_no >= il[i]) { jm = i+1; jd = j_d_no - il[i] + 1; break; } }
+// ── Jalali calendar (jdf algorithm, no dependency) ─────────────────────────
+function toJalali(gy0: number, gm: number, gd: number) {
+  const gdm = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  let jy: number, gy: number;
+  if (gy0 > 1600) { jy = 979; gy = gy0 - 1600; } else { jy = 0; gy = gy0 - 621; }
+  const gy2 = gm > 2 ? gy + 1 : gy;
+  let days = 365 * gy + Math.floor((gy2 + 3) / 4) - Math.floor((gy2 + 99) / 100) + Math.floor((gy2 + 399) / 400) - 80 + gd + gdm[gm - 1];
+  jy += 33 * Math.floor(days / 12053); days %= 12053;
+  jy += 4 * Math.floor(days / 1461); days %= 1461;
+  if (days > 365) { jy += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
+  const jm = days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
+  const jd = 1 + (days < 186 ? days % 31 : (days - 186) % 30);
   return { jy, jm, jd };
 }
 function jalaliMonthLen(jy: number, jm: number) { return jm<=6?31:jm<=11?30:jy%4===3?30:29; }
-function jalaliToGregorian(jy: number, jm: number, jd: number) {
-  let gy = jy <= 979 ? 1600 : 1976;
-  if (jy <= 979) jy += 979; else jy -= 979;
-  let days = 365*jy + Math.floor(jy/33)*8 + Math.floor((jy%33+3)/4) + 78 + jd + (jm<=6?(jm-1)*31:((jm-1)*30)+6);
-  gy += 400*Math.floor(days/146097); days %= 146097;
-  if (days > 36524) { gy += 100*Math.floor(--days/36524); days %= 36524; if (days >= 365) days++; }
-  gy += 4*Math.floor(days/1461); days %= 1461;
-  if (days > 365) { gy += Math.floor((days-1)/365); days = (days-1)%365; }
-  const gd = days+1;
-  const mArr = [0,31,28+(gy%4===0&&(gy%100!==0||gy%400===0)?1:0),31,30,31,30,31,31,30,31,30,31];
-  let gm = 0;
-  for (let i=1;i<13;i++) { if (gd<=mArr[i]) {gm=i;break;} else mArr[i+1]+=mArr[i]; }
-  return new Date(gy, gm-1, gd - (mArr[gm-1] || 0));
+function jalaliToGregorian(jy0: number, jm: number, jd: number) {
+  let gy: number, jy: number;
+  if (jy0 > 979) { gy = 1600; jy = jy0 - 979; } else { gy = 621; jy = jy0; }
+  let days = 365 * jy + Math.floor(jy / 33) * 8 + Math.floor(((jy % 33) + 3) / 4) + 78 + jd + (jm < 7 ? (jm - 1) * 31 : (jm - 7) * 30 + 186);
+  gy += 400 * Math.floor(days / 146097); days %= 146097;
+  if (days > 36524) { gy += 100 * Math.floor(--days / 36524); days %= 36524; if (days >= 365) days++; }
+  gy += 4 * Math.floor(days / 1461); days %= 1461;
+  if (days > 365) { gy += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
+  let gd = days + 1;
+  const sal = [0, 31, (gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let gm = 1;
+  for (; gm <= 12; gm++) { if (gd <= sal[gm]) break; gd -= sal[gm]; }
+  return new Date(gy, gm - 1, gd);
 }
 function jalaliFirstWeekday(jy: number, jm: number) {
   const g = jalaliToGregorian(jy, jm, 1);
