@@ -477,6 +477,7 @@ enum HolidayType {
   OFFICIAL
   COMPANY
   HALF_DAY
+  CALENDAR
 }
 
 enum ShiftType {
