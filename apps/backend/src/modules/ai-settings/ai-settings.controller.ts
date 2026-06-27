@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -13,6 +14,18 @@ export class AiSettingsController {
   @Get('providers/active')
   getActiveProviders() {
     return this.service.getActiveProviders();
+  }
+
+  /** Transcribe audio file to text via Whisper (any authenticated user). */
+  @Post('transcribe')
+  @UseInterceptors(FileInterceptor('audio_file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+  transcribe(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('language') language = 'fa',
+  ) {
+    const userId = req.user?.sub || req.user?.userId || req.user?.id;
+    return this.service.transcribe(userId, file, language);
   }
 
   /** Chat with selected provider by ID (any authenticated user). */

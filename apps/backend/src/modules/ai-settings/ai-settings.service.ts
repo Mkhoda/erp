@@ -12,10 +12,12 @@ const DEFAULT_URLS: Record<string, string> = {
   deepseek:   'https://api.deepseek.com/v1',
   groq:       'https://api.groq.com/openai/v1',
   openrouter: 'https://openrouter.ai/api/v1',
+  ollama:     'http://192.168.30.13:11434/v1',
+  whisper:    'http://192.168.30.13:8001',
   custom:     '',
 };
 
-export const VALID_PROVIDER_TYPES = ['agnes', 'openai', 'anthropic', 'gemini', 'deepseek', 'groq', 'openrouter', 'custom'] as const;
+export const VALID_PROVIDER_TYPES = ['agnes', 'openai', 'anthropic', 'gemini', 'deepseek', 'groq', 'openrouter', 'ollama', 'whisper', 'custom'] as const;
 export type ProviderType = typeof VALID_PROVIDER_TYPES[number];
 
 export interface AiProviderDto {
@@ -233,6 +235,78 @@ export class AiSettingsService {
       .sort((a, b) => b.totalTokens - a.totalTokens);
   }
 
+  /** Transcribe audio using the configured Whisper provider. */
+  async transcribe(
+    userId: string,
+    audioFile: { buffer: Buffer; originalname: string; mimetype: string },
+    language = 'fa',
+  ) {
+    const provider = await this.prisma.aiProvider.findFirst({
+      where: { type: 'whisper', isActive: true },
+    });
+    if (!provider) throw new NotFoundException('سرویس تبدیل صدا به متن (Whisper) تنظیم یا فعال نشده');
+
+    const whisperUrl = provider.apiUrl || DEFAULT_URLS['whisper'];
+    const startTime = Date.now();
+
+    try {
+      // Use Node 18+ built-in FormData (no extra package needed)
+      const form = new globalThis.FormData();
+      const blob = new Blob([audioFile.buffer as unknown as ArrayBuffer], { type: audioFile.mimetype || 'audio/wav' });
+      form.append('audio_file', blob, audioFile.originalname || 'audio.wav');
+
+      const { data } = await firstValueFrom(
+        this.http.post(`${whisperUrl}/asr`, form, {
+          params: { language, output: 'json', vad_filter: 'true' },
+          timeout: 120000,
+          maxContentLength: 50 * 1024 * 1024,
+          maxBodyLength: 50 * 1024 * 1024,
+        }),
+      );
+
+      const text: string = data?.text || '';
+      const latencyMs = Date.now() - startTime;
+
+      await this.prisma.aiUsage.create({
+        data: {
+          userId,
+          providerType: 'whisper',
+          providerName: provider.name,
+          model: 'whisper',
+          prompt: `[audio:${audioFile.originalname}]`,
+          promptTokens: 0,
+          completionTokens: text.length,
+          totalTokens: 0,
+          latencyMs,
+          success: true,
+        },
+      });
+
+      return { text, language, latencyMs };
+    } catch (err: any) {
+      const latencyMs = Date.now() - startTime;
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Whisper transcription failed';
+
+      await this.prisma.aiUsage.create({
+        data: {
+          userId,
+          providerType: 'whisper',
+          providerName: provider.name,
+          model: 'whisper',
+          prompt: `[audio:${audioFile.originalname}]`,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          latencyMs,
+          success: false,
+          errorMsg,
+        },
+      });
+
+      throw new BadRequestException(`خطا در تبدیل صدا به متن: ${errorMsg}`);
+    }
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────────
 
   private validateType(type: string) {
@@ -249,6 +323,8 @@ export class AiSettingsService {
       case 'anthropic': return this.testAnthropic(baseUrl, provider.apiKey, provider.model);
       case 'gemini':    return this.testGemini(baseUrl, provider.apiKey, provider.model);
       case 'deepseek':  return this.testDeepSeek(baseUrl, provider.apiKey, provider.model);
+      case 'ollama':    return this.testOllama(baseUrl, provider.model);
+      case 'whisper':   return this.testWhisper(baseUrl);
       default:          return this.testCustom(baseUrl, provider.apiKey);
     }
   }
@@ -298,6 +374,7 @@ export class AiSettingsService {
       case 'gemini':     return this.chatGemini(baseUrl, provider.apiKey, provider.model, messages, safeMode);
       case 'agnes':      return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, messages, safeMode, true);
       case 'openrouter': return this.chatOpenRouter(baseUrl, provider.apiKey, provider.model, messages, safeMode);
+      case 'ollama':     return this.chatOpenAI(baseUrl, provider.apiKey || 'ollama', provider.model, messages, safeMode);
       default:           return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, messages, safeMode);
     }
   }
@@ -369,6 +446,24 @@ export class AiSettingsService {
     ));
     const rawContent = data.choices?.[0]?.message?.content;
     return { content: typeof rawContent === 'string' ? rawContent : '', promptTokens: data.usage?.prompt_tokens || 0, completionTokens: data.usage?.completion_tokens || 0, totalTokens: data.usage?.total_tokens || 0 };
+  }
+
+  private async testOllama(baseUrl: string, model?: string) {
+    // baseUrl is .../v1; tags endpoint is at the root port
+    const ollamaRoot = baseUrl.replace(/\/v1\/?$/, '');
+    const { data } = await firstValueFrom(this.http.get(`${ollamaRoot}/api/tags`, { timeout: 10000 }));
+    const models = (data?.models || []).map((m: any) => m.name);
+    return { message: 'Connected successfully to Ollama', modelsAvailable: models.length, currentModel: model || 'not set', models: models.slice(0, 10) };
+  }
+
+  private async testWhisper(baseUrl: string) {
+    try {
+      await firstValueFrom(this.http.get(`${baseUrl}/`, { timeout: 5000 }));
+    } catch (err: any) {
+      if (!err?.response?.status) throw err;
+      // any HTTP response (even 404/405) means the service is reachable
+    }
+    return { message: 'Whisper service is reachable' };
   }
 
   private maskKey(key: string): string {
