@@ -182,6 +182,7 @@ export class CalcService {
 
     let workedMinutes = 0;
     let overtimeMinutes = 0;
+    let holidayOvertimeMinutes = 0;
     let delayMinutes = 0;
     let earlyLeaveMinutes = 0;
     let nightMinutes = 0;
@@ -291,13 +292,17 @@ export class CalcService {
       status = AttendanceStatus.PRESENT;
     }
 
-    // On a holiday/weekend, punches count as holiday work (overtime preserved,
-    // delay/early-leave not meaningful).
+    // On a holiday/weekend, punches count as holiday work.
+    // All worked time goes to holidayOvertimeMinutes (separate from regular OT
+    // because payment multipliers differ: e.g. regular OT × 1.4, holiday × 2.0).
     const isHolidayWork = holidayWork && bothPunches;
     if (holidayWork) {
       delayMinutes = 0;
       earlyLeaveMinutes = 0;
-      if (isHolidayWork) overtimeMinutes = workedMinutes; // whole shift is OT
+      if (isHolidayWork) {
+        holidayOvertimeMinutes = workedMinutes;
+        overtimeMinutes = 0; // reset — regular OT doesn't apply on holidays
+      }
     }
 
     await this.prisma.attendanceDay.upsert({
@@ -305,13 +310,15 @@ export class CalcService {
       create: {
         userId, gregDate, jYear, jMonth, jDay,
         firstCheckIn: firstIn, lastCheckOut: lastOut,
-        workedMinutes, overtimeMinutes, delayMinutes, earlyLeaveMinutes, nightMinutes, leaveMinutes,
+        workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
+        delayMinutes, earlyLeaveMinutes, nightMinutes, leaveMinutes,
         status, isHolidayWork, hasOverride: !!override,
       },
       update: {
         jYear, jMonth, jDay,
         firstCheckIn: firstIn, lastCheckOut: lastOut,
-        workedMinutes, overtimeMinutes, delayMinutes, earlyLeaveMinutes, nightMinutes, leaveMinutes,
+        workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
+        delayMinutes, earlyLeaveMinutes, nightMinutes, leaveMinutes,
         status, isHolidayWork, hasOverride: !!override, computedAt: new Date(),
       },
     });

@@ -70,7 +70,7 @@ export class RecordsService {
     const [agg, byStatus, byDate] = await Promise.all([
       this.prisma.attendanceDay.aggregate({
         where,
-        _sum: { workedMinutes: true, overtimeMinutes: true, delayMinutes: true, earlyLeaveMinutes: true, nightMinutes: true },
+        _sum: { workedMinutes: true, overtimeMinutes: true, holidayOvertimeMinutes: true, delayMinutes: true, earlyLeaveMinutes: true, nightMinutes: true },
         _count: true,
       }),
       this.prisma.attendanceDay.groupBy({ by: ['status'], where, _count: true }),
@@ -84,6 +84,7 @@ export class RecordsService {
       days: agg._count,
       workedMinutes: agg._sum.workedMinutes ?? 0,
       overtimeMinutes: agg._sum.overtimeMinutes ?? 0,
+      holidayOvertimeMinutes: agg._sum.holidayOvertimeMinutes ?? 0,
       delayMinutes: agg._sum.delayMinutes ?? 0,
       earlyLeaveMinutes: agg._sum.earlyLeaveMinutes ?? 0,
       nightMinutes: agg._sum.nightMinutes ?? 0,
