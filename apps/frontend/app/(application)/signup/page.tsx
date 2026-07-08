@@ -1,7 +1,6 @@
 "use client";
 import React from 'react';
 import { normalizeTo98, isValidPhone } from '../../../lib/phone';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { Eye, EyeOff, Phone, Lock, User, UserPlus, ArrowRight, Moon, Sun } from 'lucide-react';
@@ -9,7 +8,6 @@ import { Eye, EyeOff, Phone, Lock, User, UserPlus, ArrowRight, Moon, Sun } from 
 type Step = 'form' | 'otp';
 
 export default function SignUpPage() {
-  const router = useRouter();
   const [step, setStep] = React.useState<Step>('form');
   const [firstName, setFirstName] = React.useState('');
   const [lastName, setLastName] = React.useState('');
@@ -24,6 +22,7 @@ export default function SignUpPage() {
   const [otpExpiresAt, setOtpExpiresAt] = React.useState<string | null>(null);
   const [now, setNow] = React.useState(Date.now());
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
+  const [ready, setReady] = React.useState(false);
 
   const API = process.env.NEXT_PUBLIC_API_URL || '/api';
   const validPhone = isValidPhone(phone);
@@ -31,16 +30,21 @@ export default function SignUpPage() {
 
   React.useEffect(() => {
     document.title = 'ثبت نام | ارزش ERP';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (token) router.replace('/dashboard');
     const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
     if (saved) {
       setTheme(saved);
       if (saved === 'dark') document.documentElement.classList.add('dark');
     }
+    // If already authenticated, redirect immediately without showing the form
+    const token = localStorage.getItem('token');
+    if (token) {
+      window.location.replace('/dashboard');
+    } else {
+      setReady(true);
+    }
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [router]);
+  }, []);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -153,9 +157,11 @@ export default function SignUpPage() {
       if (loginRes.ok) {
         const loginData = await loginRes.json();
         localStorage.setItem('token', loginData.access_token);
-        router.push('/dashboard');
+        document.cookie = `token=${loginData.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+        // Hard navigation so middleware sees the cookie on a fresh request
+        window.location.href = '/dashboard';
       } else {
-        router.push('/signin?message=registration-success');
+        window.location.href = '/signin?message=registration-success';
       }
     } catch (e: any) {
       setError(e.message);
@@ -165,6 +171,9 @@ export default function SignUpPage() {
   }
 
   const otpRefs = Array.from({ length: 6 }, () => React.createRef<HTMLInputElement>());
+
+  // Don't render the form until we know the user isn't already logged in
+  if (!ready) return null;
 
   return (
     <div className="relative flex justify-center items-center bg-gradient-theme-light px-4 py-10 min-h-screen overflow-hidden" dir="rtl">

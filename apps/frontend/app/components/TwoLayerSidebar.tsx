@@ -28,10 +28,17 @@ function isRoleAllowed(itemRoles: Role[] | undefined, userRole: Role | null): bo
 
 /**
  * Should this item be shown?
- * - Items WITHOUT `roles` (universal pages like AI workspace, profile) → always visible
- * - Items WITH `roles` → visible only if role matches AND page is in allowedPages
+ * - Groups: visible if role matches OR if any child page is explicitly in allowedPages (API grant overrides hard-coded roles)
+ * - Leaf items without roles (universal pages like AI workspace, profile) → always visible
+ * - Leaf items with roles → visible only if role matches AND page is in allowedPages
  */
 function shouldShow(item: MenuItem, allowedPages: string[] | null, userRole: Role | null): boolean {
+  if (item.children && item.children.length > 0) {
+    if (isRoleAllowed(item.roles, userRole)) return true;
+    // Role doesn't match hard-coded list, but check if any child has an explicit API permission
+    if (allowedPages === null) return false;
+    return item.children.some(c => c.page && allowedPages.includes(c.page));
+  }
   const hasRoles = item.roles && item.roles.length > 0;
   if (!hasRoles) return true; // universal — always show
   return isRoleAllowed(item.roles, userRole) && isAllowed(item.page, allowedPages);
@@ -84,10 +91,17 @@ function SidebarItem({
 
   // Group with children
   if (item.children && item.children.length > 0) {
-    // If parent has roles and user doesn't match, hide entirely
-    if (!isRoleAllowed(item.roles, role)) return null;
+    // Show group if role matches OR if any child page is explicitly granted via API
+    const hasExplicitChildAccess = allowedPages !== null &&
+      item.children.some(c => c.page && allowedPages.includes(c.page));
+    if (!isRoleAllowed(item.roles, role) && !hasExplicitChildAccess) return null;
 
-    const visibleChildren = item.children.filter(c => shouldShow(c, allowedPages, role));
+    // Filter children by allowedPages (children rarely have their own roles)
+    const visibleChildren = item.children.filter(c => {
+      if (c.roles && c.roles.length > 0) return shouldShow(c, allowedPages, role);
+      if (!c.page) return true;
+      return allowedPages === null || allowedPages.includes(c.page);
+    });
     if (visibleChildren.length === 0) return null;
 
     // Collapsed: show icon-only button with tooltip

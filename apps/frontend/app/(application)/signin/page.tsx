@@ -1,34 +1,38 @@
 "use client";
 import React from 'react';
-import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Eye, EyeOff, Phone, Lock, LogIn, Moon, Sun } from 'lucide-react';
 import { isValidPhone, normalizeTo98 } from '../../../lib/phone';
 
 export default function SignInPage() {
-  const router = useRouter();
   const [phone, setPhone] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
+  const [ready, setReady] = React.useState(false);
 
   const validPhone = isValidPhone(phone);
   const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
   React.useEffect(() => {
     document.title = 'ورود | ارزش ERP';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (token) router.replace('/dashboard');
     const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
     if (saved) {
       setTheme(saved);
       if (saved === 'dark') document.documentElement.classList.add('dark');
       else document.documentElement.classList.remove('dark');
     }
-  }, [router]);
+    // If already authenticated, redirect immediately without showing the form
+    const token = localStorage.getItem('token');
+    if (token) {
+      window.location.replace('/dashboard');
+    } else {
+      setReady(true);
+    }
+  }, []);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -71,15 +75,19 @@ export default function SignInPage() {
       const data = await res.json();
       if (!data.access_token) throw new Error('پاسخ نامعتبر از سرور — لطفاً دوباره تلاش کنید');
       localStorage.setItem('token', data.access_token);
-      // Also set cookie for middleware auth check
+      // Set cookie for middleware auth check
       document.cookie = `token=${data.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-      router.push('/dashboard');
+      // Hard navigation so middleware sees the cookie on a fresh request
+      window.location.href = '/dashboard';
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   }
+
+  // Don't render the form until we know the user isn't already logged in
+  if (!ready) return null;
 
   return (
     <div className="relative flex justify-center items-center bg-gradient-theme-light px-4 min-h-screen overflow-hidden" dir="rtl">
