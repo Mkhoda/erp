@@ -3,13 +3,14 @@ import { JwtAuthGuard } from '../../auth/jwt.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { Page } from '../../permissions/page.decorator';
+import { PagePermissionGuard } from '../../permissions/page.guard';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DashboardsService } from './dashboards.service';
 import { resolveDeptScope } from '../scope.util';
 import { toJalaliParts, workDateOf } from '../engine/jalali.util';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN', 'MANAGER')
+@UseGuards(JwtAuthGuard, RolesGuard, PagePermissionGuard)
+@Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
 @Page('/dashboard/attendance')
 @Controller('attendance/dashboard')
 export class DashboardsController {

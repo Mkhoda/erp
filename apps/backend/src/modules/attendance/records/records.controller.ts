@@ -3,12 +3,13 @@ import { JwtAuthGuard } from '../../auth/jwt.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { Page } from '../../permissions/page.decorator';
+import { PagePermissionGuard } from '../../permissions/page.guard';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RecordsService, RecordFilter } from './records.service';
 import { resolveDeptScope, parseWorkDate } from '../scope.util';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN', 'MANAGER')
+@UseGuards(JwtAuthGuard, RolesGuard, PagePermissionGuard)
+@Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
 @Page('/dashboard/attendance/records')
 @Controller('attendance/records')
 export class RecordsController {

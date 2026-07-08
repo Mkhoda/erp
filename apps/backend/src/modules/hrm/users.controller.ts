@@ -12,7 +12,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
   @Page('/dashboard/users')
   @UseGuards(PagePermissionGuard)
   findAll(@Req() req: any) { return this.usersService.findAll(req.user); }
@@ -24,7 +24,7 @@ export class UsersController {
   updateMe(@Req() req: any, @Body() body: any) { return this.usersService.update(req.user.userId, { firstName: body.firstName, lastName: body.lastName, phone: body.phone }); }
 
   @Get(':id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
   @Page('/dashboard/users')
   @UseGuards(PagePermissionGuard)
   findOne(@Param('id') id: string) { return this.usersService.findOne(id); }

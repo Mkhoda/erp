@@ -4,13 +4,14 @@ import { JwtAuthGuard } from '../../auth/jwt.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { Page } from '../../permissions/page.decorator';
+import { PagePermissionGuard } from '../../permissions/page.guard';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RecordsService } from '../records/records.service';
 import { ReportsService, ReportMeta } from './reports.service';
 import { resolveDeptScope } from '../scope.util';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN', 'MANAGER')
+@UseGuards(JwtAuthGuard, RolesGuard, PagePermissionGuard)
+@Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
 @Page('/dashboard/attendance/reports')
 @Controller('attendance/reports')
 export class ReportsController {
