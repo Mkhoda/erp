@@ -13,6 +13,8 @@ import { ChatHistoryModule } from './chat-history/chat-history.module';
 import { TodosModule } from './todos/todos.module';
 import { QuotaModule } from './quota/quota.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { SessionsModule } from './sessions/sessions.module';
+import { AuthSettingsModule } from './auth-settings/auth-settings.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
@@ -34,6 +36,8 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     TodosModule,
     QuotaModule,
     AttendanceModule,
+    SessionsModule,
+    AuthSettingsModule,
   ],
   controllers: [ReportsController],
   providers: [

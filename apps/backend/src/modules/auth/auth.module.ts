@@ -8,18 +8,22 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
 import { BaleService } from './bale.service';
+import { SessionsModule } from '../sessions/sessions.module';
+import { AuthSettingsModule } from '../auth-settings/auth-settings.module';
 
 @Module({
   imports: [
     ConfigModule,
     HttpModule,
     PassportModule,
+    SessionsModule,
+    AuthSettingsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET') || 'devsecret',
-        signOptions: { expiresIn: '7d' },
+        // No global expiresIn — it is set dynamically per signAsync call from AuthSettingsService
       }),
     }),
   ],

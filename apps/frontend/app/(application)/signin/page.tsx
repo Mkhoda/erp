@@ -9,6 +9,7 @@ export default function SignInPage() {
   const [phone, setPhone] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
+  const [rememberMe, setRememberMe] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
@@ -66,7 +67,7 @@ export default function SignInPage() {
       const res = await fetch(`${API}/auth/login-phone`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneDigits, password }),
+        body: JSON.stringify({ phone: phoneDigits, password, rememberMe }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -75,8 +76,8 @@ export default function SignInPage() {
       const data = await res.json();
       if (!data.access_token) throw new Error('پاسخ نامعتبر از سرور — لطفاً دوباره تلاش کنید');
       localStorage.setItem('token', data.access_token);
-      // Set cookie for middleware auth check
-      document.cookie = `token=${data.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      const cookieTtl = data.expires_in ?? (rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60);
+      document.cookie = `token=${data.access_token}; path=/; max-age=${cookieTtl}; SameSite=Lax`;
       // Hard navigation so middleware sees the cookie on a fresh request
       window.location.href = '/dashboard';
     } catch (err: any) {
@@ -181,6 +182,17 @@ export default function SignInPage() {
                 </button>
               </div>
             </div>
+
+            {/* Remember me */}
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+                className="accent-blue-600 w-4 h-4 rounded"
+              />
+              <span className="text-sm text-theme-secondary">مرا به خاطر بسپار</span>
+            </label>
 
             {/* Error */}
             {error && (

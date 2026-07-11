@@ -45,6 +45,10 @@ model User {
   leaveRequests         LeaveRequest[]          @relation("LeaveUser")
   attendanceRequests    AttendanceRequest[]     @relation("AttnReqUser")
   attendanceNotifications AttendanceNotification[] @relation("AttnNotifUser")
+  // ── Security ──
+  tokenVersion Int      @default(1)
+  sessions     Session[]
+  auditLogs    AuditLog[] @relation("UserAuditLogs")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -865,4 +869,68 @@ model AttendanceNotification {
   createdAt DateTime         @default(now())
 
   @@index([userId, isRead])
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Security & Session Management
+// ════════════════════════════════════════════════════════════════════
+
+// Active login sessions — one row per login. Embedded in JWT payload as `sid`.
+// Revocation is soft-delete: set isRevoked = true.
+model Session {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issuedAt       DateTime  @default(now())
+  expiresAt      DateTime
+  lastSeenAt     DateTime  @default(now())
+  ipAddress      String?
+  userAgent      String?   @db.Text
+  deviceType     String?
+  deviceModel    String?
+  browser        String?
+  browserVersion String?
+  os             String?
+  platform       String?
+  authMethod     String    @default("password")
+  rememberMe     Boolean   @default(false)
+  isRevoked      Boolean   @default(false)
+  revokedAt      DateTime?
+  revokedById    String?
+
+  @@index([userId])
+  @@index([isRevoked, expiresAt])
+  @@index([lastSeenAt])
+}
+
+// Global auth configuration — single row, singleton pattern (id = "singleton").
+// globalTokenVersion increments on any settings change to force all tokens invalid.
+model AuthSettings {
+  id                    String   @id @default("singleton")
+  accessTokenTtlSec     Int      @default(86400)
+  rememberMeTtlSec      Int      @default(2592000)
+  idleTimeoutSec        Int      @default(0)
+  maxSessionLifetimeSec Int      @default(0)
+  globalTokenVersion    Int      @default(1)
+  updatedAt             DateTime @updatedAt
+  updatedById           String?
+}
+
+// Security audit log — login, logout, password change, session revoke, settings change.
+model AuditLog {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  userId    String?
+  user      User?    @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: SetNull)
+  adminId   String?
+  ipAddress String?
+  userAgent String?
+  action    String
+  result    String   @default("SUCCESS")
+  details   Json?
+  sessionId String?
+
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
 }
