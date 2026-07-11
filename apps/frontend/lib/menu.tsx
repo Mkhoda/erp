@@ -148,8 +148,9 @@ export const MENU: MenuItem[] = [
       { id: 'admin.quota',       title: 'سقف توکن',        page: '/dashboard/quota',                 icon: Shield },
       { id: 'admin.logs',        title: 'لاگ سیستم',      page: '/dashboard/system-logs',          icon: ScrollText },
       { id: 'access',            title: 'دسترسی صفحات',   page: '/dashboard/access',               icon: FileText },
-      { id: 'admin.sessions',    title: 'مدیریت نشست‌ها', page: '/dashboard/security/sessions',    icon: ShieldCheck },
-      { id: 'admin.secSettings', title: 'تنظیمات امنیتی', page: '/dashboard/security/settings',   icon: Settings },
+      { id: 'admin.sessions',    title: 'مدیریت نشست‌ها',    page: '/dashboard/security/sessions',  icon: ShieldCheck },
+      { id: 'admin.secSettings', title: 'تنظیمات امنیتی',    page: '/dashboard/security/settings', icon: Settings },
+      { id: 'admin.messaging',   title: 'تنظیمات پیام‌رسانی', page: '/dashboard/messaging/admin',   icon: MessageCircle },
     ],
   },
 ];

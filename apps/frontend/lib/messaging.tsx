@@ -191,6 +191,15 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // ── Initial data load (independent of socket) ────────────────
+
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetchConversations();
+    fetchUsers();
+  }, [fetchConversations, fetchUsers]);
+
   // ── Socket setup ───────────────────────────────────────────────
 
   React.useEffect(() => {
