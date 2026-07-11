@@ -101,15 +101,12 @@ export class PermissionsService {
   async menuForUser(user: any, departmentId?: string) {
     const activePaths = await this.activePagePaths();
 
-    // ── ADMIN: all active pages ────────────────────────────────────────────────
+    // ── ADMIN: all known pages (no Page-table filter — ADMIN bypasses PagePermissionGuard anyway)
     if (user?.role === 'ADMIN') {
-      const pages = activePaths
-        ? KNOWN_PAGES.filter(p => activePaths.has(p.page))
-        : KNOWN_PAGES;
       return {
         departments: [],
-        permissions: pages.map(p => ({ page: p.page, canRead: true, canWrite: true, role: '*' })),
-        menuPages: pages.map(p => p.page),
+        permissions: KNOWN_PAGES.map(p => ({ page: p.page, canRead: true, canWrite: true, role: '*' })),
+        menuPages: KNOWN_PAGES.map(p => p.page),
       };
     }
 

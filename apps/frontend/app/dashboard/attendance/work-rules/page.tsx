@@ -5,6 +5,7 @@ import {
   CalendarRange, LayoutGrid, List, Settings, Activity, ChevronRight, ChevronLeft, X,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import TimeSelect from "../../../components/ui/TimeSelect";
 import AttendanceSettingsPage from "../settings/page";
 import SyncMonitorPage from "../sync/page";
 
@@ -246,10 +247,10 @@ export default function WorkRulesPage() {
           </Section>
           <Section title="بازه‌های ورود و خروج" icon={Timer}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="شروع بازه ورود"><input type="time" className={inputCls} value={form.checkInStart || ""} onChange={e => setF("checkInStart", e.target.value)} /></Field>
-              <Field label="پایان بازه ورود" hint="ورود بعد از این = تاخیر"><input type="time" className={inputCls} value={form.checkInEnd || ""} onChange={e => setF("checkInEnd", e.target.value)} /></Field>
-              <Field label="شروع بازه خروج" hint="خروج قبل از این = تعجیل"><input type="time" className={inputCls} value={form.checkOutStart || ""} onChange={e => setF("checkOutStart", e.target.value)} /></Field>
-              <Field label="پایان بازه خروج" hint="کار بعد از این = اضافه‌کار"><input type="time" className={inputCls} value={form.checkOutEnd || ""} onChange={e => setF("checkOutEnd", e.target.value)} /></Field>
+              <Field label="شروع بازه ورود"><TimeSelect className={inputCls} value={form.checkInStart || ""} onChange={v => setF("checkInStart", v)} /></Field>
+              <Field label="پایان بازه ورود" hint="ورود بعد از این = تاخیر"><TimeSelect className={inputCls} value={form.checkInEnd || ""} onChange={v => setF("checkInEnd", v)} /></Field>
+              <Field label="شروع بازه خروج" hint="خروج قبل از این = تعجیل"><TimeSelect className={inputCls} value={form.checkOutStart || ""} onChange={v => setF("checkOutStart", v)} /></Field>
+              <Field label="پایان بازه خروج" hint="کار بعد از این = اضافه‌کار"><TimeSelect className={inputCls} value={form.checkOutEnd || ""} onChange={v => setF("checkOutEnd", v)} /></Field>
               <Field label="ساعت کار مورد نیاز (دقیقه)" hint={hrs(form.dailyMinutes)}><input type="number" className={inputCls} value={form.dailyMinutes ?? ""} onChange={e => setF("dailyMinutes", +e.target.value)} /></Field>
               <Field label="کسر ناهار/استراحت (دقیقه)"><input type="number" className={inputCls} value={form.lunchMinutes ?? ""} onChange={e => setF("lunchMinutes", +e.target.value)} /></Field>
             </div>
@@ -478,10 +479,10 @@ function DayActionModal({ open, ctx, group, onClose, onSaved, authHeaders }: any
             <label className="flex items-center gap-2 text-sm text-theme-primary"><input type="checkbox" checked={isOff} onChange={e => setIsOff(e.target.checked)} /> این روز(ها) تعطیل/غیرکاری باشد</label>
             {!isOff && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <Field label="شروع ورود"><input type="time" className={inputCls} value={ov.checkInStart} onChange={e => setOv((s: any) => ({ ...s, checkInStart: e.target.value }))} /></Field>
-                <Field label="پایان ورود"><input type="time" className={inputCls} value={ov.checkInEnd} onChange={e => setOv((s: any) => ({ ...s, checkInEnd: e.target.value }))} /></Field>
-                <Field label="شروع خروج"><input type="time" className={inputCls} value={ov.checkOutStart} onChange={e => setOv((s: any) => ({ ...s, checkOutStart: e.target.value }))} /></Field>
-                <Field label="پایان خروج"><input type="time" className={inputCls} value={ov.checkOutEnd} onChange={e => setOv((s: any) => ({ ...s, checkOutEnd: e.target.value }))} /></Field>
+                <Field label="شروع ورود"><TimeSelect className={inputCls} value={ov.checkInStart} onChange={v => setOv((s: any) => ({ ...s, checkInStart: v }))} /></Field>
+                <Field label="پایان ورود"><TimeSelect className={inputCls} value={ov.checkInEnd} onChange={v => setOv((s: any) => ({ ...s, checkInEnd: v }))} /></Field>
+                <Field label="شروع خروج"><TimeSelect className={inputCls} value={ov.checkOutStart} onChange={v => setOv((s: any) => ({ ...s, checkOutStart: v }))} /></Field>
+                <Field label="پایان خروج"><TimeSelect className={inputCls} value={ov.checkOutEnd} onChange={v => setOv((s: any) => ({ ...s, checkOutEnd: v }))} /></Field>
                 <Field label="ساعت موظف (دقیقه)"><input type="number" className={inputCls} value={ov.dailyMinutes} onChange={e => setOv((s: any) => ({ ...s, dailyMinutes: e.target.value }))} /></Field>
               </div>
             )}
