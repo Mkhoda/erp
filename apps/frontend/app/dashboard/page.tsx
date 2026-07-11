@@ -129,7 +129,7 @@ function TodoWidget({ token }: { token: string }) {
 
   const toggle = async (id: string) => {
     const res = await fetch(`${API}/todos/${id}/toggle`, { method: "PATCH", headers: h });
-    if (res.ok) { const t = await res.json(); setTodos(prev => prev.map(x => x.id === id ? t : x)); }
+    if (res.ok) { const t = await res.json(); setTodos(prev => prev.map(x => x.id === id ? { ...x, ...t } : x)); }
   };
 
   const remove = async (id: string) => {
