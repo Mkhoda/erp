@@ -180,7 +180,7 @@ export default function SyncMonitorPage() {
       )}
 
       {/* Source status cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {status.map(s => (
           <motion.div key={s.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-theme-card border border-theme rounded-xl p-5">
             <div className="flex items-start justify-between">

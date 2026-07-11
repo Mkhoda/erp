@@ -239,12 +239,12 @@ export default function AttendanceRecordsPage() {
                 <th className="font-medium px-2">کد کارت</th><th className="font-medium px-2">دپارتمان</th>
                 <th className="font-medium px-2">تاریخ</th><th className="font-medium px-2">ورود</th><th className="font-medium px-2">خروج</th>
                 <th className="font-medium px-2">کارکرد</th><th className="font-medium px-2">تاخیر</th><th className="font-medium px-2">تعجیل</th>
-                <th className="font-medium px-2">کسری</th><th className="font-medium px-2">اضافه‌کار</th>
+                <th className="font-medium px-2">کسری</th><th className="font-medium px-2">اضافه‌کار</th><th className="font-medium px-2">تعطیل‌کاری</th>
                 <th className="font-medium px-2">وضعیت</th><th className="font-medium px-2">جزئیات</th>
               </tr></thead>
               <tbody>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={14} className="py-10 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
+                  <tr><td colSpan={15} className="py-10 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
                 ) : rows.slice((page-1)*pageSize, page*pageSize).map((r, i) => (
                   <tr key={r.id} className="border-b border-theme/40 hover:bg-theme-hover">
                     <td className="py-1.5 px-2 text-theme-muted">{faNum((page-1)*pageSize + i + 1)}</td>
@@ -259,6 +259,7 @@ export default function AttendanceRecordsPage() {
                     <td className="px-2 text-yellow-600" dir="ltr">{r.earlyLeaveMinutes ? fmtMin(r.earlyLeaveMinutes) : "—"}</td>
                     <td className="px-2 text-orange-600 font-medium" dir="ltr">{(r.delayMinutes + r.earlyLeaveMinutes) ? fmtMin(r.delayMinutes + r.earlyLeaveMinutes) : "—"}</td>
                     <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
+                    <td className="px-2 text-rose-600" dir="ltr">{r.holidayOvertimeMinutes ? fmtMin(r.holidayOvertimeMinutes) : "—"}</td>
                     <td className="px-2"><span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[r.status] || "bg-theme-secondary"}`}>{STATUS_FA[r.status] || r.status}</span></td>
                     <td className="px-2">
                       <button onClick={() => openDetail(r)} title="مشاهده جزئیات و پانچ‌ها"
@@ -305,6 +306,7 @@ export default function AttendanceRecordsPage() {
               <Info label="وضعیت" value={STATUS_FA[detail.row.status] || detail.row.status} />
               <Info label="کارکرد" value={fmtMin(detail.row.workedMinutes)} />
               <Info label="اضافه‌کار" value={fmtMin(detail.row.overtimeMinutes)} />
+              <Info label="تعطیل‌کاری" value={fmtMin(detail.row.holidayOvertimeMinutes)} />
               <Info label="تاخیر" value={fmtMin(detail.row.delayMinutes)} />
               <Info label="تعجیل" value={fmtMin(detail.row.earlyLeaveMinutes)} />
               <Info label="شب‌کاری" value={fmtMin(detail.row.nightMinutes)} />

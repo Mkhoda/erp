@@ -247,7 +247,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         `}
       >
           {/* Brand */}
-          <div className={`flex items-center border-b border-theme px-3 py-3 shrink-0 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
+          <div className={`flex items-center border-b border-theme px-3 py-4 shrink-0 ${sidebarCollapsed ? "justify-center" : "justify-between"}`}>
             <div className="flex items-center gap-2 min-w-0">
               <div className="flex justify-center items-center bg-ai-gradient rounded-lg w-7 h-7 shrink-0">
                 <Sparkles className="w-3.5 h-3.5 text-white" />
