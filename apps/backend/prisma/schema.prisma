@@ -49,6 +49,12 @@ model User {
   tokenVersion Int      @default(1)
   sessions     Session[]
   auditLogs    AuditLog[] @relation("UserAuditLogs")
+  // ── Messaging ──
+  chatMembers   ChatMember[]   @relation("UserChatMemberships")
+  chatMessages  ChatMessage[]  @relation("ChatMessageSender")
+  chatReactions ChatReaction[] @relation("UserChatReactions")
+  chatReads     ChatRead[]     @relation("UserChatReads")
+  presence      UserPresence?  @relation("UserPresenceRecord")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -933,4 +939,146 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([timestamp])
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Internal Real-Time Messaging
+// ════════════════════════════════════════════════════════════════════
+
+enum ChatConvType {
+  DIRECT
+  GROUP
+}
+
+enum ChatMsgType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  VOICE
+  DOCUMENT
+  CODE
+  LINK
+  SYSTEM
+}
+
+enum PresenceStatus {
+  ONLINE
+  AWAY
+  BUSY
+  OFFLINE
+}
+
+model ChatConversation {
+  id        String       @id @default(cuid())
+  type      ChatConvType @default(DIRECT)
+  name      String?
+  avatarUrl String?
+  members   ChatMember[]
+  messages  ChatMessage[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([updatedAt])
+}
+
+model ChatMember {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User             @relation("UserChatMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  role           String           @default("MEMBER")
+  lastReadAt     DateTime?
+  isArchived     Boolean          @default(false)
+  joinedAt       DateTime         @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+}
+
+model ChatMessage {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User             @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  type           ChatMsgType      @default(TEXT)
+  content        String?
+  isEdited       Boolean          @default(false)
+  editedAt       DateTime?
+  isDeleted      Boolean          @default(false)
+  deletedForAll  Boolean          @default(false)
+  replyToId      String?
+  replyTo        ChatMessage?     @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies        ChatMessage[]    @relation("MessageReplies")
+  metadata       Json?
+  attachments    ChatAttachment[]
+  reactions      ChatReaction[]
+  readBy         ChatRead[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model ChatAttachment {
+  id        String      @id @default(cuid())
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  type      ChatMsgType @default(DOCUMENT)
+  url       String
+  name      String
+  size      Int
+  mimeType  String?
+  width     Int?
+  height    Int?
+  duration  Int?
+  createdAt DateTime    @default(now())
+
+  @@index([messageId])
+}
+
+model ChatReaction {
+  messageId String
+  userId    String
+  emoji     String
+  user      User        @relation("UserChatReactions", fields: [userId], references: [id], onDelete: Cascade)
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+
+  @@id([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model ChatRead {
+  messageId String
+  userId    String
+  user      User        @relation("UserChatReads", fields: [userId], references: [id], onDelete: Cascade)
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  readAt    DateTime    @default(now())
+
+  @@id([messageId, userId])
+  @@index([userId])
+}
+
+model UserPresence {
+  userId     String         @id
+  user       User           @relation("UserPresenceRecord", fields: [userId], references: [id], onDelete: Cascade)
+  status     PresenceStatus @default(OFFLINE)
+  lastSeenAt DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
+
+model ChatSettings {
+  id                     String   @id @default("singleton")
+  maxFileSizeMb          Int      @default(10)
+  allowedExtensions      String[] @default(["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "zip", "mp4", "mp3"])
+  messageEditWindowSec   Int      @default(300)
+  messageDeleteWindowSec Int      @default(300)
+  retentionDays          Int      @default(0)
+  updatedAt              DateTime @updatedAt
+  updatedById            String?
 }

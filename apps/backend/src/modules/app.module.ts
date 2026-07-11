@@ -15,6 +15,7 @@ import { QuotaModule } from './quota/quota.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { AuthSettingsModule } from './auth-settings/auth-settings.module';
+import { MessagingModule } from './messaging/messaging.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
@@ -38,6 +39,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     AttendanceModule,
     SessionsModule,
     AuthSettingsModule,
+    MessagingModule,
   ],
   controllers: [ReportsController],
   providers: [

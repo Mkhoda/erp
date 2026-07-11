@@ -7,12 +7,14 @@ import {
   ChevronLeft, LayoutDashboard, Boxes, Layers, Tag,
   Handshake, UserCog, Building, MapPin, Home,
   CircleDollarSign, Users, Shield, FileText, Settings,
-  Bell, Sparkles, Cpu, Calendar, ShieldOff,
+  Bell, Sparkles, Cpu, Calendar, ShieldOff, MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import TwoLayerSidebar from "../components/TwoLayerSidebar";
 import CommandPalette from "../components/CommandPalette";
 import { ToastProvider } from "../components/ui/Toast";
+import { MessagingProvider } from "../../lib/messaging";
+import ChatWidget from "../components/messaging/ChatWidget";
 import type { Role } from "../../lib/menu";
 
 const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
@@ -40,6 +42,8 @@ const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard/change-password": { label: "تغییر رمز عبور", Icon: Shield },
   "/dashboard/system-logs": { label: "لاگ سیستم", Icon: Bell },
   "/dashboard/ai-usage": { label: "مصرف AI", Icon: Cpu },
+  "/dashboard/messaging": { label: "پیام‌رسانی", Icon: MessageSquare },
+  "/dashboard/messaging/admin": { label: "تنظیمات پیام‌رسانی", Icon: Settings },
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -217,6 +221,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
+    <MessagingProvider>
     <div className="flex bg-theme-base h-dvh overflow-hidden" dir="rtl">
       {/* Command Palette */}
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
@@ -412,10 +417,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             ) : (
               <div className="page-enter">{children}</div>
             )}
+            <ChatWidget />
           </ToastProvider>
         </main>
       </div>
     </div>
+    </MessagingProvider>
   );
 }
 

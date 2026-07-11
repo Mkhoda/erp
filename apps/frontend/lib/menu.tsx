@@ -12,6 +12,7 @@ import {
   Building,
   Home,
   MessageSquare,
+  MessageCircle,
   Shield,
   ShieldCheck,
   BarChart3,
@@ -54,6 +55,14 @@ export const MENU: MenuItem[] = [
     page: '/dashboard/chat',
     icon: MessageSquare,
     isNew: true,
+  },
+
+  // ── پیام‌رسانی داخلی ─────────────────────────────────────
+  {
+    id: 'messaging',
+    title: 'پیام‌رسانی',
+    page: '/dashboard/messaging',
+    icon: MessageCircle,
   },
 
   // ── حضور من (همه کاربران) ─────────────────────────────────
