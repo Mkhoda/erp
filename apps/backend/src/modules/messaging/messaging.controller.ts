@@ -45,6 +45,25 @@ export class MessagingController {
     return conv;
   }
 
+  @Post('conversations/:id/messages')
+  async sendMessage(
+    @Req() req: any,
+    @Param('id') convId: string,
+    @Body() body: { content?: string; type?: string; replyToId?: string },
+  ) {
+    if (!(await this.convs.isMember(convId, req.user.userId))) throw new ForbiddenException();
+    if (!body.content?.trim() && !body.type) throw new BadRequestException('content required');
+    const msg = await this.msgs.create({
+      conversationId: convId,
+      senderId: req.user.userId,
+      content: body.content,
+      type: body.type || 'TEXT',
+      replyToId: body.replyToId,
+    });
+    this.gateway.notifyConversation(convId, 'message:new', msg);
+    return msg;
+  }
+
   @Get('conversations/:id/messages')
   async getMessages(
     @Req() req: any,

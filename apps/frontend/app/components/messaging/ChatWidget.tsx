@@ -141,7 +141,7 @@ function ConvList({
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
                       <span className="text-white/50 text-[11px] truncate">
-                        {last?.isDeleted ? "پیام حذف شد" : last?.content ?? (last?.attachments[0]?.name ?? "")}
+                        {last?.isDeleted ? "پیام حذف شد" : last?.content ?? last?.attachments?.[0]?.name ?? ""}
                       </span>
                       {conv.unreadCount > 0 && (
                         <span className="shrink-0 bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">

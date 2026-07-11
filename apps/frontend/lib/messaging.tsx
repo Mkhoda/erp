@@ -376,8 +376,33 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchMessages]);
 
-  const sendMessage = React.useCallback((convId: string, content: string, type = "TEXT", replyToId?: string) => {
-    socketRef.current?.emit("message:send", { conversationId: convId, content, type, replyToId });
+  const sendMessage = React.useCallback(async (convId: string, content: string, type = "TEXT", replyToId?: string) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("message:send", { conversationId: convId, content, type, replyToId });
+    } else {
+      // REST fallback when socket is disconnected
+      try {
+        const r = await fetch(`${API}/messaging/conversations/${convId}/messages`, {
+          method: "POST",
+          headers: authHeader(),
+          body: JSON.stringify({ content, type, replyToId }),
+        });
+        if (r.ok) {
+          const msg = await r.json();
+          setState((s) => {
+            const existing = s.messages[convId] ?? [];
+            const updatedConvs = s.conversations.map((c) =>
+              c.id === convId ? { ...c, messages: [msg], updatedAt: msg.createdAt } : c,
+            );
+            return {
+              ...s,
+              messages: { ...s.messages, [convId]: [msg, ...existing] },
+              conversations: updatedConvs,
+            };
+          });
+        }
+      } catch {}
+    }
   }, []);
 
   const uploadFile = React.useCallback(async (convId: string, file: File) => {
