@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
+import TimeSelect from "../../../components/ui/TimeSelect";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -352,29 +353,6 @@ export default function AttendanceRecordsPage() {
           </div>
         )}
       </Modal>
-    </div>
-  );
-}
-
-function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const parts = value ? value.split(":") : [];
-  const h = parts[0] !== undefined && parts[0] !== "" ? +parts[0] : -1;
-  const m = parts[1] !== undefined && parts[1] !== "" ? +parts[1] : -1;
-  function set(newH: number, newM: number) {
-    if (newH < 0) { onChange(""); return; }
-    onChange(`${String(newH).padStart(2,"0")}:${String(newM >= 0 ? newM : 0).padStart(2,"0")}`);
-  }
-  return (
-    <div className="flex gap-1 items-center" dir="ltr">
-      <select className="input-theme text-sm flex-1" value={h >= 0 ? h : ""} onChange={e => set(e.target.value !== "" ? +e.target.value : -1, m)}>
-        <option value="">ساعت</option>
-        {Array.from({length:24},(_,i)=>i).map(i=><option key={i} value={i}>{String(i).padStart(2,"0")}</option>)}
-      </select>
-      <span className="text-theme-muted font-bold">:</span>
-      <select className="input-theme text-sm flex-1" value={m >= 0 ? m : ""} onChange={e => set(h, e.target.value !== "" ? +e.target.value : -1)}>
-        <option value="">دقیقه</option>
-        {Array.from({length:60},(_,i)=>i).map(i=><option key={i} value={i}>{String(i).padStart(2,"0")}</option>)}
-      </select>
     </div>
   );
 }

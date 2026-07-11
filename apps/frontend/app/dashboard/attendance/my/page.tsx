@@ -2,6 +2,7 @@
 import React from "react";
 import { Loader2, Fingerprint, Pencil, AlertTriangle, Send, Hourglass } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import TimeSelect from "../../../components/ui/TimeSelect";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
@@ -140,13 +141,14 @@ export default function MyAttendancePage() {
       )}
 
       {summary && (
-        <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
+        <div className="grid grid-cols-3 md:grid-cols-8 gap-2">
           <Sum label="روزها" value={faNum(summary.days)} />
           <Sum label="کارکرد" value={fmtMin(summary.workedMinutes)} />
           <Sum label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
           <Sum label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" />
           <Sum label="کسری" value={fmtMin((summary.delayMinutes || 0) + (summary.earlyLeaveMinutes || 0))} cls="text-orange-600" />
-          <Sum label="اضافه‌کار" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
+          <Sum label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
+          <Sum label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" />
           <Sum label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" />
         </div>
       )}
@@ -284,13 +286,13 @@ export default function MyAttendancePage() {
                   <label className="flex items-center gap-2 text-sm text-theme-primary w-32 shrink-0">
                     <input type="checkbox" checked={reqForm.fixIn} onChange={e => setReqForm((s: any) => ({ ...s, fixIn: e.target.checked }))} /> اصلاح ورود
                   </label>
-                  <input type="time" dir="ltr" disabled={!reqForm.fixIn} value={reqForm.inTime} onChange={e => setReqForm((s: any) => ({ ...s, inTime: e.target.value }))} className="input-theme text-sm disabled:opacity-50" />
+                  <TimeSelect disabled={!reqForm.fixIn} value={reqForm.inTime} onChange={v => setReqForm((s: any) => ({ ...s, inTime: v }))} />
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="flex items-center gap-2 text-sm text-theme-primary w-32 shrink-0">
                     <input type="checkbox" checked={reqForm.fixOut} onChange={e => setReqForm((s: any) => ({ ...s, fixOut: e.target.checked }))} /> اصلاح خروج
                   </label>
-                  <input type="time" dir="ltr" disabled={!reqForm.fixOut} value={reqForm.outTime} onChange={e => setReqForm((s: any) => ({ ...s, outTime: e.target.value }))} className="input-theme text-sm disabled:opacity-50" />
+                  <TimeSelect disabled={!reqForm.fixOut} value={reqForm.outTime} onChange={v => setReqForm((s: any) => ({ ...s, outTime: v }))} />
                 </div>
               </div>
             )}
