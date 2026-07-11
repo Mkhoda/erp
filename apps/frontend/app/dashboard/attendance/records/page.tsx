@@ -202,13 +202,14 @@ export default function AttendanceRecordsPage() {
 
       {/* Summary */}
       {summary && (
-        <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
+        <div className="grid grid-cols-3 md:grid-cols-8 gap-2">
           <SumCard label="روزهای دارای داده" value={faNum(summary.distinctDays ?? summary.days)} />
           <SumCard label="کارکرد" value={fmtMin(summary.workedMinutes)} />
           <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
           <SumCard label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" />
           <SumCard label="کسری" value={fmtMin((summary.delayMinutes || 0) + (summary.earlyLeaveMinutes || 0))} cls="text-orange-600" />
-          <SumCard label="اضافه‌کار" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
+          <SumCard label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
+          <SumCard label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" />
           <SumCard label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" />
         </div>
       )}
@@ -326,8 +327,14 @@ export default function AttendanceRecordsPage() {
             <div className="mt-4 border-t border-theme pt-3">
               <div className="text-sm font-medium text-theme-secondary mb-2 flex items-center gap-1"><Pencil className="w-4 h-4" /> اصلاح ساعت ورود/خروج</div>
               <div className="grid grid-cols-2 gap-2">
-                <div><label className="block mb-1 text-theme-secondary text-xs">ورود</label><input type="time" dir="ltr" value={ov.inTime} onChange={e => setOv(s => ({ ...s, inTime: e.target.value }))} className="input-theme text-sm" /></div>
-                <div><label className="block mb-1 text-theme-secondary text-xs">خروج</label><input type="time" dir="ltr" value={ov.outTime} onChange={e => setOv(s => ({ ...s, outTime: e.target.value }))} className="input-theme text-sm" /></div>
+                <div>
+                  <label className="block mb-1 text-theme-secondary text-xs">ورود</label>
+                  <TimeSelect value={ov.inTime} onChange={v => setOv(s => ({ ...s, inTime: v }))} />
+                </div>
+                <div>
+                  <label className="block mb-1 text-theme-secondary text-xs">خروج</label>
+                  <TimeSelect value={ov.outTime} onChange={v => setOv(s => ({ ...s, outTime: v }))} />
+                </div>
                 <div><label className="block mb-1 text-theme-secondary text-xs">وضعیت (اختیاری)</label>
                   <select value={ov.status} onChange={e => setOv(s => ({ ...s, status: e.target.value }))} className="input-theme text-sm">
                     <option value="">— خودکار —</option>
@@ -345,6 +352,29 @@ export default function AttendanceRecordsPage() {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const parts = value ? value.split(":") : [];
+  const h = parts[0] !== undefined && parts[0] !== "" ? +parts[0] : -1;
+  const m = parts[1] !== undefined && parts[1] !== "" ? +parts[1] : -1;
+  function set(newH: number, newM: number) {
+    if (newH < 0) { onChange(""); return; }
+    onChange(`${String(newH).padStart(2,"0")}:${String(newM >= 0 ? newM : 0).padStart(2,"0")}`);
+  }
+  return (
+    <div className="flex gap-1 items-center" dir="ltr">
+      <select className="input-theme text-sm flex-1" value={h >= 0 ? h : ""} onChange={e => set(e.target.value !== "" ? +e.target.value : -1, m)}>
+        <option value="">ساعت</option>
+        {Array.from({length:24},(_,i)=>i).map(i=><option key={i} value={i}>{String(i).padStart(2,"0")}</option>)}
+      </select>
+      <span className="text-theme-muted font-bold">:</span>
+      <select className="input-theme text-sm flex-1" value={m >= 0 ? m : ""} onChange={e => set(h, e.target.value !== "" ? +e.target.value : -1)}>
+        <option value="">دقیقه</option>
+        {Array.from({length:60},(_,i)=>i).map(i=><option key={i} value={i}>{String(i).padStart(2,"0")}</option>)}
+      </select>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import { CircleDollarSign, Search, TrendingUp, Boxes, BarChart3, Save, Check } from 'lucide-react';
+import JalaliDatePicker from '../../components/ui/JalaliDatePicker';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 type AssetRow = { id: string; name: string; barcode: string; cost?: number; purchaseDate?: string };
@@ -164,11 +165,10 @@ function EditableRow({ row, onSave }: { row: AssetRow; onSave: (id: string, data
         />
       </td>
       <td>
-        <input
-          type="date"
+        <JalaliDatePicker
           value={purchaseDate}
-          onChange={e => setPurchaseDate(e.target.value)}
-          className="input-theme text-sm w-40"
+          onChange={setPurchaseDate}
+          className="input-theme text-sm"
         />
       </td>
       <td>

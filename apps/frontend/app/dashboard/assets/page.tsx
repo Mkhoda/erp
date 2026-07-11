@@ -10,6 +10,7 @@ import { EmptyStateRow, EmptyStateBox } from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import { useConfirm } from "../../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ui/Toast";
+import JalaliDatePicker from "../../components/ui/JalaliDatePicker";
 
 type Asset = {
   id: string; name: string; barcode: string; oldBarcode?: string; description?: string;
@@ -302,7 +303,7 @@ export default function AssetsPage() {
             </div>
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-sm">تاریخ خرید</label>
-              <input type="date" value={editing?.purchaseDate || ""} onChange={e => setEditing(s => s ? { ...s, purchaseDate: e.target.value } : s)} className="input-theme" />
+              <JalaliDatePicker value={editing?.purchaseDate || ""} onChange={v => setEditing(s => s ? { ...s, purchaseDate: v } : s)} />
             </div>
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-sm">قیمت خرید (تومان)</label>

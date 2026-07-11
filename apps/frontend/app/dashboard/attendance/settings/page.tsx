@@ -5,6 +5,7 @@ import {
   Server, Database, Clock, Save, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, Plug, ShieldCheck, AlertTriangle, Cpu, Plus,
 } from "lucide-react";
+import JalaliDatePicker from "../../../components/ui/JalaliDatePicker";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -179,7 +180,7 @@ export default function AttendanceSettingsPage() {
           <Field label="اندازه دسته"><input type="number" className={inputCls} value={form.batchSize} onChange={e => set("batchSize", +e.target.value)} /></Field>
           <Field label="تعداد تلاش مجدد"><input type="number" className={inputCls} value={form.retryCount} onChange={e => set("retryCount", +e.target.value)} /></Field>
           <Field label="RecordID اولیه (نقطه شروع)"><input type="number" className={inputCls} value={form.initialRecordId} onChange={e => set("initialRecordId", +e.target.value)} /></Field>
-          <Field label="تاریخ شروع اولیه"><input type="date" className={inputCls} value={form.initialSyncDate} onChange={e => set("initialSyncDate", e.target.value)} /></Field>
+          <Field label="تاریخ شروع اولیه"><JalaliDatePicker className={inputCls} value={form.initialSyncDate} onChange={v => set("initialSyncDate", v)} /></Field>
           <Field label="منطقه زمانی">
             <select className={inputCls} value={form.timeZone} onChange={e => set("timeZone", e.target.value)}>
               <option value="Asia/Tehran">Asia/Tehran (UTC+3:30)</option>
