@@ -14,6 +14,7 @@ const toFa = (s: string) => s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d
 const fmtMin = (m: number) => toFa(`${Math.floor(Math.abs(m||0)/60)}:${String(Math.abs(m||0)%60).padStart(2,"0")}`);
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
+const faDOW  = (g: string) => new Date(g).toLocaleDateString("fa-IR", { weekday:"long", timeZone:"UTC" });
 
 // Current Jalali year/month (Tehran) — used to default the filters on load.
 function currentJalali() {
@@ -124,18 +125,31 @@ export default function MyAttendancePage() {
       </div>
 
       {leave && (
-        <div className="bg-gradient-to-l from-blue-500/10 to-transparent border border-blue-500/30 rounded-xl px-4 py-3 space-y-2">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-theme-primary font-medium">مرخصی سال {toFa(String(leave.jYear))}:</span>
-            <span className="text-blue-600 font-semibold">مانده {faNum(leave.remainingDays)} روز</span>
-            <span className="text-theme-muted">از {faNum(leave.entitlement)} روز ({fmtMin(leave.remainingMinutes)} ساعت)</span>
+        <div className="border border-blue-500/30 rounded-xl overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5 bg-blue-500/10 border-b border-blue-500/20">
+            <span className="text-theme-primary font-semibold text-sm">مرخصی سال {toFa(String(leave.jYear))}</span>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-blue-600 font-bold">{faNum(leave.remainingDays)} روز مانده</span>
+              <span className="text-theme-muted text-xs">از {faNum(leave.entitlement)} روز · {fmtMin(leave.remainingMinutes)} ساعت</span>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-theme-muted">
-            <span>مرخصی روزانه: <b className="text-theme-primary">{faNum(leave.fullDays)} روز</b></span>
-            <span>مرخصی ساعتی: <b className="text-theme-primary">{fmtMin(leave.hourlyLeaveMinutes)}</b></span>
-            <span>کسر تاخیر/تعجیل: <b className="text-amber-600">{fmtMin(leave.tardyMinutes)}</b></span>
-            <span>ماموریت: <b className="text-theme-primary">{faNum(leave.mission)}</b></span>
-            <span>دورکاری: <b className="text-theme-primary">{faNum(leave.remote)}</b></span>
+          <div className="flex flex-wrap items-stretch bg-blue-500/5 text-xs">
+            {([
+              { lbl: "مرخصی روزانه", val: `${faNum(leave.fullDays)} روز`, cls: "text-blue-600" },
+              { lbl: "مرخصی ساعتی", val: fmtMin(leave.hourlyLeaveMinutes), cls: "text-blue-600" },
+              { lbl: "مصرف کل", val: `${faNum(leave.usedDays)} روز`, cls: "text-orange-600" },
+              { lbl: "کسر تاخیر/تعجیل", val: fmtMin(leave.tardyMinutes), cls: "text-amber-600" },
+              { lbl: "ماموریت", val: `${faNum(leave.mission)} روز`, cls: "text-violet-600" },
+              { lbl: "دورکاری", val: `${faNum(leave.remote)} روز`, cls: "text-cyan-600" },
+            ] as { lbl: string; val: string; cls: string }[]).map((item, i) => (
+              <React.Fragment key={item.lbl}>
+                {i > 0 && <div className="w-px bg-blue-500/20 self-stretch" />}
+                <div className="flex flex-col items-center justify-center px-3 py-2 text-center">
+                  <span className="text-theme-muted whitespace-nowrap">{item.lbl}</span>
+                  <span className={`font-semibold whitespace-nowrap mt-0.5 ${item.cls}`}>{item.val}</span>
+                </div>
+              </React.Fragment>
+            ))}
           </div>
         </div>
       )}
@@ -179,7 +193,10 @@ export default function MyAttendancePage() {
                   const isPending = pendingDates.has(r.gregDate.slice(0, 10));
                   return (
                     <tr key={r.id} className={`border-b border-theme/40 ${needsResolve && !isPending ? "bg-orange-500/5" : ""}`}>
-                      <td className="py-1.5 px-2 text-theme-primary" dir="ltr">{faDate(r.gregDate)}</td>
+                      <td className="py-1.5 px-2">
+                        <div className="text-theme-primary text-xs" dir="ltr">{faDate(r.gregDate)}</div>
+                        <div className="text-[10px] text-theme-muted">{faDOW(r.gregDate)}</div>
+                      </td>
                       <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.firstCheckIn)}</td>
                       <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.lastCheckOut)}</td>
                       <td className="px-2 text-theme-primary" dir="ltr">{fmtMin(r.workedMinutes)}</td>
