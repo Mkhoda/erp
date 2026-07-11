@@ -217,7 +217,7 @@ export default function AttendanceRecordsPage() {
 
       {leave && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-blue-500/5 border border-blue-500/30 rounded-xl px-4 py-2.5 text-sm">
-          <span className="text-theme-primary font-medium">مرخصی سال {faNum(leave.jYear)}:</span>
+          <span className="text-theme-primary font-medium">مرخصی سال {faY(leave.jYear)}:</span>
           <span className="text-blue-600 font-semibold">مانده {faNum(leave.remainingDays)} روز</span>
           <span className="text-theme-muted">از {faNum(leave.entitlement)}</span>
           <span className="text-theme-muted">· روزانه {faNum(leave.fullDays)} روز</span>

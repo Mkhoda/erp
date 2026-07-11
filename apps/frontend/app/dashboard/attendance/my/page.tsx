@@ -126,7 +126,7 @@ export default function MyAttendancePage() {
       {leave && (
         <div className="bg-gradient-to-l from-blue-500/10 to-transparent border border-blue-500/30 rounded-xl px-4 py-3 space-y-2">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-theme-primary font-medium">مرخصی سال {faNum(leave.jYear)}:</span>
+            <span className="text-theme-primary font-medium">مرخصی سال {toFa(String(leave.jYear))}:</span>
             <span className="text-blue-600 font-semibold">مانده {faNum(leave.remainingDays)} روز</span>
             <span className="text-theme-muted">از {faNum(leave.entitlement)} روز ({fmtMin(leave.remainingMinutes)} ساعت)</span>
           </div>

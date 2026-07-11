@@ -202,7 +202,7 @@ export default function WorkRulesPage() {
         <div className="bg-theme-card border border-theme rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <button onClick={() => { if (vm === 1) { setVm(12); setVy(y => y - 1); } else setVm(m => m - 1); }} className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted"><ChevronRight className="w-4 h-4" /></button>
-            <div className="text-center"><div className="font-bold text-theme-primary">{J_MONTHS[vm - 1]} {faNum(vy)}</div><div className="text-[11px] text-theme-muted">{group.isDefault ? "پیش‌فرض سازمان" : group.name}</div></div>
+            <div className="text-center"><div className="font-bold text-theme-primary">{J_MONTHS[vm - 1]} {faDigits(String(vy))}</div><div className="text-[11px] text-theme-muted">{group.isDefault ? "پیش‌فرض سازمان" : group.name}</div></div>
             <button onClick={() => { if (vm === 12) { setVm(1); setVy(y => y + 1); } else setVm(m => m + 1); }} className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted"><ChevronLeft className="w-4 h-4" /></button>
           </div>
           <div className="grid grid-cols-7 mb-1">{WEEK.map(w => <div key={w.d} className="text-center text-[11px] font-medium text-theme-muted py-1">{w.name.slice(0, 1)}</div>)}</div>
