@@ -137,8 +137,9 @@ export default function MyAttendancePage() {
             {([
               { lbl: "مرخصی روزانه", val: `${faNum(leave.fullDays)} روز`, cls: "text-blue-600" },
               { lbl: "مرخصی ساعتی", val: fmtMin(leave.hourlyLeaveMinutes), cls: "text-blue-600" },
-              { lbl: "مصرف کل", val: `${faNum(leave.usedDays)} روز`, cls: "text-orange-600" },
+              { lbl: "غیبت", val: `${faNum(leave.absentDays)} روز`, cls: "text-red-600" },
               { lbl: "کسر تاخیر/تعجیل", val: fmtMin(leave.tardyMinutes), cls: "text-amber-600" },
+              { lbl: "مصرف کل", val: `${faNum(leave.usedDays)} روز`, cls: "text-orange-600" },
               { lbl: "ماموریت", val: `${faNum(leave.mission)} روز`, cls: "text-violet-600" },
               { lbl: "دورکاری", val: `${faNum(leave.remote)} روز`, cls: "text-cyan-600" },
             ] as { lbl: string; val: string; cls: string }[]).map((item, i) => (

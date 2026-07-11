@@ -118,8 +118,9 @@ export class RecordsService {
     }
     const entitlement = sched?.annualLeaveDays ?? 26;
     const dailyReq = sched?.dailyMinutes ?? 500;
-    const [fullDays, mission, remote, tardyAgg, hourlyAgg] = await Promise.all([
+    const [fullDays, absentDays, mission, remote, tardyAgg, hourlyAgg] = await Promise.all([
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'LEAVE' } }),
+      this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'ABSENT' } }),
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'MISSION' } }),
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'REMOTE_WORK' } }),
       // Delay + early-leave across the year are deducted from leave (hourly).
@@ -139,11 +140,12 @@ export class RecordsService {
 
     const r2 = (n: number) => Math.round(n * 100) / 100;
     const entitlementMin = entitlement * dailyReq;
-    const usedMin = fullDays * dailyReq + hourlyLeaveMinutes + tardyMinutes;
+    const usedMin = fullDays * dailyReq + absentDays * dailyReq + hourlyLeaveMinutes + tardyMinutes;
     const remainingMin = Math.max(0, entitlementMin - usedMin);
     return {
       jYear, entitlement, dailyReq, mission, remote,
       fullDays,                                   // whole-day leaves
+      absentDays,                                 // unexcused absences (deducted from balance)
       hourlyLeaveMinutes,                         // partial (hourly) leave minutes
       tardyMinutes,                               // delay + early-leave minutes
       usedMinutes: usedMin,
