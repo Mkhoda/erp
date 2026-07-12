@@ -15,6 +15,12 @@ const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 // ── Helpers ────────────────────────────────────────────────────────────────
 const toFa   = (s: string) => s.replace(/[0-9]/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const faNum  = (n: number) => (n ?? 0).toLocaleString("fa-IR");
+
+function splitDaysHours(days: number): { d: number; h: number } {
+  const d = Math.floor(days);
+  const h = Math.round((days - d) * 8);
+  return { d, h };
+}
 const fmtMin = (m: number) => { const h = Math.floor(Math.abs(m||0)/60); const mm = Math.abs(m||0)%60; return toFa(`${h}:${String(mm).padStart(2,"0")}`); };
 
 // ── Jalali calendar algorithm (jdf, no dependency) ────────────────────────
@@ -218,13 +224,26 @@ function LeaveCard({ leave }: { leave: any }) {
       </div>
 
       {/* Balance display */}
-      <div className="flex items-end justify-between mb-2">
-        <div>
-          <span className="text-2xl font-bold text-blue-600">{faNum(remaining)}</span>
-          <span className="text-theme-muted text-sm mr-1">روز مانده</span>
-        </div>
-        <span className="text-xs text-theme-muted">از {faNum(total)} روز</span>
-      </div>
+      {(() => {
+        const { d, h } = splitDaysHours(remaining);
+        return (
+          <div className="flex items-end justify-between mb-2">
+            <div className="flex items-baseline gap-1 flex-wrap">
+              <span className="text-2xl font-bold text-blue-600">{faNum(d)}</span>
+              <span className="text-theme-muted text-sm">روز</span>
+              {h > 0 && (
+                <>
+                  <span className="text-theme-muted text-xs">و</span>
+                  <span className="text-base font-semibold text-blue-500">{faNum(h)}</span>
+                  <span className="text-theme-muted text-xs">ساعت</span>
+                </>
+              )}
+              <span className="text-theme-muted text-sm">مانده</span>
+            </div>
+            <span className="text-xs text-theme-muted shrink-0">از {faNum(total)} روز</span>
+          </div>
+        );
+      })()}
 
       {/* Progress bar: remaining = blue, consumed = segmented */}
       <div className="h-2.5 bg-theme-secondary rounded-full overflow-hidden mb-3 flex gap-px">
@@ -249,7 +268,9 @@ function LeaveCard({ leave }: { leave: any }) {
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-400 shrink-0" />مرخصی: <b className="text-blue-600">{faNum(leave.fullDays)} روز</b></span>
         {(leave.absentDays||0) > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400 shrink-0" />غیبت: <b className="text-red-600">{faNum(leave.absentDays)} روز</b></span>}
         {leave.tardyMinutes > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-400 shrink-0" />کسر تاخیر: <b className="text-amber-600">{fmtMin(leave.tardyMinutes)}</b></span>}
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 shrink-0" />مانده: <b className="text-emerald-600">{faNum(remaining)} روز</b></span>
+        {(() => { const { d, h } = splitDaysHours(remaining); return (
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 shrink-0" />مانده: <b className="text-emerald-600">{faNum(d)} روز{h > 0 ? ` و ${faNum(h)} ساعت` : ""}</b></span>
+        ); })()}
       </div>
     </div>
   );

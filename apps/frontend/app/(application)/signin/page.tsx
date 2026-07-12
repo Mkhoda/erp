@@ -223,14 +223,6 @@ export default function SignInPage() {
             </button>
           </form>
 
-          <div className="mt-5 text-center">
-            <p className="text-theme-muted text-sm">
-              حساب کاربری ندارید؟{' '}
-              <Link href="/signup" className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 transition-colors">
-                ثبت نام کنید
-              </Link>
-            </p>
-          </div>
         </motion.div>
 
         <motion.p

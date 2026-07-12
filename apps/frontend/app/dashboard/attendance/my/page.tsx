@@ -10,6 +10,7 @@ const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر"
 const STATUS_CLS: Record<string,string> = { PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600", EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600", INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600", MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600", HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500" };
 const REQ_STATUS_FA: Record<string,string> = { PENDING:"در انتظار", APPROVED:"تایید شده", REJECTED:"رد شده", MANAGER_APPROVED:"تایید مدیر", HR_APPROVED:"تایید HR" };
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
+const fmtDH = (days: number) => { const d = Math.floor(days); const h = Math.round((days - d) * 8); return h > 0 ? `${faNum(d)} روز و ${faNum(h)} ساعت` : `${faNum(d)} روز`; };
 const toFa = (s: string) => s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const fmtMin = (m: number) => toFa(`${Math.floor(Math.abs(m||0)/60)}:${String(Math.abs(m||0)%60).padStart(2,"0")}`);
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
@@ -129,8 +130,8 @@ export default function MyAttendancePage() {
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5 bg-blue-500/10 border-b border-blue-500/20">
             <span className="text-theme-primary font-semibold text-sm">مرخصی سال {toFa(String(leave.jYear))}</span>
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-blue-600 font-bold">{faNum(leave.remainingDays)} روز مانده</span>
-              <span className="text-theme-muted text-xs">از {faNum(leave.entitlement)} روز · {fmtMin(leave.remainingMinutes)} ساعت</span>
+              <span className="text-blue-600 font-bold">{fmtDH(leave.remainingDays)} مانده</span>
+              <span className="text-theme-muted text-xs">از {faNum(leave.entitlement)} روز</span>
             </div>
           </div>
           <div className="flex flex-wrap items-stretch bg-blue-500/5 text-xs">

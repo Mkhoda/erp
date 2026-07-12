@@ -4,10 +4,14 @@ import { normalizeTo98, isValidPhone } from '../../../lib/phone';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { Eye, EyeOff, Phone, Lock, User, UserPlus, ArrowRight, Moon, Sun } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
+const SIGNUP_ENABLED = process.env.NEXT_PUBLIC_SIGNUP_ENABLED === 'true';
 
 type Step = 'form' | 'otp';
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [step, setStep] = React.useState<Step>('form');
   const [firstName, setFirstName] = React.useState('');
   const [lastName, setLastName] = React.useState('');
@@ -23,6 +27,12 @@ export default function SignUpPage() {
   const [now, setNow] = React.useState(Date.now());
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
   const [ready, setReady] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!SIGNUP_ENABLED) router.replace('/signin');
+  }, [router]);
+
+  if (!SIGNUP_ENABLED) return null;
 
   const API = process.env.NEXT_PUBLIC_API_URL || '/api';
   const validPhone = isValidPhone(phone);
