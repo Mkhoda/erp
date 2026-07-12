@@ -85,7 +85,7 @@ export const MENU: MenuItem[] = [
   {
     id: 'worldmonitor',
     title: 'پایش جهانی',
-    page: '/worldmonitor',
+    page: '/dashboard/worldmonitor',
     icon: Globe,
   },
 
