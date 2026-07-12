@@ -23,6 +23,14 @@ import {
   ClipboardList,
   SlidersHorizontal,
   ClipboardCheck,
+  Globe,
+  Landmark,
+  CalendarOff,
+  Bot,
+  BookOpen,
+  UserCog,
+  GitMerge,
+  RefreshCw,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -73,6 +81,14 @@ export const MENU: MenuItem[] = [
     icon: Fingerprint,
   },
 
+  // ── پایش جهانی — visible to all ───────────────────────────
+  {
+    id: 'worldmonitor',
+    title: 'پایش جهانی',
+    page: '/worldmonitor',
+    icon: Globe,
+  },
+
   // ── ERP ───────────────────────────────────────────────────
   {
     id: 'assets',
@@ -106,6 +122,13 @@ export const MENU: MenuItem[] = [
     icon: Users,
     roles: ['ADMIN', 'MANAGER'],
   },
+  {
+    id: 'accounting',
+    title: 'حسابداری',
+    page: '/dashboard/accounting',
+    icon: Landmark,
+    roles: ['ADMIN', 'MANAGER'],
+  },
 
   // ── تحلیل ─────────────────────────────────────────────────
   {
@@ -118,9 +141,6 @@ export const MENU: MenuItem[] = [
   },
 
   // ── حضور و غیاب ───────────────────────────────────────────
-  // NOTE: only settings + sync pages exist today (slices 1-2). The
-  // employee/manager/HR pages (records, calendar, requests, approvals,
-  // holidays, shifts, reports) are added here as their slices ship.
   {
     id: 'attendance',
     title: 'حضور و غیاب',
@@ -128,10 +148,13 @@ export const MENU: MenuItem[] = [
     section: 'حضور و غیاب',
     roles: ['ADMIN'],
     children: [
-      { id: 'attendance.dashboard', title: 'داشبورد حضور',         page: '/dashboard/attendance',          icon: LayoutDashboard },
-      { id: 'attendance.records',   title: 'کارکرد روزانه',        page: '/dashboard/attendance/records',  icon: ClipboardList },
-      { id: 'attendance.approvals', title: 'صف تایید',            page: '/dashboard/attendance/approvals', icon: ClipboardCheck },
-      { id: 'attendance.workRules', title: 'قوانین و تقویم کاری', page: '/dashboard/attendance/work-rules', icon: SlidersHorizontal },
+      { id: 'attendance.dashboard', title: 'داشبورد حضور',         page: '/dashboard/attendance',                icon: LayoutDashboard },
+      { id: 'attendance.records',   title: 'کارکرد روزانه',        page: '/dashboard/attendance/records',        icon: ClipboardList },
+      { id: 'attendance.approvals', title: 'صف تایید',             page: '/dashboard/attendance/approvals',      icon: ClipboardCheck },
+      { id: 'attendance.workRules', title: 'قوانین و تقویم کاری', page: '/dashboard/attendance/work-rules',     icon: SlidersHorizontal },
+      { id: 'attendance.holidays',  title: 'تعطیلات',              page: '/dashboard/attendance/holidays',       icon: CalendarOff },
+      { id: 'attendance.settings',  title: 'تنظیمات حضور',        page: '/dashboard/attendance/settings',       icon: Settings },
+      { id: 'attendance.sync',      title: 'همگام‌سازی دستگاه',   page: '/dashboard/attendance/sync',           icon: RefreshCw },
     ],
   },
 
@@ -143,14 +166,20 @@ export const MENU: MenuItem[] = [
     section: 'مدیریت',
     roles: ['ADMIN'],
     children: [
-      { id: 'admin.aiSettings',  title: 'تنظیمات AI',     page: '/dashboard/ai-settings',          icon: Cpu },
-      { id: 'admin.aiUsage',     title: 'مصرف AI',         page: '/dashboard/ai-usage',             icon: BarChart3 },
-      { id: 'admin.quota',       title: 'سقف توکن',        page: '/dashboard/quota',                 icon: Shield },
-      { id: 'admin.logs',        title: 'لاگ سیستم',      page: '/dashboard/system-logs',          icon: ScrollText },
-      { id: 'access',            title: 'دسترسی صفحات',   page: '/dashboard/access',               icon: FileText },
-      { id: 'admin.sessions',    title: 'مدیریت نشست‌ها',    page: '/dashboard/security/sessions',  icon: ShieldCheck },
-      { id: 'admin.secSettings', title: 'تنظیمات امنیتی',    page: '/dashboard/security/settings', icon: Settings },
-      { id: 'admin.messaging',   title: 'تنظیمات پیام‌رسانی', page: '/dashboard/messaging/admin',   icon: MessageCircle },
+      { id: 'admin.agents',      title: 'عوامل هوشمند',        page: '/dashboard/agents',              icon: Bot },
+      { id: 'admin.knowledge',   title: 'پایگاه دانش',         page: '/dashboard/knowledge',           icon: BookOpen },
+      { id: 'admin.workflows',   title: 'جریان‌های کاری',      page: '/dashboard/workflows',           icon: GitMerge },
+      { id: 'admin.aiSettings',  title: 'تنظیمات AI',          page: '/dashboard/ai-settings',        icon: Cpu },
+      { id: 'admin.aiUsage',     title: 'مصرف AI',             page: '/dashboard/ai-usage',           icon: BarChart3 },
+      { id: 'admin.quota',       title: 'سقف توکن',            page: '/dashboard/quota',               icon: Shield },
+      { id: 'admin.roles',       title: 'نقش‌ها و دسترسی',    page: '/dashboard/roles',               icon: UserCog },
+      { id: 'access',            title: 'دسترسی صفحات',        page: '/dashboard/access',             icon: FileText },
+      { id: 'admin.pages',       title: 'مدیریت صفحات',        page: '/dashboard/pages',              icon: FileText },
+      { id: 'admin.logs',        title: 'لاگ سیستم',           page: '/dashboard/system-logs',        icon: ScrollText },
+      { id: 'admin.sessions',    title: 'مدیریت نشست‌ها',      page: '/dashboard/security/sessions', icon: ShieldCheck },
+      { id: 'admin.secSettings', title: 'تنظیمات امنیتی',      page: '/dashboard/security/settings', icon: Settings },
+      { id: 'admin.settings',    title: 'تنظیمات سامانه',      page: '/dashboard/settings',           icon: SlidersHorizontal },
+      { id: 'admin.messaging',   title: 'تنظیمات پیام‌رسانی',  page: '/dashboard/messaging/admin',   icon: MessageCircle },
     ],
   },
 ];

@@ -5,11 +5,45 @@ import {
   Search, Send, Paperclip, ArrowRight, Check, CheckCheck,
   MoreHorizontal, Trash2, Pencil, X, Users, MessageSquare,
   Smile, Download, Shield, Share2, Play, Music, ExternalLink,
+  AlertCircle, RefreshCw,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMessaging, type Conversation, type ChatMessage } from "../../../lib/messaging";
 import { useToast } from "../../components/ui/Toast";
 import MediaViewer from "../../components/messaging/MediaViewer";
+
+// ── Error Boundary ────────────────────────────────────────────────────────
+class MsgErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: string | null }
+> {
+  constructor(props: any) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e: Error) { return { error: e.message }; }
+  componentDidCatch(e: Error) { console.error("[Messaging render error]", e); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 p-8 text-center h-full">
+          <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/30 flex items-center justify-center">
+            <AlertCircle className="w-5 h-5 text-red-500" />
+          </div>
+          <div>
+            <p className="font-semibold text-theme-primary mb-1">خطا در نمایش گفتگو</p>
+            <p className="text-xs text-theme-muted mb-4">مشکلی در بارگذاری این قسمت پیش آمد.</p>
+            <button
+              onClick={() => this.setState({ error: null })}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700 mx-auto"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              تلاش مجدد
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const EMOJI_LIST = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🎉", "🔥"];
 
@@ -98,7 +132,7 @@ function MessageBubble({
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const reactionMap = msg.reactions.reduce(
+  const reactionMap = (msg.reactions ?? []).reduce(
     (acc, r) => ({ ...acc, [r.emoji]: (acc[r.emoji] ?? 0) + 1 }),
     {} as Record<string, number>,
   );
@@ -129,9 +163,9 @@ function MessageBubble({
         >
           {msg.isDeleted ? (
             <span className="italic text-sm opacity-70">پیام حذف شد</span>
-          ) : msg.attachments.length > 0 ? (
+          ) : (msg.attachments ?? []).length > 0 ? (
             <div className="space-y-1">
-              {msg.attachments.map((att) => (
+              {(msg.attachments ?? []).map((att) => (
                 <div key={att.id}>
                   {att.type === "IMAGE" ? (
                     <button
@@ -198,7 +232,7 @@ function MessageBubble({
           <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isMe ? "text-blue-200" : "text-theme-muted"}`}>
             {msg.isEdited && <span>ویرایش‌شده ·</span>}
             <span>{timeStr(msg.createdAt)}</span>
-            {isMe && (msg.readBy.length > 0 ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />)}
+            {isMe && ((msg.readBy ?? []).length > 0 ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />)}
           </div>
         </div>
 
@@ -352,8 +386,8 @@ export default function MessagingPage() {
 
   async function sendForward() {
     if (!forwardMsg || forwardTargets.size === 0) return;
-    const content = forwardMsg.content ?? forwardMsg.attachments[0]?.name ?? "فایل ضمیمه";
-    const type = forwardMsg.attachments.length > 0 ? forwardMsg.attachments[0].type as "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" : "TEXT";
+    const content = forwardMsg.content ?? forwardMsg.attachments?.[0]?.name ?? "فایل ضمیمه";
+    const type = (forwardMsg.attachments ?? []).length > 0 ? forwardMsg.attachments[0].type as "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" : "TEXT";
     const count = forwardTargets.size;
     for (const convId of forwardTargets) {
       await ctx.sendMessage(convId, content, type);
@@ -447,8 +481,8 @@ export default function MessagingPage() {
                 </div>
               )}
               {filteredConvs.map((conv) => {
-                const other = conv.members.find((m) => m.userId !== myId) ?? conv.members[0];
-                const last = conv.messages[0];
+                const other = conv.members?.find((m) => m.userId !== myId) ?? conv.members?.[0];
+                const last = conv.messages?.[0];
                 const isActive = activeConvId === conv.id;
                 return (
                   <button
@@ -513,6 +547,7 @@ export default function MessagingPage() {
 
       {/* ── Right panel: active conversation ─────────────────────── */}
       <div className="flex-1 flex flex-col bg-theme-base min-w-0">
+      <MsgErrorBoundary>
         {!activeConv ? (
           <div className="flex-1 flex flex-col items-center justify-center text-theme-muted gap-4">
             <MessageSquare className="w-16 h-16 opacity-20" />
@@ -526,7 +561,7 @@ export default function MessagingPage() {
             {/* Chat header */}
             <div className="px-4 py-3 border-b border-theme bg-theme-card flex items-center gap-3">
               {(() => {
-                const other = activeConv.members.find((m) => m.userId !== myId) ?? activeConv.members[0];
+                const other = activeConv.members?.find((m) => m.userId !== myId) ?? activeConv.members?.[0];
                 return (
                   <>
                     <Avatar name={fullName(other?.user ?? { firstName: "؟", lastName: "" })} online={other?.isOnline} size={10} />
@@ -675,6 +710,7 @@ export default function MessagingPage() {
             </div>
           </>
         )}
+      </MsgErrorBoundary>
       </div>
     </div>
 
@@ -716,7 +752,7 @@ export default function MessagingPage() {
               </div>
               <div className="px-4 py-2 border-b border-theme bg-theme-hover/50">
                 <p className="text-xs text-theme-muted truncate">
-                  {forwardMsg.content ?? forwardMsg.attachments[0]?.name ?? "فایل ضمیمه"}
+                  {forwardMsg.content ?? forwardMsg.attachments?.[0]?.name ?? "فایل ضمیمه"}
                 </p>
               </div>
               <div className="max-h-64 overflow-y-auto py-1">
