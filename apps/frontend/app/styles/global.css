@@ -667,10 +667,7 @@ html:not(.dark) body {
 
 .input-theme {
   width: 100%;
-  padding-top: 0.625rem;
-  padding-bottom: 0.625rem;
-  padding-left: 0.875rem;
-  padding-right: 0.875rem;
+  padding: .625rem 2.125rem .625rem .875rem;
   font-size: 0.875rem;
   color: rgb(15 23 42);
   background-color: rgb(255 255 255);

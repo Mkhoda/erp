@@ -317,6 +317,7 @@ export default function MessagingPage() {
   const [mediaView, setMediaView] = React.useState<{ url: string; type: "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT"; name: string } | null>(null);
   const [forwardMsg, setForwardMsg] = React.useState<ChatMessage | null>(null);
   const [forwardTargets, setForwardTargets] = React.useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = React.useState(false);
 
   React.useEffect(() => {
     try {
@@ -328,7 +329,14 @@ export default function MessagingPage() {
     } catch {}
   }, []);
 
-  const { conversations, activeConvId, messages, typing, presence, isConnected, users, loadingMore, hasMore } = ctx;
+  const { conversations, activeConvId, messages, typing, presence, isConnected, users, loadingMore, hasMore, refreshConversations } = ctx;
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try { await refreshConversations(); } finally {
+      setTimeout(() => setRefreshing(false), 600);
+    }
+  }
 
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
   const activeMessages = activeConvId ? (messages[activeConvId] ?? []) : [];
@@ -426,11 +434,22 @@ export default function MessagingPage() {
       <div className="w-72 lg:w-80 flex flex-col border-l border-theme bg-theme-card shrink-0">
         {/* Header */}
         <div className="px-4 py-3 border-b border-theme flex items-center justify-between">
-          <h2 className="font-bold text-theme-primary text-sm">پیام‌رسانی</h2>
-          <div className="flex items-center gap-1.5">
-            {!isConnected && (
-              <span className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">قطع</span>
-            )}
+          <div className="flex items-center gap-2">
+            <h2 className="font-bold text-theme-primary text-sm">پیام‌رسانی</h2>
+            <span
+              title={isConnected ? "متصل" : "قطع — در حال اتصال مجدد..."}
+              className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? "bg-green-400" : "bg-red-400 animate-pulse"}`}
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              title="بارگذاری مجدد گفتگوها"
+              className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted hover:text-theme-primary transition-colors disabled:opacity-40"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
             {myRole === "ADMIN" && (
               <Link href="/dashboard/messaging/admin" className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted hover:text-theme-primary transition-colors" title="تنظیمات مدیر">
                 <Shield className="w-3.5 h-3.5" />
