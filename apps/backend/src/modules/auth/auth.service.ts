@@ -196,24 +196,23 @@ export class AuthService {
     // Parse user-agent for device info
     const ua = parseUserAgent(ctx.userAgent);
 
-    // Create session record (fire-and-forget errors — auth still succeeds)
-    this.sessions
-      .createSession({
-        userId: sub,
-        sessionId,
-        expiresAt,
-        ipAddress: ctx.ip,
-        userAgent: ctx.userAgent,
-        deviceType: ua.deviceType,
-        deviceModel: ua.deviceModel,
-        browser: ua.browser,
-        browserVersion: ua.browserVersion,
-        os: ua.os,
-        platform: ua.platform,
-        rememberMe: ctx.rememberMe ?? false,
-        authMethod: 'password',
-      })
-      .catch((e) => console.error('[AUTH] session create failed:', e?.message));
+    // Session must be written before returning the token; otherwise the client
+    // can call /auth/me before the record exists and receive a spurious 401.
+    await this.sessions.createSession({
+      userId: sub,
+      sessionId,
+      expiresAt,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+      deviceType: ua.deviceType,
+      deviceModel: ua.deviceModel,
+      browser: ua.browser,
+      browserVersion: ua.browserVersion,
+      os: ua.os,
+      platform: ua.platform,
+      rememberMe: ctx.rememberMe ?? false,
+      authMethod: 'password',
+    });
 
     return { access_token: token, expires_in: ttlSec };
   }

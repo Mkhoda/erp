@@ -78,8 +78,10 @@ export default function SignInPage() {
       localStorage.setItem('token', data.access_token);
       const cookieTtl = data.expires_in ?? (rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60);
       document.cookie = `token=${data.access_token}; path=/; max-age=${cookieTtl}; SameSite=Lax`;
-      // Hard navigation so middleware sees the cookie on a fresh request
-      window.location.href = '/dashboard';
+      // Respect ?redirect= so the user lands on the page they originally requested
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      window.location.href = redirect && redirect.startsWith('/') ? redirect : '/dashboard';
     } catch (err: any) {
       setError(err.message);
     } finally {
