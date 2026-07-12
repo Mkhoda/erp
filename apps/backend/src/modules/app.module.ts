@@ -16,6 +16,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { AuthSettingsModule } from './auth-settings/auth-settings.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
@@ -39,6 +40,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     AttendanceModule,
     SessionsModule,
     AuthSettingsModule,
+    SystemSettingsModule,
     MessagingModule,
   ],
   controllers: [ReportsController],

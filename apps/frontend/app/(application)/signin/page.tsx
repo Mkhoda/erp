@@ -4,8 +4,10 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Eye, EyeOff, Phone, Lock, LogIn, Moon, Sun } from 'lucide-react';
 import { isValidPhone, normalizeTo98 } from '../../../lib/phone';
+import { useToast } from '../../components/ui/Toast';
 
 export default function SignInPage() {
+  const toast = useToast();
   const [phone, setPhone] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
@@ -83,7 +85,9 @@ export default function SignInPage() {
       const redirect = params.get('redirect');
       window.location.href = redirect && redirect.startsWith('/') ? redirect : '/dashboard';
     } catch (err: any) {
-      setError(err.message);
+      const msg = err.message || 'نام کاربری یا رمز عبور اشتباه است';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

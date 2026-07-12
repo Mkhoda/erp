@@ -3,20 +3,13 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import * as crypto from 'crypto';
+import { SystemSettingsService } from '../system-settings/system-settings.service';
 
 /**
  * Bale Safir v3 API service for sending OTP messages.
  *
- * Uses the Safir bulk-messaging API (v3) with simple api-access-key auth.
- * Reference: https://docs.bale.ai/safir
- *
- * Required env vars:
- *   BALE_BOT_ID        — numeric bot ID (e.g. "1016716104")
- *   BALE_SAFIR_API_KEY — api-access-key from Bale business panel
- *
- * Optional:
- *   BALE_MOCK          — "true" to skip real SMS (dev/testing)
- *   LOG_BALE_VERBOSE   — "true" for verbose logging
+ * Reads BALE_SAFIR_API_KEY and BALE_BOT_ID from SystemSettings (DB) first,
+ * falling back to environment variables for initial bootstrap.
  */
 @Injectable()
 export class BaleService {
@@ -25,6 +18,7 @@ export class BaleService {
   constructor(
     private readonly http: HttpService,
     private readonly config: ConfigService,
+    private readonly systemSettings: SystemSettingsService,
   ) {}
 
   // ─── Config helpers ────────────────────────────────────────────────
@@ -34,47 +28,44 @@ export class BaleService {
     return v === 'true' || v === '1';
   }
 
-  private get isMock(): boolean {
-    const v = this.config.get<string>('BALE_MOCK') || '';
-    return v === 'true' || v === '1';
-  }
+  /** Resolve settings: DB values take priority, env vars are the fallback. */
+  private async resolveSettings(): Promise<{ isMock: boolean; apiKey: string; botId: number }> {
+    const db = await this.systemSettings.get();
 
-  /**
-   * Numeric bot ID required by Safir v3.
-   * Accepts BALE_BOT_ID, or falls back to extracting from BALE_API_KEY (format "botId:token").
-   */
-  private get botId(): number {
-    if (this.isMock) return 0;
+    const isMock =
+      db.baleMock ||
+      (this.config.get<string>('BALE_MOCK') || '') === 'true' ||
+      (this.config.get<string>('BALE_MOCK') || '') === '1';
 
-    // 1. Explicit BALE_BOT_ID
-    const explicit = this.config.get<string>('BALE_BOT_ID');
-    if (explicit) return Number(explicit);
+    if (isMock) return { isMock: true, apiKey: 'mock', botId: 0 };
 
-    // 2. Extract from BALE_API_KEY ("1016716104:abc123..." → 1016716104)
-    const apiKey = this.config.get<string>('BALE_API_KEY') || '';
-    if (apiKey.includes(':')) {
-      const id = Number(apiKey.split(':')[0]);
-      if (id > 0) return id;
-    }
-
-    throw new InternalServerErrorException(
-      'BALE_BOT_ID is not set and could not be extracted from BALE_API_KEY',
-    );
-  }
-
-  /**
-   * Safir v3 api-access-key.
-   * Accepts BALE_SAFIR_API_KEY or falls back to BALE_CLIENT_ID (may be the same value).
-   */
-  private get apiKey(): string {
-    if (this.isMock) return 'mock';
-
-    const v =
+    // API key: DB → env
+    const apiKey =
+      db.baleSafirApiKey ||
       this.config.get<string>('BALE_SAFIR_API_KEY') ||
-      this.config.get<string>('BALE_API_KEY') ||       // full bot token as last resort
-      this.config.get<string>('BALE_CLIENT_ID') || '';
-    if (!v) throw new InternalServerErrorException('BALE_SAFIR_API_KEY is not set');
-    return v;
+      this.config.get<string>('BALE_API_KEY') ||
+      this.config.get<string>('BALE_CLIENT_ID') ||
+      '';
+    if (!apiKey) throw new InternalServerErrorException('BALE_SAFIR_API_KEY is not configured (set it in DB settings or .env)');
+
+    // Bot ID: DB → env → extract from BALE_API_KEY
+    let botId = 0;
+    if (db.baleBotId) {
+      botId = Number(db.baleBotId);
+    } else {
+      const envBotId = this.config.get<string>('BALE_BOT_ID');
+      if (envBotId) {
+        botId = Number(envBotId);
+      } else {
+        const apiKeyEnv = this.config.get<string>('BALE_API_KEY') || '';
+        if (apiKeyEnv.includes(':')) {
+          botId = Number(apiKeyEnv.split(':')[0]);
+        }
+      }
+    }
+    if (!botId) throw new InternalServerErrorException('BALE_BOT_ID is not configured (set it in DB settings or .env)');
+
+    return { isMock: false, apiKey, botId };
   }
 
   private maskPhone(p: string): string {
@@ -99,83 +90,51 @@ export class BaleService {
    * @see https://docs.bale.ai/safir#ارسال-پیام-رمز-یکبار-مصرف
    */
   async sendOtp(phone: string, otp: string): Promise<void> {
-    if (this.isMock) {
-      this.logger.log(
-        `[MOCK] Would send OTP ${otp} to ${this.maskPhone(phone)}`,
-      );
+    const { isMock, apiKey, botId } = await this.resolveSettings();
+
+    if (isMock) {
+      this.logger.log(`[MOCK] Would send OTP ${otp} to ${this.maskPhone(phone)}`);
       return;
     }
 
-    // Ensure phone is in correct Safir format (98XXXXXXXXXX)
     const normalizedPhone = phone.replace(/\D/g, '');
     if (!normalizedPhone.startsWith('98') || normalizedPhone.length !== 12) {
-      this.logger.warn(
-        `[BALE] Phone ${this.maskPhone(phone)} may not be in Safir format (expected 98XXXXXXXXXX)`,
-      );
+      this.logger.warn(`[BALE] Phone ${this.maskPhone(phone)} may not be in 98XXXXXXXXXX format`);
     }
 
     const requestId = this.generateRequestId();
-
     const payload = {
       request_id: requestId,
-      bot_id: this.botId,
+      bot_id: botId,
       phone_number: normalizedPhone,
-      message_data: {
-        otp_message: {
-          otp: otp,
-        },
-      },
+      message_data: { otp_message: { otp } },
     };
 
     if (this.verbose) {
-      this.logger.log(
-        `[BALE] Sending OTP via Safir v3 → ${SafirBase}/send_message`,
-      );
-      this.logger.log(`[BALE] bot_id=${this.botId}, phone=${this.maskPhone(normalizedPhone)}, request_id=${requestId}`);
+      this.logger.log(`[BALE] Sending OTP → ${SafirBase}/send_message  bot_id=${botId} phone=${this.maskPhone(normalizedPhone)}`);
     }
 
     try {
       const res = await firstValueFrom(
         this.http.post(`${SafirBase}/send_message`, payload, {
-          headers: {
-            'api-access-key': this.apiKey,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'api-access-key': apiKey, 'Content-Type': 'application/json' },
         }),
       );
-
-      this.logger.log(
-        `[BALE] OTP sent to ${this.maskPhone(normalizedPhone)} (status ${res.status})`,
-      );
-
-      if (this.verbose) {
-        this.logger.log(`[BALE] Response: ${JSON.stringify(res.data)}`);
-      }
+      this.logger.log(`[BALE] OTP sent to ${this.maskPhone(normalizedPhone)} (HTTP ${res.status})`);
+      if (this.verbose) this.logger.log(`[BALE] Response: ${JSON.stringify(res.data)}`);
     } catch (err: any) {
       const status = err?.response?.status;
       const data = err?.response?.data;
-      this.logger.error(
-        `[BALE] Safir v3 send_message failed (HTTP ${status}): ${JSON.stringify(data || err?.message)}`,
-      );
-
-      // Surface meaningful error details
+      this.logger.error(`[BALE] send_message failed (HTTP ${status}): ${JSON.stringify(data || err?.message)}`);
       if (data?.error_data?.length) {
-        const firstErr = data.error_data[0];
-        this.logger.error(
-          `[BALE] Error code ${firstErr.code}: ${firstErr.description} (phone: ${firstErr.phone_number})`,
-        );
+        const e = data.error_data[0];
+        this.logger.error(`[BALE] code=${e.code}: ${e.description}`);
       }
-
-      // Provide actionable guidance for common errors
-      let hint = '';
-      if (status === 403) {
-        hint = ' — The api-access-key may be incorrect. Get it from Bale Business Panel → Safir settings.';
-      } else if (status === 401) {
-        hint = ' — Authentication failed. Check BALE_SAFIR_API_KEY in .env.';
-      }
-
+      const hint =
+        status === 403 ? ' — api-access-key نادرست است. از پنل بیل → تنظیمات Safir دریافت کنید.' :
+        status === 401 ? ' — احراز هویت ناموفق بود.' : '';
       throw new InternalServerErrorException(
-        `Failed to send OTP via Bale Safir: ${data?.error_data?.[0]?.description || err?.message || 'unknown error'}${hint}`,
+        `خطا در ارسال OTP از طریق بیل: ${data?.error_data?.[0]?.description || err?.message || 'خطای ناشناخته'}${hint}`,
       );
     }
   }

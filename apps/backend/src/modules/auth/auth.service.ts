@@ -113,9 +113,15 @@ export class AuthService {
     if (verbose) console.log(`[AUTH] OTPs sent in the last hour for ${phone}: ${count}`);
 
     const otp = this.makeOtp();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    await this.prisma.otp.create({ data: { phone, code: otp, expiresAt } });
-    await this.bale.sendOtp(phone, otp);
+    const expiresAt = new Date(Date.now() + 60 * 1000); // 1 minute
+    const otpRecord = await this.prisma.otp.create({ data: { phone, code: otp, expiresAt } });
+    try {
+      await this.bale.sendOtp(phone, otp);
+    } catch (e) {
+      // If the SMS send fails, remove the phantom OTP record so the user can retry cleanly
+      await this.prisma.otp.delete({ where: { id: otpRecord.id } }).catch(() => {});
+      throw e;
+    }
     console.log(`[BALE${process.env.BALE_MOCK === 'true' ? '_MOCK' : ''}] OTP request accepted for ${phone}, expires at ${expiresAt.toISOString()}`);
     if (verbose) console.log('[AUTH] OTP created and stored; expiresAt:', expiresAt.toISOString());
     return { ok: true, expiresAt };

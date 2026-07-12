@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PWAInstaller from "./PWAInstaller";
 import GlassyBackground from "@/components/GlassyBackground";
+import { ToastProvider } from "./ui/Toast";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -13,13 +14,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <GlassyBackground />
       <div className="relative flex flex-col min-h-screen text-theme-primary">
         <Navbar />
-        <motion.main 
+        <motion.main
           className="flex-1"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          {children}
+          <ToastProvider>{children}</ToastProvider>
         </motion.main>
         <Footer />
         <PWAInstaller />

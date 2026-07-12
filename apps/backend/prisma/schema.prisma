@@ -1072,6 +1072,17 @@ model UserPresence {
   updatedAt  DateTime       @updatedAt
 }
 
+// System-wide settings managed via admin panel (Bale OTP, etc.)
+model SystemSettings {
+  id              String   @id @default("singleton")
+  // Bale Safir OTP gateway
+  baleSafirApiKey String?  // api-access-key from Bale Business Panel → Safir
+  baleBotId       String?  // numeric bot ID
+  baleMock        Boolean  @default(false) // skip real SMS in dev/test
+  updatedAt       DateTime @updatedAt
+  updatedById     String?
+}
+
 model ChatSettings {
   id                     String   @id @default("singleton")
   maxFileSizeMb          Int      @default(10)
