@@ -4,11 +4,12 @@ import Link from "next/link";
 import {
   Search, Send, Paperclip, ArrowRight, Check, CheckCheck,
   MoreHorizontal, Trash2, Pencil, X, Users, MessageSquare,
-  Smile, Download, Shield,
+  Smile, Download, Shield, Share2, Play, Music, ExternalLink,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMessaging, type Conversation, type ChatMessage } from "../../../lib/messaging";
 import { useToast } from "../../components/ui/Toast";
+import MediaViewer from "../../components/messaging/MediaViewer";
 
 const EMOJI_LIST = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🎉", "🔥"];
 
@@ -75,6 +76,8 @@ function MessageBubble({
   onDelete,
   onEdit,
   onReact,
+  onForward,
+  onView,
 }: {
   msg: ChatMessage;
   isMe: boolean;
@@ -82,6 +85,8 @@ function MessageBubble({
   onDelete: () => void;
   onEdit: () => void;
   onReact: (emoji: string) => void;
+  onForward: () => void;
+  onView: (url: string, type: "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT", name: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [showEmoji, setShowEmoji] = React.useState(false);
@@ -129,21 +134,57 @@ function MessageBubble({
               {msg.attachments.map((att) => (
                 <div key={att.id}>
                   {att.type === "IMAGE" ? (
-                    <img src={att.url} alt={att.name} className="max-w-full max-h-48 rounded-xl object-cover" />
-                  ) : att.type === "VIDEO" ? (
-                    <video src={att.url} controls className="max-w-full max-h-48 rounded-xl" />
-                  ) : (
-                    <a
-                      href={att.url}
-                      download={att.name}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl ${isMe ? "bg-white/10 hover:bg-white/20" : "bg-theme-hover hover:bg-theme-hover"} transition-colors`}
+                    <button
+                      onClick={() => onView(att.url, "IMAGE", att.name)}
+                      className="block w-full text-left"
                     >
+                      <img
+                        src={att.url}
+                        alt={att.name}
+                        className="max-w-full max-h-48 rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+                      />
+                    </button>
+                  ) : att.type === "VIDEO" ? (
+                    <button
+                      onClick={() => onView(att.url, "VIDEO", att.name)}
+                      className="relative block w-full group cursor-pointer"
+                    >
+                      <video src={att.url} className="max-w-full max-h-48 rounded-xl pointer-events-none" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl group-hover:bg-black/40 transition-colors">
+                        <Play className="w-10 h-10 text-white drop-shadow" />
+                      </div>
+                    </button>
+                  ) : att.type === "AUDIO" ? (
+                    <button
+                      onClick={() => onView(att.url, "AUDIO", att.name)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl w-full ${isMe ? "bg-white/10 hover:bg-white/20" : "bg-theme-hover hover:bg-theme-card"} transition-colors`}
+                    >
+                      <Music className="w-4 h-4 shrink-0 opacity-60" />
+                      <span className="text-xs truncate flex-1">{att.name}</span>
+                    </button>
+                  ) : (
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${isMe ? "bg-white/10" : "bg-theme-hover"}`}>
                       <Paperclip className="w-4 h-4 shrink-0 opacity-60" />
                       <span className="text-xs truncate flex-1">{att.name}</span>
-                      <Download className="w-3.5 h-3.5 shrink-0 opacity-60" />
-                    </a>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          onClick={() => onView(att.url, "DOCUMENT", att.name)}
+                          className={`p-1 rounded opacity-60 hover:opacity-100 transition-opacity ${isMe ? "hover:bg-white/10" : "hover:bg-theme-card"}`}
+                          title="مشاهده"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                        <a
+                          href={att.url}
+                          download={att.name}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`p-1 rounded opacity-60 hover:opacity-100 transition-opacity ${isMe ? "hover:bg-white/10" : "hover:bg-theme-card"}`}
+                          title="دانلود"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}
@@ -201,6 +242,9 @@ function MessageBubble({
               <Smile className="w-3.5 h-3.5" />
             </button>
             <button onClick={onReply} className="p-1 rounded-lg hover:bg-theme-hover text-theme-muted hover:text-theme-primary transition-colors text-sm">↩</button>
+            <button onClick={onForward} className="p-1 rounded-lg hover:bg-theme-hover text-theme-muted hover:text-theme-primary transition-colors" title="ارسال مجدد">
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
             {isMe && (
               <>
                 <button onClick={onEdit} className="p-1 rounded-lg hover:bg-theme-hover text-theme-muted hover:text-theme-primary transition-colors">
@@ -236,6 +280,9 @@ export default function MessagingPage() {
   const fileRef = React.useRef<HTMLInputElement>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [uploadProgress, setUploadProgress] = React.useState(false);
+  const [mediaView, setMediaView] = React.useState<{ url: string; type: "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT"; name: string } | null>(null);
+  const [forwardMsg, setForwardMsg] = React.useState<ChatMessage | null>(null);
+  const [forwardTargets, setForwardTargets] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
     try {
@@ -303,6 +350,19 @@ export default function MessagingPage() {
     }
   }
 
+  async function sendForward() {
+    if (!forwardMsg || forwardTargets.size === 0) return;
+    const content = forwardMsg.content ?? forwardMsg.attachments[0]?.name ?? "فایل ضمیمه";
+    const type = forwardMsg.attachments.length > 0 ? forwardMsg.attachments[0].type as "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" : "TEXT";
+    const count = forwardTargets.size;
+    for (const convId of forwardTargets) {
+      await ctx.sendMessage(convId, content, type);
+    }
+    setForwardMsg(null);
+    setForwardTargets(new Set());
+    toast.success(`پیام به ${count} گفتگو ارسال شد`);
+  }
+
   // Group messages by date
   const sorted = [...activeMessages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const grouped: Array<{ date: string; msgs: ChatMessage[] }> = [];
@@ -326,6 +386,7 @@ export default function MessagingPage() {
   );
 
   return (
+    <>
     <div className="flex h-[calc(100vh-var(--header-h,64px)-2rem)] overflow-hidden rounded-2xl border border-theme shadow-sm" dir="rtl">
       {/* ── Left panel: conversations + users ─────────────────────── */}
       <div className="w-72 lg:w-80 flex flex-col border-l border-theme bg-theme-card shrink-0">
@@ -512,6 +573,8 @@ export default function MessagingPage() {
                         onDelete={() => ctx.deleteMessage(msg.id, true)}
                         onEdit={() => { setEditingId(msg.id); setEditInput(msg.content ?? ""); }}
                         onReact={(emoji) => ctx.toggleReaction(msg.id, emoji)}
+                        onForward={() => { setForwardMsg(msg); setForwardTargets(new Set()); }}
+                        onView={(url, type, name) => setMediaView({ url, type, name })}
                       />
                     );
                   })}
@@ -614,5 +677,94 @@ export default function MessagingPage() {
         )}
       </div>
     </div>
+
+      {/* Media Viewer overlay */}
+      <AnimatePresence>
+        {mediaView && (
+          <MediaViewer
+            url={mediaView.url}
+            type={mediaView.type}
+            name={mediaView.name}
+            onClose={() => setMediaView(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Forward Modal */}
+      <AnimatePresence>
+        {forwardMsg && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setForwardMsg(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-theme-card border border-theme rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              dir="rtl"
+            >
+              <div className="px-4 py-3 border-b border-theme flex items-center justify-between">
+                <h3 className="font-semibold text-theme-primary text-sm">ارسال مجدد</h3>
+                <button onClick={() => setForwardMsg(null)} className="text-theme-muted hover:text-theme-primary transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="px-4 py-2 border-b border-theme bg-theme-hover/50">
+                <p className="text-xs text-theme-muted truncate">
+                  {forwardMsg.content ?? forwardMsg.attachments[0]?.name ?? "فایل ضمیمه"}
+                </p>
+              </div>
+              <div className="max-h-64 overflow-y-auto py-1">
+                {conversations.map((conv) => {
+                  const other = conv.members.find((m) => m.userId !== myId) ?? conv.members[0];
+                  const name = fullName(other?.user ?? { firstName: "گفتگو", lastName: "" });
+                  const checked = forwardTargets.has(conv.id);
+                  return (
+                    <button
+                      key={conv.id}
+                      onClick={() =>
+                        setForwardTargets((s) => {
+                          const ns = new Set(s);
+                          if (ns.has(conv.id)) ns.delete(conv.id);
+                          else ns.add(conv.id);
+                          return ns;
+                        })
+                      }
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors ${checked ? "bg-blue-50 dark:bg-blue-950/20" : "hover:bg-theme-hover"}`}
+                    >
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${checked ? "bg-blue-600 border-blue-600" : "border-theme-muted"}`}>
+                        {checked && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                      <Avatar name={name} size={8} />
+                      <span className="text-sm text-theme-primary truncate">{name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="px-4 py-3 border-t border-theme flex gap-2">
+                <button
+                  onClick={sendForward}
+                  disabled={forwardTargets.size === 0}
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-xl transition-colors font-medium"
+                >
+                  {forwardTargets.size > 0 ? `ارسال به ${forwardTargets.size} گفتگو` : "انتخاب کنید..."}
+                </button>
+                <button
+                  onClick={() => { setForwardMsg(null); setForwardTargets(new Set()); }}
+                  className="px-4 py-2 bg-theme-hover hover:bg-theme-card text-theme-secondary text-sm rounded-xl transition-colors"
+                >
+                  لغو
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

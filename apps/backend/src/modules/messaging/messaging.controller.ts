@@ -64,6 +64,13 @@ export class MessagingController {
     return msg;
   }
 
+  @Post('conversations/:id/read')
+  async markRead(@Req() req: any, @Param('id') convId: string) {
+    if (!(await this.convs.isMember(convId, req.user.userId))) throw new ForbiddenException();
+    await this.msgs.markRead(convId, req.user.userId);
+    return { ok: true };
+  }
+
   @Get('conversations/:id/messages')
   async getMessages(
     @Req() req: any,

@@ -327,6 +327,15 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
             ? { ...c, members: c.members.map((m) => m.userId === data.userId ? { ...m, lastReadAt: new Date().toISOString() } : m) }
             : c,
         ),
+        // Mark all my messages in this conversation as read by the reader
+        messages: {
+          ...s.messages,
+          [data.conversationId]: (s.messages[data.conversationId] ?? []).map((msg) => {
+            if (msg.senderId !== myIdRef.current) return msg;
+            if (msg.readBy.some((r) => r.userId === data.userId)) return msg;
+            return { ...msg, readBy: [...msg.readBy, { userId: data.userId, readAt: new Date().toISOString() }] };
+          }),
+        },
       }));
     });
 
@@ -492,7 +501,15 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const markRead = React.useCallback((convId: string) => {
-    socketRef.current?.emit("message:read", { conversationId: convId });
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("message:read", { conversationId: convId });
+    } else {
+      // REST fallback so the DB is actually updated when socket is offline
+      fetch(`${API}/messaging/conversations/${convId}/read`, {
+        method: "POST",
+        headers: authHeader(),
+      }).catch(() => {});
+    }
     setState((s) => ({
       ...s,
       conversations: s.conversations.map((c) =>
