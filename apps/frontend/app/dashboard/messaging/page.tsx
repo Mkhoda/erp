@@ -99,7 +99,7 @@ function MessageBubble({
   );
 
   return (
-    <div ref={ref} className={`flex ${isMe ? "flex-row-reverse" : "flex-row"} items-end gap-2 group`}>
+    <div ref={ref} className={`flex ${isMe ? "flex-row" : "flex-row-reverse"} items-end gap-2 group`}>
       {!isMe && (
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center font-bold text-white text-xs shrink-0 mb-1">
           {fullName(msg.sender)[0]}
