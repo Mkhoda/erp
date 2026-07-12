@@ -1,123 +1,161 @@
 "use client";
-import React from "react";
-import { ExternalLink, Globe, AlertTriangle, RefreshCw } from "lucide-react";
+import {
+  ExternalLink,
+  Globe,
+  Zap,
+  Shield,
+  CloudRain,
+  Flame,
+  Droplets,
+  TrendingDown,
+  Radio,
+  Crosshair,
+  Mountain,
+  AlertTriangle,
+} from "lucide-react";
 
 const MONITOR_URL =
   "https://www.worldmonitor.app/dashboard?lat=31.3324&lon=50.6483&zoom=3.89&view=global&timeRange=7d&layers=conflicts%2Cbases%2Chotspots%2Cnuclear%2Csanctions%2Cweather%2Ceconomic%2Cwaterways%2Coutages%2Cmilitary%2Cnatural%2Cfires";
 
+const LAYERS = [
+  { icon: Crosshair,    label: "مناطق درگیری",    desc: "تعارضات فعال" },
+  { icon: Shield,       label: "پایگاه‌های نظامی", desc: "استقرار نیرو" },
+  { icon: AlertTriangle,label: "نقاط بحرانی",     desc: "هاتسپات‌ها" },
+  { icon: Zap,          label: "انرژی هسته‌ای",   desc: "تأسیسات و تحریم" },
+  { icon: CloudRain,    label: "آب و هوا",         desc: "رویدادهای جوی" },
+  { icon: TrendingDown, label: "اقتصاد",           desc: "شاخص‌های کلان" },
+  { icon: Droplets,     label: "آبراه‌ها",         desc: "مسیرهای دریایی" },
+  { icon: Radio,        label: "قطعی‌ها",          desc: "اینترنت و برق" },
+  { icon: Flame,        label: "آتش‌سوزی",         desc: "حریق فعال" },
+  { icon: Mountain,     label: "بلایای طبیعی",     desc: "زلزله، سیل و..." },
+];
+
 export default function WorldMonitorPage() {
-  const [status, setStatus] = React.useState<"loading" | "loaded" | "blocked">("loading");
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  React.useEffect(() => {
-    document.title = "پایش جهانی | Arzesh ERP";
-
-    // If iframe doesn't fire onLoad within 8s it's likely blocked
-    timerRef.current = setTimeout(() => {
-      if (status === "loading") setStatus("blocked");
-    }, 8000);
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  function handleLoad() {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    // Even after onLoad fires the content might be an error page due to X-Frame-Options;
-    // we can't inspect cross-origin content so we optimistically mark as loaded.
-    setStatus("loaded");
-  }
-
-  function handleError() {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setStatus("blocked");
-  }
-
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#0d1117]">
-      {/* Slim header */}
-      <header className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-white/10 shrink-0 z-10">
-        <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-blue-400" />
-          <span className="text-white text-sm font-medium">پایش وضعیت جهانی</span>
-          <span className="text-white/30 text-xs hidden sm:inline">· worldmonitor.app</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {status === "loading" && (
-            <span className="flex items-center gap-1.5 text-xs text-white/40">
-              <RefreshCw className="w-3 h-3 animate-spin" />
-              در حال بارگذاری...
-            </span>
-          )}
-          <a
-            href={MONITOR_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            باز در تب جدید
-          </a>
-        </div>
-      </header>
+    <div
+      dir="rtl"
+      className="fixed inset-0 overflow-auto"
+      style={{
+        background: "radial-gradient(ellipse at 50% 20%, #0e1e3a 0%, #070d1a 60%, #030608 100%)",
+      }}
+    >
+      {/* Grid overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.04]"
+        style={{
+          backgroundImage:
+            "linear-gradient(#4a9eff 1px, transparent 1px), linear-gradient(90deg, #4a9eff 1px, transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
 
-      {/* Main area */}
-      <div className="flex-1 relative">
-        {/* Iframe */}
-        {status !== "blocked" && (
-          <iframe
-            ref={iframeRef}
-            src={MONITOR_URL}
-            onLoad={handleLoad}
-            onError={handleError}
-            className="absolute inset-0 w-full h-full border-0"
-            title="World Monitor"
-            allow="geolocation; fullscreen"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+      {/* Glow orb */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          top: "15%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "500px",
+          height: "500px",
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(30,100,220,0.15) 0%, rgba(30,100,220,0.04) 50%, transparent 70%)",
+        }}
+      />
+
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-full py-16 px-6">
+        {/* Globe icon + pulse */}
+        <div className="relative mb-8">
+          <span
+            className="absolute inset-0 rounded-full animate-ping"
+            style={{ background: "rgba(59,130,246,0.15)", animationDuration: "2.5s" }}
           />
-        )}
-
-        {/* Loading overlay */}
-        {status === "loading" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-[#0d1117] pointer-events-none">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 rounded-full border-2 border-blue-500/20" />
-              <div className="absolute inset-0 rounded-full border-2 border-t-blue-500 animate-spin" />
-              <Globe className="absolute inset-0 m-auto w-7 h-7 text-blue-400" />
-            </div>
-            <p className="text-white/50 text-sm">در حال اتصال به World Monitor...</p>
+          <div
+            className="relative w-24 h-24 rounded-full flex items-center justify-center"
+            style={{
+              background:
+                "radial-gradient(circle at 35% 35%, #1e5fc0, #0a2a6e)",
+              boxShadow: "0 0 0 1px rgba(100,160,255,0.15), 0 0 40px rgba(30,100,220,0.3)",
+            }}
+          >
+            <Globe className="w-11 h-11 text-blue-300" />
           </div>
-        )}
+        </div>
 
-        {/* Blocked fallback */}
-        {status === "blocked" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-8">
-            <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-              <AlertTriangle className="w-7 h-7 text-amber-400" />
-            </div>
-            <div className="text-center max-w-md">
-              <h2 className="text-white text-lg font-semibold mb-2">نمایش مستقیم امکان‌پذیر نیست</h2>
-              <p className="text-white/50 text-sm leading-relaxed">
-                سایت World Monitor اجازه نمایش درون فریم را نمی‌دهد (X-Frame-Options). برای مشاهده روی دکمه زیر کلیک کنید تا در تب جدید باز شود.
-              </p>
-            </div>
-            <a
-              href={MONITOR_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+        {/* Title */}
+        <h1
+          className="text-3xl sm:text-4xl font-bold text-white mb-3 text-center"
+          style={{ textShadow: "0 0 40px rgba(100,160,255,0.4)" }}
+        >
+          پایش وضعیت جهانی
+        </h1>
+        <p className="text-blue-300/60 text-sm tracking-widest uppercase mb-2">
+          World Monitor
+        </p>
+        <p className="text-white/40 text-sm text-center max-w-md leading-relaxed mb-10">
+          نقشه تعاملی از رویدادهای امنیتی، نظامی، اقتصادی و طبیعی سراسر جهان
+          به‌صورت لحظه‌ای
+        </p>
+
+        {/* CTA */}
+        <a
+          href={MONITOR_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white text-base transition-all duration-200"
+          style={{
+            background: "linear-gradient(135deg, #1d4ed8, #1e40af)",
+            boxShadow:
+              "0 0 0 1px rgba(100,160,255,0.2), 0 8px 32px rgba(29,78,216,0.4)",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.boxShadow =
+              "0 0 0 1px rgba(100,160,255,0.3), 0 12px 40px rgba(29,78,216,0.6)";
+            (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.boxShadow =
+              "0 0 0 1px rgba(100,160,255,0.2), 0 8px 32px rgba(29,78,216,0.4)";
+            (e.currentTarget as HTMLElement).style.transform = "";
+          }}
+        >
+          <Globe className="w-5 h-5" />
+          باز کردن World Monitor
+          <ExternalLink className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+        </a>
+
+        <p className="mt-4 text-white/20 text-xs">در تب جدید مرورگر باز می‌شود</p>
+
+        {/* Divider */}
+        <div className="flex items-center gap-4 my-12 w-full max-w-2xl">
+          <div className="flex-1 h-px bg-white/5" />
+          <span className="text-white/20 text-xs">لایه‌های اطلاعاتی</span>
+          <div className="flex-1 h-px bg-white/5" />
+        </div>
+
+        {/* Layers grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full max-w-2xl">
+          {LAYERS.map(({ icon: Icon, label, desc }) => (
+            <div
+              key={label}
+              className="flex flex-col items-center gap-2 rounded-xl px-3 py-4 text-center transition-colors"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.06)",
+              }}
             >
-              <Globe className="w-4 h-4" />
-              باز کردن World Monitor
-              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-            </a>
-            <p className="text-white/20 text-xs">
-              {MONITOR_URL.slice(0, 60)}...
-            </p>
-          </div>
-        )}
+              <Icon className="w-5 h-5 text-blue-400/80" />
+              <span className="text-white/70 text-xs font-medium">{label}</span>
+              <span className="text-white/25 text-[10px]">{desc}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer note */}
+        <p className="mt-12 text-white/15 text-xs text-center">
+          این صفحه توسط worldmonitor.app ارائه می‌شود و به دلیل سیاست امنیتی آن سایت، نمایش داخلی امکان‌پذیر نیست.
+        </p>
       </div>
     </div>
   );

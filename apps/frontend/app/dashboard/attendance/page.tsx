@@ -20,11 +20,13 @@ const STATUS_FA: Record<string,string> = {
   PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت",
   INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت",
   REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته",
+  WORKING:"در حال کار",
 };
 const STATUS_CLR: Record<string,string> = {
   PRESENT:"#10b981", LATE:"#f59e0b", EARLY_LEAVE:"#eab308", ABSENT:"#ef4444",
   INCOMPLETE:"#f97316", LEAVE:"#3b82f6", MISSION:"#8b5cf6",
   REMOTE_WORK:"#06b6d4", HOLIDAY:"#94a3b8", COMPANY_HOLIDAY:"#64748b", WEEKEND:"#cbd5e1",
+  WORKING:"#10b981",
 };
 const STATUS_BADGE: Record<string,string> = {
   PRESENT:"bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
@@ -38,6 +40,7 @@ const STATUS_BADGE: Record<string,string> = {
   HOLIDAY:"bg-slate-100 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400",
   COMPANY_HOLIDAY:"bg-slate-100 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400",
   WEEKEND:"bg-slate-100 text-slate-400 dark:bg-slate-800/40 dark:text-slate-500",
+  WORKING:"bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400",
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -58,6 +61,12 @@ function fmtTime(iso?: string | null): string {
 }
 const fullName = (u?: { firstName?: string; lastName?: string } | null) =>
   `${u?.firstName || ""} ${u?.lastName || ""}`.trim() || "—";
+
+// INCOMPLETE + has check-in + no check-out + today → person is still at work
+function liveStatus(r: { status: string; firstCheckIn?: string|null; lastCheckOut?: string|null; gregDate: string }, todayISO: string): string {
+  if (r.status === "INCOMPLETE" && r.firstCheckIn && !r.lastCheckOut && r.gregDate?.slice(0, 10) === todayISO) return "WORKING";
+  return r.status;
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 interface DashData {
@@ -267,8 +276,9 @@ export default function AttendanceDashboardPage() {
   const todayRecs = React.useMemo(() =>
     records.filter(r => r.gregDate?.slice(0,10) === todayISO), [records, todayISO]);
 
+  // Exclude records that are "currently working" (checked in, no checkout, today) — they're not truly incomplete
   const incompleteRecs = React.useMemo(() =>
-    records.filter(r => r.status === "INCOMPLETE"), [records]);
+    records.filter(r => r.status === "INCOMPLETE" && liveStatus(r, todayISO) !== "WORKING"), [records, todayISO]);
 
   const filteredToday = React.useMemo(() => {
     let arr = todayTab === "ALL" ? todayRecs : todayRecs.filter(r => r.status === todayTab);
@@ -580,7 +590,7 @@ export default function AttendanceDashboardPage() {
                   <tbody>
                     {filteredToday.map((r,idx)=>(
                       <tr key={r.id}
-                        className={`border-b border-theme transition-colors hover:bg-theme-hover/30 ${r.status==="ABSENT"?"bg-red-50/20 dark:bg-red-950/10":r.status==="INCOMPLETE"?"bg-orange-50/20 dark:bg-orange-950/10":""}`}>
+                        className={`border-b border-theme transition-colors hover:bg-theme-hover/30 ${liveStatus(r,todayISO)==="ABSENT"?"bg-red-50/20 dark:bg-red-950/10":liveStatus(r,todayISO)==="INCOMPLETE"?"bg-orange-50/20 dark:bg-orange-950/10":""}`}>
                         <td className="px-3 py-2 text-xs text-theme-muted">{faNum(idx+1)}</td>
                         <td className="px-3 py-2 font-medium text-theme-primary text-xs">{fullName(r.user)}</td>
                         <td className="px-3 py-2 text-xs text-theme-muted">{r.user?.department?.name||"—"}</td>
@@ -597,7 +607,7 @@ export default function AttendanceDashboardPage() {
                             ?<span className="font-bold text-violet-600 dark:text-violet-400">{fmtMin(r.overtimeMinutes)}</span>
                             :<span className="text-theme-muted">—</span>}
                         </td>
-                        <td className="px-3 py-2"><Badge status={r.status}/></td>
+                        <td className="px-3 py-2"><Badge status={liveStatus(r, todayISO)}/></td>
                         <td className="px-3 py-2">
                           <Link href={`/dashboard/attendance/records?userId=${r.userId}`}
                             className="text-blue-500 hover:text-blue-600 transition-colors">

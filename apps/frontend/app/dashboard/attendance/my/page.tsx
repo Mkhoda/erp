@@ -6,8 +6,13 @@ import TimeSelect from "../../../components/ui/TimeSelect";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
-const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته" };
-const STATUS_CLS: Record<string,string> = { PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600", EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600", INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600", MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600", HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500" };
+const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", WORKING:"در حال کار" };
+const STATUS_CLS: Record<string,string> = { PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600", EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600", INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600", MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600", HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500", WORKING:"bg-teal-500/15 text-teal-600" };
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
+function liveStatus(r: any): string {
+  if (r.status === "INCOMPLETE" && r.firstCheckIn && !r.lastCheckOut && r.gregDate?.slice(0, 10) === TODAY_ISO) return "WORKING";
+  return r.status;
+}
 const REQ_STATUS_FA: Record<string,string> = { PENDING:"در انتظار", APPROVED:"تایید شده", REJECTED:"رد شده", MANAGER_APPROVED:"تایید مدیر", HR_APPROVED:"تایید HR" };
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 const fmtDH = (days: number) => { const d = Math.floor(days); const h = Math.round((days - d) * 8); return h > 0 ? `${faNum(d)} روز و ${faNum(h)} ساعت` : `${faNum(d)} روز`; };
@@ -170,7 +175,7 @@ export default function MyAttendancePage() {
       )}
 
       {(() => {
-        const unresolved = rows.filter(r => (r.status === "INCOMPLETE" || r.status === "ABSENT") && !pendingDates.has(r.gregDate.slice(0, 10)));
+        const unresolved = rows.filter(r => (liveStatus(r) === "INCOMPLETE" || liveStatus(r) === "ABSENT") && !pendingDates.has(r.gregDate.slice(0, 10)));
         return unresolved.length > 0 ? (
           <div className="flex items-center gap-2 text-sm text-orange-700 bg-orange-500/10 rounded-xl px-4 py-3">
             <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -191,7 +196,8 @@ export default function MyAttendancePage() {
               </tr></thead>
               <tbody>
                 {rows.length === 0 ? <tr><td colSpan={11} className="py-10 text-theme-muted">رکوردی نیست</td></tr> : rows.slice((page-1)*pageSize, page*pageSize).map(r => {
-                  const needsResolve = r.status === "INCOMPLETE" || r.status === "ABSENT";
+                  const ls = liveStatus(r);
+                  const needsResolve = (ls === "INCOMPLETE" || ls === "ABSENT");
                   const isPending = pendingDates.has(r.gregDate.slice(0, 10));
                   return (
                     <tr key={r.id} className={`border-b border-theme/40 ${needsResolve && !isPending ? "bg-orange-500/5" : ""}`}>
@@ -207,7 +213,7 @@ export default function MyAttendancePage() {
                       <td className="px-2 text-orange-600 font-medium" dir="ltr">{(r.delayMinutes + r.earlyLeaveMinutes) ? fmtMin(r.delayMinutes + r.earlyLeaveMinutes) : "—"}</td>
                       <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
                       <td className="px-2 text-rose-600" dir="ltr">{r.holidayOvertimeMinutes ? fmtMin(r.holidayOvertimeMinutes) : "—"}</td>
-                      <td className="px-2"><span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[r.status] || ""}`}>{needsResolve && <AlertTriangle className="w-3 h-3" />}{STATUS_FA[r.status] || r.status}</span></td>
+                      <td className="px-2"><span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[ls] || ""}`}>{needsResolve && <AlertTriangle className="w-3 h-3" />}{STATUS_FA[ls] || r.status}</span></td>
                       <td className="px-2">
                         {isPending ? (
                           <span className="inline-flex items-center gap-1 text-xs text-amber-600" title="درخواست در حال بررسی"><Hourglass className="w-3.5 h-3.5" /> در انتظار</span>
