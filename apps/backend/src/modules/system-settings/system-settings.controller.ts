@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { SystemSettingsService } from './system-settings.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -21,5 +21,10 @@ export class SystemSettingsController {
     @Req() req: any,
   ) {
     return this.svc.update(dto, req.user.userId);
+  }
+
+  @Post('test-bale')
+  testBale(@Body() dto: { phone: string; otp: string }) {
+    return this.svc.testBale(dto.phone, dto.otp);
   }
 }

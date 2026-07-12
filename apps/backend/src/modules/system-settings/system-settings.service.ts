@@ -1,5 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
+
+const SAFIR_URL = 'https://safir.bale.ai/api/v3/send_message';
 
 export interface SystemSettingsData {
   baleSafirApiKey: string | null;
@@ -13,7 +18,11 @@ export class SystemSettingsService {
   private cacheAt = 0;
   private readonly CACHE_TTL_MS = 30_000;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly http: HttpService,
+    private readonly config: ConfigService,
+  ) {}
 
   async get(): Promise<SystemSettingsData> {
     const now = Date.now();
@@ -49,5 +58,39 @@ export class SystemSettingsService {
     });
     this.invalidateCache();
     return updated;
+  }
+
+  /** Send a test OTP via Bale Safir using current DB/env settings. */
+  async testBale(phone: string, otp: string): Promise<{ ok: boolean; status?: number; data?: any }> {
+    const settings = await this.get();
+
+    const apiKey =
+      settings.baleSafirApiKey ||
+      this.config.get<string>('BALE_SAFIR_API_KEY') ||
+      this.config.get<string>('BALE_API_KEY') || '';
+    const botId = settings.baleBotId
+      ? Number(settings.baleBotId)
+      : Number(this.config.get<string>('BALE_BOT_ID') || '0');
+
+    if (!apiKey || !botId) throw new InternalServerErrorException('BALE_SAFIR_API_KEY یا BALE_BOT_ID تنظیم نشده است');
+
+    const normalizedPhone = phone.replace(/\D/g, '');
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post(SAFIR_URL, {
+          bot_id: botId,
+          phone_number: normalizedPhone,
+          message_data: { otp_message: { otp } },
+        }, {
+          headers: { 'api-access-key': apiKey, 'Content-Type': 'application/json' },
+        }),
+      );
+      return { ok: true, status: res.status, data: res.data };
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+      return { ok: false, status, data };
+    }
   }
 }

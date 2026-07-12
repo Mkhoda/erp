@@ -11,6 +11,7 @@ export default function ForgotPasswordPage() {
   const [otp, setOtp] = React.useState(['', '', '', '', '', '']);
   const [newPassword, setNewPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const [phoneError, setPhoneError] = React.useState('');
   const [step, setStep] = React.useState<'phone' | 'otp'>('phone');
   const [expiresAt, setExpiresAt] = React.useState<number | null>(null);
   const [now, setNow] = React.useState(Date.now());
@@ -45,6 +46,7 @@ export default function ForgotPasswordPage() {
   async function sendOtp() {
     if (loading) return;
     setLoading(true);
+    setPhoneError('');
     try {
       const phoneNorm = normalizeTo98(phone);
       const res = await fetch(`${API}/auth/send-otp`, {
@@ -54,17 +56,22 @@ export default function ForgotPasswordPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 404) throw new Error('کاربری با این شماره پیدا نشد');
+        if (res.status === 404) throw new Error('کاربری با این شماره در سامانه یافت نشد');
         if (res.status === 403) throw new Error('درخواست بیش از حد مجاز — کمی صبر کنید');
         throw new Error(data.message || 'ارسال کد ناموفق بود');
       }
       setExpiresAt(data.expiresAt ? new Date(data.expiresAt).getTime() : Date.now() + 60_000);
+      setPhoneError('');
       setStep('otp');
       setOtp(['', '', '', '', '', '']);
-      toast.success('کد تایید ارسال شد');
       setTimeout(() => inputRefs.current[0]?.focus(), 100);
     } catch (e: any) {
-      toast.error(e.message || 'خطا در ارسال کد');
+      const msg = e.message || 'خطا در ارسال کد';
+      if (step === 'phone') {
+        setPhoneError(msg);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -189,6 +196,14 @@ export default function ForgotPasswordPage() {
                   </span>
                 ) : 'ارسال کد تایید'}
               </button>
+              {phoneError && (
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                  {phoneError}
+                </div>
+              )}
               <p className="text-theme-secondary text-sm text-center">
                 بازگشت به{' '}
                 <Link href="/signin" className="text-blue-600 hover:text-blue-500 dark:text-blue-400">ورود</Link>
@@ -198,8 +213,8 @@ export default function ForgotPasswordPage() {
             <form onSubmit={submitNewPassword} className="space-y-6">
               {/* Phone display */}
               <div className="flex items-center justify-between text-sm">
-                <span className="text-theme-muted">کد به {phone} ارسال شد</span>
-                <button type="button" onClick={() => setStep('phone')} className="text-blue-600 hover:text-blue-500 text-xs">
+                <span className="text-theme-muted">کد به <bdi dir="ltr" className="font-medium text-theme-primary">{phone}</bdi> ارسال شد</span>
+                <button type="button" onClick={() => { setStep('phone'); setPhoneError(''); }} className="text-blue-600 hover:text-blue-500 text-xs">
                   تغییر شماره
                 </button>
               </div>

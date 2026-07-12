@@ -177,9 +177,7 @@ export const MENU: MenuItem[] = [
       { id: 'admin.pages',       title: 'مدیریت صفحات',        page: '/dashboard/pages',              icon: FileText },
       { id: 'admin.logs',        title: 'لاگ سیستم',           page: '/dashboard/system-logs',        icon: ScrollText },
       { id: 'admin.sessions',    title: 'مدیریت نشست‌ها',      page: '/dashboard/security/sessions', icon: ShieldCheck },
-      { id: 'admin.secSettings', title: 'تنظیمات امنیتی',      page: '/dashboard/security/settings', icon: Settings },
       { id: 'admin.settings',    title: 'تنظیمات سامانه',      page: '/dashboard/settings',           icon: SlidersHorizontal },
-      { id: 'admin.messaging',   title: 'تنظیمات پیام‌رسانی',  page: '/dashboard/messaging/admin',   icon: MessageCircle },
     ],
   },
 ];
