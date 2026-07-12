@@ -172,7 +172,6 @@ export default function SyncMonitorPage() {
           </div>
         )}
       </div>
-
       {status.length === 0 && (
         <div className="bg-theme-card border border-theme rounded-xl p-8 text-center text-theme-muted">
           هیچ منبعی تنظیم نشده است. ابتدا از صفحه «تنظیمات حضور و غیاب» یک منبع اضافه کنید.

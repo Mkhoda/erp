@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   MessageCircle, X, Minus, Maximize2, Send, ArrowRight,
   Paperclip, Smile, Users, Search, Check, CheckCheck,
@@ -438,6 +439,7 @@ function ChatView({
 
 export default function ChatWidget() {
   const ctx = useMessagingOptional();
+  const pathname = usePathname();
   const [myId, setMyId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -449,7 +451,8 @@ export default function ChatWidget() {
     } catch {}
   }, []);
 
-  if (!ctx || !myId) return null;
+  // Don't show the floating widget when already on the full messaging page
+  if (!ctx || !myId || pathname?.startsWith("/dashboard/messaging")) return null;
 
   const { conversations, activeConvId, messages, isWidgetOpen, unreadTotal, typing, onlineCount } = ctx;
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;

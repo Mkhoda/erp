@@ -129,6 +129,7 @@ export function useMessagingOptional() {
 
 export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const socketRef = React.useRef<Socket | null>(null);
+  const myIdRef = React.useRef<string>("");
   const [state, setState] = React.useState<MessagingState>({
     conversations: [],
     activeConvId: null,
@@ -196,6 +197,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
+    try {
+      myIdRef.current = JSON.parse(atob(token.split(".")[1])).sub || "";
+    } catch {}
     fetchConversations();
     fetchUsers();
   }, [fetchConversations, fetchUsers]);
@@ -208,9 +212,11 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
     const socket = io(getSocketUrl(), {
       auth: { token },
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
       reconnection: true,
-      reconnectionDelay: 2000,
+      reconnectionDelay: 5000,
+      reconnectionDelayMax: 30_000,
+      randomizationFactor: 0.3,
       reconnectionAttempts: Infinity,
     });
     socketRef.current = socket;
@@ -228,10 +234,29 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     });
 
     socket.on("message:new", (msg: ChatMessage) => {
+      // Browser notification when window is hidden and message is from someone else
+      if (
+        msg.senderId !== myIdRef.current &&
+        typeof document !== "undefined" &&
+        document.hidden
+      ) {
+        if (Notification.permission === "granted") {
+          new Notification(
+            `${msg.sender.firstName} ${msg.sender.lastName}`.trim() || "پیام جدید",
+            { body: msg.content ?? "فایل ضمیمه", icon: "/favicon.ico", tag: msg.conversationId },
+          );
+        } else if (Notification.permission === "default") {
+          Notification.requestPermission().catch(() => {});
+        }
+      }
       setState((s) => {
         const existing = s.messages[msg.conversationId] ?? [];
-        const alreadyExists = existing.some((m) => m.id === msg.id);
-        const updatedMsgs = alreadyExists ? existing : [msg, ...existing];
+        if (existing.some((m) => m.id === msg.id)) return s;
+        // Remove optimistic placeholder when the real message echoes back from server
+        const base =
+          msg.senderId === myIdRef.current
+            ? existing.filter((m) => !m.id.startsWith("_opt_"))
+            : existing;
         const updatedConvs = s.conversations.map((c) => {
           if (c.id !== msg.conversationId) return c;
           const isActive = s.activeConvId === c.id && s.isWidgetOpen;
@@ -245,7 +270,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         const total = updatedConvs.reduce((sum, c) => sum + c.unreadCount, 0);
         return {
           ...s,
-          messages: { ...s.messages, [msg.conversationId]: updatedMsgs },
+          messages: { ...s.messages, [msg.conversationId]: [msg, ...base] },
           conversations: updatedConvs,
           unreadTotal: total,
         };
@@ -377,10 +402,41 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   }, [fetchMessages]);
 
   const sendMessage = React.useCallback(async (convId: string, content: string, type = "TEXT", replyToId?: string) => {
+    // Typing events are not real messages — only emit via socket, skip optimistic UI and REST fallback
+    const isMsg = ["TEXT", "IMAGE", "VIDEO", "AUDIO", "DOCUMENT"].includes(type);
+    if (!isMsg || !content.trim()) {
+      socketRef.current?.emit("message:send", { conversationId: convId, content, type, replyToId });
+      return;
+    }
+
+    // Optimistic: show the message immediately before server confirms
+    const tempId = `_opt_${Date.now()}`;
+    const optimistic: ChatMessage = {
+      id: tempId,
+      conversationId: convId,
+      senderId: myIdRef.current,
+      sender: { id: myIdRef.current, firstName: "", lastName: "" },
+      type,
+      content,
+      isEdited: false,
+      isDeleted: false,
+      deletedForAll: false,
+      replyToId,
+      attachments: [],
+      reactions: [],
+      readBy: [],
+      createdAt: new Date().toISOString(),
+    };
+    setState((s) => ({
+      ...s,
+      messages: { ...s.messages, [convId]: [optimistic, ...(s.messages[convId] ?? [])] },
+    }));
+
     if (socketRef.current?.connected) {
+      // Server will echo back message:new which removes the optimistic entry
       socketRef.current.emit("message:send", { conversationId: convId, content, type, replyToId });
     } else {
-      // REST fallback when socket is disconnected
+      // REST fallback: replace optimistic entry with real message on response
       try {
         const r = await fetch(`${API}/messaging/conversations/${convId}/messages`, {
           method: "POST",
@@ -388,20 +444,29 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({ content, type, replyToId }),
         });
         if (r.ok) {
-          const msg = await r.json();
+          const msg: ChatMessage = await r.json();
           setState((s) => {
-            const existing = s.messages[convId] ?? [];
-            const updatedConvs = s.conversations.map((c) =>
-              c.id === convId ? { ...c, messages: [msg], updatedAt: msg.createdAt } : c,
-            );
+            const existing = (s.messages[convId] ?? []).filter((m) => m.id !== tempId);
             return {
               ...s,
               messages: { ...s.messages, [convId]: [msg, ...existing] },
-              conversations: updatedConvs,
+              conversations: s.conversations.map((c) =>
+                c.id === convId ? { ...c, messages: [msg], updatedAt: msg.createdAt } : c,
+              ),
             };
           });
+        } else {
+          setState((s) => ({
+            ...s,
+            messages: { ...s.messages, [convId]: (s.messages[convId] ?? []).filter((m) => m.id !== tempId) },
+          }));
         }
-      } catch {}
+      } catch {
+        setState((s) => ({
+          ...s,
+          messages: { ...s.messages, [convId]: (s.messages[convId] ?? []).filter((m) => m.id !== tempId) },
+        }));
+      }
     }
   }, []);
 
@@ -409,16 +474,21 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     const fd = new FormData();
     fd.append("file", file);
     const token = localStorage.getItem("token") || "";
-    try {
-      const r = await fetch(`${API}/messaging/conversations/${convId}/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      if (!r.ok) throw new Error();
-    } catch {
-      throw new Error("آپلود فایل ناموفق بود");
-    }
+    const r = await fetch(`${API}/messaging/conversations/${convId}/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    });
+    if (!r.ok) throw new Error("آپلود فایل ناموفق بود");
+    const msg: ChatMessage = await r.json();
+    // Always update state — socket may not deliver the event when disconnected
+    setState((s) => ({
+      ...s,
+      messages: { ...s.messages, [convId]: [msg, ...(s.messages[convId] ?? [])] },
+      conversations: s.conversations.map((c) =>
+        c.id === convId ? { ...c, messages: [msg], updatedAt: msg.createdAt } : c,
+      ),
+    }));
   }, []);
 
   const markRead = React.useCallback((convId: string) => {
@@ -453,6 +523,10 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   }, [fetchMessages]);
 
   const toggleWidget = React.useCallback(() => {
+    // Request notification permission on first interaction with the widget
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
     setState((s) => ({ ...s, isWidgetOpen: !s.isWidgetOpen }));
   }, []);
 
