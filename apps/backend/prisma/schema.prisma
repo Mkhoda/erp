@@ -19,7 +19,9 @@ model User {
   lastName  String
   role      Role      @default(USER)
   // When true, user cannot log in (soft-disable instead of hard delete)
-  disabled  Boolean   @default(false)
+  disabled    Boolean   @default(false)
+  // Max concurrent active sessions (0 = unlimited). Default 1 = single-session.
+  maxSessions Int       @default(1)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
   // Many-to-many memberships in departments (additional to primary departmentId)

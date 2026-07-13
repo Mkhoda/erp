@@ -28,10 +28,21 @@ export default function SignInPage() {
       if (saved === 'dark') document.documentElement.classList.add('dark');
       else document.documentElement.classList.remove('dark');
     }
-    // If already authenticated, redirect immediately without showing the form
+    // If a token exists, validate it before redirecting — stale/revoked tokens cause a redirect loop
     const token = localStorage.getItem('token');
     if (token) {
-      window.location.replace('/dashboard');
+      fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => {
+          if (r.ok) {
+            window.location.replace('/dashboard');
+          } else {
+            // Token invalid/revoked/expired — clear it and show sign-in form
+            localStorage.removeItem('token');
+            document.cookie = 'token=; path=/; max-age=0';
+            setReady(true);
+          }
+        })
+        .catch(() => setReady(true)); // network error — show form without clearing token
     } else {
       setReady(true);
     }

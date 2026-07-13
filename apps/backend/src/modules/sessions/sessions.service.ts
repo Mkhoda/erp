@@ -78,6 +78,25 @@ export class SessionsService {
     });
   }
 
+  // Enforce maxSessions: revoke oldest sessions so only `maxSessions` active ones remain.
+  // Called immediately after a new session is created.
+  async enforceLimit(userId: string, maxSessions: number, newSessionId: string) {
+    if (maxSessions <= 0) return; // 0 = unlimited
+    const active = await this.prisma.session.findMany({
+      where: { userId, isRevoked: false, expiresAt: { gt: new Date() }, id: { not: newSessionId } },
+      orderBy: { lastSeenAt: 'asc' }, // oldest-activity first = evict these first
+      select: { id: true },
+    });
+    const excess = active.length + 1 - maxSessions; // +1 for the new session just created
+    if (excess <= 0) return;
+    const ids = active.slice(0, excess).map(s => s.id);
+    ids.forEach(id => this.invalidateCache(id));
+    await this.prisma.session.updateMany({
+      where: { id: { in: ids } },
+      data: { isRevoked: true, revokedAt: new Date(), revokedById: userId },
+    });
+  }
+
   // Revoke all sessions for a user, optionally keeping one (e.g., current session after password change)
   async revokeUserSessions(userId: string, exceptSessionId?: string) {
     const sessions = await this.prisma.session.findMany({

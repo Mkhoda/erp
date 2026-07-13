@@ -11,6 +11,7 @@ import { useToast } from "../../components/ui/Toast";
 
 type User = {
   id: string;
+  maxSessions?: number;
   email?: string | null;
   phone?: string | null;
   firstName: string;
@@ -128,7 +129,7 @@ export default function UsersPage() {
   const DEFAULT_RULE = { employeeType: "FULL_TIME", scheduleId: "", otAllowed: true, checkInEnd: "", checkOutStart: "", dailyMinutes: "", otMaxDaily: "", otMaxMonthly: "" };
 
   function onAdd() {
-    setEditing({ firstName: "", lastName: "", phone: "", email: "", password: "", role: "USER", departmentIds: [], rule: { ...DEFAULT_RULE } });
+    setEditing({ firstName: "", lastName: "", phone: "", email: "", password: "", role: "USER", maxSessions: 1, departmentIds: [], rule: { ...DEFAULT_RULE } });
     setShowPwdField(false); setShowNewPwd(false);
     setOpen(true);
   }
@@ -173,6 +174,7 @@ export default function UsersPage() {
         firstName: editing.firstName, lastName: editing.lastName,
         phone: editing.phone || null, email: editing.email || null,
         role: editing.role, attendanceCardNo: editing.attendanceCardNo || null,
+        maxSessions: Number(editing.maxSessions) || 1,
         departmentIds: editing.departmentIds,
       };
       if (isNew) payload.password = editing.password;
@@ -497,6 +499,25 @@ export default function UsersPage() {
                   <option value="ADMIN">مدیر ارشد</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Session limit */}
+          <div className="gap-3 grid grid-cols-2">
+            <div>
+              <label className="block mb-1.5 font-medium text-theme-secondary text-xs flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                حداکثر نشست همزمان
+              </label>
+              <input
+                type="number" min={0} max={20} dir="ltr"
+                value={editing?.maxSessions ?? 1}
+                onChange={e => setEditing((s: any) => ({ ...s, maxSessions: Math.max(0, parseInt(e.target.value) || 0) }))}
+                className="text-sm input-theme w-full"
+              />
+              <p className="mt-1 text-theme-muted text-xs">
+                {(editing?.maxSessions ?? 1) === 0 ? "نامحدود" : `هنگام ورود جدید، ${editing?.maxSessions ?? 1} نشست باقی می‌ماند`}
+              </p>
             </div>
           </div>
 

@@ -20,6 +20,7 @@ interface LoginContext {
   ip?: string;
   userAgent?: string;
   rememberMe?: boolean;
+  maxSessions?: number; // per-user session limit (default 1); 0 = unlimited
 }
 
 @Injectable()
@@ -61,7 +62,7 @@ export class AuthService {
     if (!user.password) throw new UnauthorizedException('Password not set');
     const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
-    return this.signUser(user.id, user.email, user.role, ctx);
+    return this.signUser(user.id, user.email, user.role, { ...ctx, maxSessions: user.maxSessions });
   }
 
   async loginByPhone(dto: LoginByPhoneDto, ctx: LoginContext = {}) {
@@ -73,7 +74,7 @@ export class AuthService {
     if (!user.password) throw new UnauthorizedException('Password not set');
     const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
-    return this.signUser(user.id, user.email, user.role, ctx);
+    return this.signUser(user.id, user.email, user.role, { ...ctx, maxSessions: user.maxSessions });
   }
 
   normalizePhone(input: string) {
@@ -140,7 +141,7 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid OTP');
     if (user.disabled) throw new UnauthorizedException('حساب کاربری غیرفعال است');
     await this.prisma.otp.deleteMany({ where: { phone } });
-    const result = await this.signUser(user.id, user.email, user.role, { ...ctx, rememberMe: false });
+    const result = await this.signUser(user.id, user.email, user.role, { ...ctx, rememberMe: false, maxSessions: user.maxSessions });
     return { ...result, user: { id: user.id, phone: user.phone, email: user.email } };
   }
 
@@ -220,6 +221,9 @@ export class AuthService {
       rememberMe: ctx.rememberMe ?? false,
       authMethod: 'password',
     });
+
+    // Evict oldest sessions beyond the per-user limit (non-blocking — don't await)
+    this.sessions.enforceLimit(sub, ctx.maxSessions ?? 1, sessionId).catch(() => {});
 
     return { access_token: token, expires_in: ttlSec };
   }

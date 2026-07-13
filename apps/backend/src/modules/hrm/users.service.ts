@@ -23,11 +23,11 @@ export class UsersService {
       : undefined;
     return this.prisma.user.findMany({
       where,
-      select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, attendanceCardNo: true, userDepartments: { select: { departmentId: true, department: true } } },
+      select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, maxSessions: true, attendanceCardNo: true, userDepartments: { select: { departmentId: true, department: true } } },
     });
   }
   findOne(id: string) {
-    return this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, attendanceCardNo: true, userDepartments: { select: { departmentId: true, department: true } } } });
+    return this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, maxSessions: true, attendanceCardNo: true, userDepartments: { select: { departmentId: true, department: true } } } });
   }
   async create(data: any) {
     const payload = { ...data };
@@ -151,7 +151,7 @@ export class UsersService {
     delete payload.departmentIds;
     let updated: any;
     try {
-      updated = await this.prisma.user.update({ where: { id }, data: payload, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, disabled: true, attendanceCardNo: true } });
+      updated = await this.prisma.user.update({ where: { id }, data: payload, select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, disabled: true, maxSessions: true, attendanceCardNo: true } });
     } catch (e: any) {
       if (e?.code === 'P2002') {
         const field = e?.meta?.target?.[0] || 'فیلد';
