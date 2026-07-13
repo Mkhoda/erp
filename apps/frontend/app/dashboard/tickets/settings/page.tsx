@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Loader2, Plus, Trash2, Edit2, Check, X, Settings, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Plus, Trash2, Edit2, Check, X, Settings, Save, ChevronDown, ChevronUp, ToggleLeft, ToggleRight } from "lucide-react";
 import SearchSelect from "../../../components/ui/SearchSelect";
 import { useToast } from "../../../components/ui/Toast";
 
@@ -8,7 +8,6 @@ const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 type Tab = "departments" | "global";
 
-// JS getDay(): 0=Sun,1=Mon,...,5=Fri,6=Sat — Persian week starts Saturday
 const WORK_DAYS: { day: number; label: string }[] = [
   { day: 6, label: "شنبه" },
   { day: 0, label: "یکشنبه" },
@@ -22,13 +21,12 @@ const WORK_DAYS: { day: number; label: string }[] = [
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
     <button type="button" onClick={() => onChange(!value)}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${value ? "bg-blue-600" : "bg-theme-secondary border border-theme"}`}>
-      <span className={`inline-block w-3.5 h-3.5 transform rounded-full bg-white shadow-sm transition-transform ${value ? "translate-x-4" : "translate-x-0.5"}`} />
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${value ? "bg-blue-600" : "bg-theme-secondary border border-theme"}`}>
+      <span className={`inline-block w-4 h-4 transform rounded-full bg-white shadow transition-transform ${value ? "translate-x-6" : "translate-x-1"}`} />
     </button>
   );
 }
 
-// Per-dept editable config state
 type DeptCfgState = {
   id?: string;
   isEnabled: boolean;
@@ -42,6 +40,18 @@ type DeptCfgState = {
   categories: any[];
 };
 
+const DEFAULT_DEPT_CFG: Omit<DeptCfgState, "id"> = {
+  isEnabled: false,
+  slaFirstResponseHours: 4,
+  slaResolutionHours: 24,
+  workHoursStart: "08:00",
+  workHoursEnd: "17:00",
+  workDays: [6, 0, 1, 2, 3],
+  managerIds: [],
+  defaultAssigneeIds: [],
+  categories: [],
+};
+
 export default function TicketSettingsPage() {
   React.useEffect(() => { document.title = "تنظیمات تیکت | Arzesh"; }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -53,19 +63,15 @@ export default function TicketSettingsPage() {
   const [departments, setDepartments] = React.useState<any[]>([]);
   const [users, setUsers] = React.useState<any[]>([]);
   const [expandedDept, setExpandedDept] = React.useState<string | null>(null);
-  // Per-dept config state keyed by deptId
   const [deptCfgs, setDeptCfgs] = React.useState<Record<string, DeptCfgState>>({});
   const [loadingDept, setLoadingDept] = React.useState<Record<string, boolean>>({});
   const [savingDept, setSavingDept] = React.useState<Record<string, boolean>>({});
 
-  // New category per dept
   const [newCatName, setNewCatName] = React.useState<Record<string, string>>({});
   const [savingCat, setSavingCat] = React.useState<Record<string, boolean>>({});
-
-  // Edit category
   const [editCat, setEditCat] = React.useState<any>(null);
+  const [togglingCat, setTogglingCat] = React.useState<string | null>(null);
 
-  // Global settings
   const [globalDraft, setGlobalDraft] = React.useState<any>(null);
   const [savingGlobal, setSavingGlobal] = React.useState(false);
 
@@ -84,12 +90,13 @@ export default function TicketSettingsPage() {
   }, []);
 
   const loadDeptConfig = async (deptId: string) => {
-    if (deptCfgs[deptId]) return; // already loaded
+    if (deptCfgs[deptId]) return;
     setLoadingDept(p => ({ ...p, [deptId]: true }));
     try {
       const res = await fetch(`${API}/tickets/config/${deptId}`, { headers: h as any });
-      if (res.ok) {
-        const cfg = await res.json();
+      // Backend returns null (200 OK) when no config exists — treat null same as 404
+      const cfg = res.ok ? await res.json() : null;
+      if (cfg && cfg.id) {
         setDeptCfgs(p => ({
           ...p,
           [deptId]: {
@@ -106,13 +113,13 @@ export default function TicketSettingsPage() {
           },
         }));
       } else {
-        // No config yet — set defaults
-        setDeptCfgs(p => ({
-          ...p,
-          [deptId]: { isEnabled: false, slaFirstResponseHours: 4, slaResolutionHours: 24, workHoursStart: "08:00", workHoursEnd: "17:00", workDays: [6, 0, 1, 2, 3], managerIds: [], defaultAssigneeIds: [], categories: [] },
-        }));
+        setDeptCfgs(p => ({ ...p, [deptId]: { ...DEFAULT_DEPT_CFG } }));
       }
-    } finally { setLoadingDept(p => ({ ...p, [deptId]: false })); }
+    } catch {
+      setDeptCfgs(p => ({ ...p, [deptId]: { ...DEFAULT_DEPT_CFG } }));
+    } finally {
+      setLoadingDept(p => ({ ...p, [deptId]: false }));
+    }
   };
 
   const patchDeptCfg = (deptId: string, patch: Partial<DeptCfgState>) => {
@@ -146,7 +153,6 @@ export default function TicketSettingsPage() {
       });
       if (!res.ok) { toast.error("خطا در ذخیره پیکربندی"); return; }
       toast.success("پیکربندی ذخیره شد");
-      // Re-load config to get updated id/data
       setDeptCfgs(p => { const n = { ...p }; delete n[deptId]; return n; });
       await loadDeptConfig(deptId);
     } finally { setSavingDept(p => ({ ...p, [deptId]: false })); }
@@ -166,7 +172,6 @@ export default function TicketSettingsPage() {
       if (!res.ok) { toast.error("خطا در افزودن دسته‌بندی"); return; }
       toast.success("دسته‌بندی افزوده شد");
       setNewCatName(p => ({ ...p, [deptId]: "" }));
-      // Re-load dept config to refresh categories
       setDeptCfgs(p => { const n = { ...p }; delete n[deptId]; return n; });
       await loadDeptConfig(deptId);
     } finally { setSavingCat(p => ({ ...p, [deptId]: false })); }
@@ -179,11 +184,25 @@ export default function TicketSettingsPage() {
     if (!res.ok) { toast.error("خطا در ویرایش"); return; }
     toast.success("ذخیره شد");
     setEditCat(null);
-    // Refresh all expanded dept cats
     if (expandedDept) {
       setDeptCfgs(p => { const n = { ...p }; delete n[expandedDept]; return n; });
       await loadDeptConfig(expandedDept);
     }
+  };
+
+  const toggleCategoryActive = async (cat: any) => {
+    setTogglingCat(cat.id);
+    try {
+      const res = await fetch(`${API}/tickets/categories/${cat.id}`, {
+        method: "PATCH", headers: h as any,
+        body: JSON.stringify({ isActive: !cat.isActive }),
+      });
+      if (!res.ok) { toast.error("خطا در تغییر وضعیت دسته‌بندی"); return; }
+      if (expandedDept) {
+        setDeptCfgs(p => { const n = { ...p }; delete n[expandedDept]; return n; });
+        await loadDeptConfig(expandedDept);
+      }
+    } finally { setTogglingCat(null); }
   };
 
   const deleteCategory = async (catId: string) => {
@@ -249,16 +268,26 @@ export default function TicketSettingsPage() {
                 <button type="button" onClick={() => toggleExpand(dept.id)}
                   className="w-full flex items-center gap-3 p-4 hover:bg-theme-hover text-right">
                   <span className="font-medium text-theme-primary">{dept.name}</span>
-                  {cfg?.isEnabled && <span className="text-xs text-green-600 bg-green-500/10 px-1.5 py-0.5 rounded">فعال</span>}
+                  {cfg?.isEnabled
+                    ? <span className="text-xs text-green-600 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded">● فعال</span>
+                    : cfg && <span className="text-xs text-theme-muted bg-theme-secondary border border-theme px-1.5 py-0.5 rounded">غیرفعال</span>
+                  }
                   {cfg && <span className="text-xs text-theme-muted">{cfg.categories.length} دسته</span>}
                   <span className="mr-auto">{isLoading ? <Loader2 className="w-4 h-4 animate-spin text-blue-500" /> : isOpen ? <ChevronUp className="w-4 h-4 text-theme-muted" /> : <ChevronDown className="w-4 h-4 text-theme-muted" />}</span>
                 </button>
 
                 {isOpen && cfg && (
                   <div className="border-t border-theme p-4 space-y-5">
-                    {/* Enable toggle */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-theme-secondary">فعال بودن پشتیبانی تیکت</span>
+                    {/* Enable toggle — prominent card */}
+                    <div
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${cfg.isEnabled ? "border-green-500/30 bg-green-500/5 hover:bg-green-500/8" : "border-theme bg-theme-secondary hover:bg-theme-hover"}`}
+                      onClick={() => patchDeptCfg(dept.id, { isEnabled: !cfg.isEnabled })}>
+                      <div>
+                        <div className="text-sm font-semibold text-theme-primary">فعال‌سازی پشتیبانی تیکت</div>
+                        <div className="text-xs text-theme-muted mt-0.5">
+                          {cfg.isEnabled ? "این دپارتمان تیکت‌پذیر است" : "کاربران نمی‌توانند تیکت ارسال کنند"}
+                        </div>
+                      </div>
                       <Toggle value={cfg.isEnabled} onChange={v => patchDeptCfg(dept.id, { isEnabled: v })} />
                     </div>
 
@@ -353,7 +382,7 @@ export default function TicketSettingsPage() {
                         displayKey="firstName" searchKey="lastName" />
                     </div>
 
-                    {/* Save SLA btn */}
+                    {/* Save btn */}
                     <div className="flex justify-end">
                       <button onClick={() => saveDeptConfig(dept.id)} disabled={savingDept[dept.id]}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50">
@@ -370,19 +399,35 @@ export default function TicketSettingsPage() {
                       )}
                       <div className="space-y-2">
                         {cfg.categories.map((cat: any) => (
-                          <div key={cat.id} className="flex items-center gap-2 p-2 rounded-lg bg-theme-secondary border border-theme">
+                          <div key={cat.id} className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${cat.isActive ? "bg-theme-secondary border-theme" : "bg-theme-card border-theme/50 opacity-70"}`}>
                             {editCat?.id === cat.id ? (
                               <>
                                 <input className="input-theme text-sm flex-1" value={editCat.name}
                                   onChange={e => setEditCat((p: any) => ({ ...p, name: e.target.value }))} />
-                                <button onClick={() => updateCategory(cat.id, { name: editCat.name, isActive: editCat.isActive })}
+                                <button onClick={() => updateCategory(cat.id, { name: editCat.name })}
                                   className="text-green-600 hover:text-green-700"><Check className="w-4 h-4" /></button>
                                 <button onClick={() => setEditCat(null)} className="text-red-500"><X className="w-4 h-4" /></button>
                               </>
                             ) : (
                               <>
                                 <span className="flex-1 text-sm text-theme-primary">{cat.name}</span>
-                                {!cat.isActive && <span className="text-xs text-theme-muted bg-theme-card px-1.5 py-0.5 rounded">غیرفعال</span>}
+                                {/* Active/inactive toggle pill */}
+                                <button
+                                  onClick={() => toggleCategoryActive(cat)}
+                                  disabled={togglingCat === cat.id}
+                                  title={cat.isActive ? "کلیک برای غیرفعال کردن" : "کلیک برای فعال کردن"}
+                                  className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-all disabled:opacity-50 ${
+                                    cat.isActive
+                                      ? "bg-green-500/10 border-green-500/30 text-green-600 hover:bg-red-500/10 hover:border-red-400/30 hover:text-red-500"
+                                      : "bg-theme-card border-theme text-theme-muted hover:bg-green-500/10 hover:border-green-500/30 hover:text-green-600"
+                                  }`}>
+                                  {togglingCat === cat.id
+                                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                                    : cat.isActive
+                                      ? <><ToggleRight className="w-3 h-3" /> فعال</>
+                                      : <><ToggleLeft className="w-3 h-3" /> غیرفعال</>
+                                  }
+                                </button>
                                 <button onClick={() => setEditCat(cat)} className="text-theme-muted hover:text-blue-600"><Edit2 className="w-3.5 h-3.5" /></button>
                                 <button onClick={() => deleteCategory(cat.id)} className="text-theme-muted hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                               </>
@@ -433,15 +478,29 @@ export default function TicketSettingsPage() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            {[
-              { key: "allowUserPriority", label: "کاربر می‌تواند اولویت انتخاب کند" },
-            ].map(({ key, label }) => (
-              <div key={key} className="flex items-center justify-between">
-                <span className="text-sm text-theme-secondary">{label}</span>
-                <Toggle value={globalDraft[key] ?? false} onChange={v => patchGlobal(key, v)} />
+          {/* allowUserPriority — redesigned as a prominent option card */}
+          <div
+            className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+              globalDraft.allowUserPriority
+                ? "border-blue-500/50 bg-blue-500/5 hover:bg-blue-500/8"
+                : "border-theme bg-theme-secondary hover:bg-theme-hover"
+            }`}
+            onClick={() => patchGlobal("allowUserPriority", !globalDraft.allowUserPriority)}>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-theme-primary text-sm">انتخاب اولویت توسط کاربر</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${globalDraft.allowUserPriority ? "bg-blue-600 text-white" : "bg-theme-card border border-theme text-theme-muted"}`}>
+                  {globalDraft.allowUserPriority ? "فعال" : "غیرفعال"}
+                </span>
               </div>
-            ))}
+              <p className="text-xs text-theme-muted leading-relaxed">
+                {globalDraft.allowUserPriority
+                  ? "کاربران می‌توانند هنگام ارسال تیکت اولویت آن را تعیین کنند (کم / متوسط / بالا / بحرانی)"
+                  : "اولویت تیکت‌ها فقط توسط مدیران و کارشناسان تعیین می‌شود"
+                }
+              </p>
+            </div>
+            <Toggle value={globalDraft.allowUserPriority ?? false} onChange={v => patchGlobal("allowUserPriority", v)} />
           </div>
 
           <div>

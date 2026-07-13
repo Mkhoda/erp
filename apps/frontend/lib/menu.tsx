@@ -95,6 +95,14 @@ export const MENU: MenuItem[] = [
     icon: Globe,
   },
 
+  // ── تیکت‌های من — visible to all ──────────────────────────
+  {
+    id: 'tickets.my',
+    title: 'تیکت‌های من',
+    page: '/dashboard/tickets/my',
+    icon: TicketCheck,
+  },
+
   // ── ERP ───────────────────────────────────────────────────
   {
     id: 'assets',
@@ -156,7 +164,6 @@ export const MENU: MenuItem[] = [
     icon: Ticket,
     section: 'سرویس‌دهی',
     children: [
-      { id: 'tickets.my',        title: 'تیکت‌های من',    page: '/dashboard/tickets/my',        icon: TicketCheck },
       { id: 'tickets.list',      title: 'همه تیکت‌ها',    page: '/dashboard/tickets',           icon: ClipboardList, roles: ['ADMIN', 'MANAGER', 'EXPERT'] as Role[] },
       { id: 'tickets.new',       title: 'تیکت جدید',      page: '/dashboard/tickets/new',       icon: PlusCircle },
       { id: 'tickets.dashboard', title: 'داشبورد تیکت‌ها', page: '/dashboard/tickets/dashboard', icon: PieChart, roles: ['ADMIN', 'MANAGER'] as Role[] },

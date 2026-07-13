@@ -55,10 +55,14 @@ export class TicketsController {
   }
 
   @Get('my')
-  @UseGuards(PagePermissionGuard)
-  @Page('/dashboard/tickets/my')
   myTickets(@Query() q: TicketFilterDto, @Request() req: any) {
-    return this.tickets.findAll({ ...q, requesterId: req.user.id }, { ...req.user, role: 'ADMIN' as any });
+    const user = req.user;
+    // Managers/Experts in manager-type role see their dept tickets;
+    // regular users see only their own submitted tickets
+    if (user.role === 'MANAGER') {
+      return this.tickets.findAll(q, user);
+    }
+    return this.tickets.findAll({ ...q, requesterId: user.id }, { ...user, role: 'ADMIN' as any });
   }
 
   @Get('notifications')
