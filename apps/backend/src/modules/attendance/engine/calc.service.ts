@@ -305,20 +305,26 @@ export class CalcService {
       }
     }
 
+    // Net deficit: hours short of required. Zero for HOURLY staff, holidays, and weekends.
+    // Formula: max(0, required - worked - approved_leave). Handles late, early, short, absent.
+    const deficitMinutes = (!holidayWork && sched.employeeType === 'FULL_TIME')
+      ? Math.max(0, sched.dailyMinutes - workedMinutes - leaveMinutes)
+      : 0;
+
     await this.prisma.attendanceDay.upsert({
       where: { userId_gregDate: { userId, gregDate } },
       create: {
         userId, gregDate, jYear, jMonth, jDay,
         firstCheckIn: firstIn, lastCheckOut: lastOut,
         workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
-        delayMinutes, earlyLeaveMinutes, nightMinutes, leaveMinutes,
+        delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes,
         status, isHolidayWork, hasOverride: !!override,
       },
       update: {
         jYear, jMonth, jDay,
         firstCheckIn: firstIn, lastCheckOut: lastOut,
         workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
-        delayMinutes, earlyLeaveMinutes, nightMinutes, leaveMinutes,
+        delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes,
         status, isHolidayWork, hasOverride: !!override, computedAt: new Date(),
       },
     });

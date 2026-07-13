@@ -21,6 +21,28 @@ const fmtMin = (m: number) => toFa(`${Math.floor(Math.abs(m||0)/60)}:${String(Ma
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
 const faDOW  = (g: string) => new Date(g).toLocaleDateString("fa-IR", { weekday:"long", timeZone:"UTC" });
+const J_MONTHS_NAMES = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
+function toJalali(gy0: number, gm: number, gd: number) {
+  const gdm = [0,31,59,90,120,151,181,212,243,273,304,334]; let jy: number, gy: number;
+  if (gy0>1600){jy=979;gy=gy0-1600;}else{jy=0;gy=gy0-621;}
+  const gy2=gm>2?gy+1:gy; let days=365*gy+Math.floor((gy2+3)/4)-Math.floor((gy2+99)/100)+Math.floor((gy2+399)/400)-80+gd+gdm[gm-1];
+  jy+=33*Math.floor(days/12053);days%=12053;jy+=4*Math.floor(days/1461);days%=1461;
+  if(days>365){jy+=Math.floor((days-1)/365);days=(days-1)%365;}
+  const jm=days<186?1+Math.floor(days/31):7+Math.floor((days-186)/30);
+  const jd=1+(days<186?days%31:(days-186)%30);return{jy,jm,jd};
+}
+function jalaliToGregorian(jy0: number, jm: number, jd: number) {
+  let gy: number, jy: number;
+  if(jy0>979){gy=1600;jy=jy0-979;}else{gy=621;jy=jy0;}
+  let days=365*jy+Math.floor(jy/33)*8+Math.floor(((jy%33)+3)/4)+78+jd+(jm<7?(jm-1)*31:(jm-7)*30+186);
+  gy+=400*Math.floor(days/146097);days%=146097;
+  if(days>36524){gy+=100*Math.floor(--days/36524);days%=36524;if(days>=365)days++;}
+  gy+=4*Math.floor(days/1461);days%=1461;if(days>365){gy+=Math.floor((days-1)/365);days=(days-1)%365;}
+  let gd=days+1;const sal=[0,31,(gy%4===0&&gy%100!==0)||gy%400===0?29:28,31,30,31,30,31,31,30,31,30,31];let gm=1;
+  for(;gm<=12;gm++){if(gd<=sal[gm])break;gd-=sal[gm];}return{y:gy,m:gm,d:gd};
+}
+const jMonthLen=(jy:number,jm:number)=>(jm<=6?31:jm<=11?30:jy%4===3?30:29);
+const todayJ=()=>{const t=new Date();return toJalali(t.getFullYear(),t.getMonth()+1,t.getDate());};
 
 // Current Jalali year/month (Tehran) — used to default the filters on load.
 function currentJalali() {
@@ -47,6 +69,9 @@ export default function MyAttendancePage() {
   const [modal, setModal] = React.useState<any>(null); // { row }
   const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", fixIn: false, inTime: "", fixOut: false, outTime: "", description: "" });
   const [sending, setSending] = React.useState(false);
+  const [leaveModal, setLeaveModal] = React.useState(false);
+  const [leaveForm, setLeaveForm] = React.useState({ jy: 0, jm: 0, jd: 0, type: "LEAVE", leaveHours: "", description: "" });
+  const [leaveSending, setLeaveSending] = React.useState(false);
 
   // Days that already have an open (pending) request — block re-submitting.
   const pendingDates = React.useMemo(
@@ -79,6 +104,32 @@ export default function MyAttendancePage() {
 
   const yearOpts = [...new Set([...(jYear ? [jYear] : []), ...periods.map(p => p.jYear)])].sort((a, b) => b - a);
   const monthOpts = [...new Set([...(jMonth ? [jMonth] : []), ...periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth)])].sort((a, b) => a - b);
+
+  function openLeaveModal() {
+    const { jy, jm, jd } = todayJ();
+    setLeaveForm({ jy, jm, jd, type: "LEAVE", leaveHours: "", description: "" });
+    setLeaveModal(true);
+  }
+
+  async function submitLeaveRequest() {
+    if (!leaveForm.jy || !leaveForm.jm || !leaveForm.jd) { alert("تاریخ را انتخاب کنید"); return; }
+    setLeaveSending(true);
+    try {
+      const g = jalaliToGregorian(leaveForm.jy, leaveForm.jm, leaveForm.jd);
+      const date = `${g.y}-${String(g.m).padStart(2, "0")}-${String(g.d).padStart(2, "0")}`;
+      const body: any = { date, description: leaveForm.description };
+      if (leaveForm.type === "HOURLY_LEAVE") {
+        body.type = "LEAVE";
+        body.leaveMinutes = Math.round((Number(leaveForm.leaveHours) || 0) * 60);
+      } else {
+        body.type = "LEAVE";
+        body.targetStatus = leaveForm.type;
+      }
+      const res = await fetch(`${API}/attendance/me/requests`, { method: "POST", headers: h, body: JSON.stringify(body) });
+      if (res.ok) { setLeaveModal(false); await load(); }
+      else { const e = await res.json().catch(() => ({})); alert(e.message || "خطا در ثبت درخواست"); }
+    } finally { setLeaveSending(false); }
+  }
 
   function openRequest(row: any) {
     const hasIn = !!row.firstCheckIn, hasOut = !!row.lastCheckOut;
@@ -167,7 +218,7 @@ export default function MyAttendancePage() {
           <Sum label="کارکرد" value={fmtMin(summary.workedMinutes)} />
           <Sum label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
           <Sum label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" />
-          <Sum label="کسری" value={fmtMin((summary.delayMinutes || 0) + (summary.earlyLeaveMinutes || 0))} cls="text-orange-600" />
+          <Sum label="کسری" value={fmtMin(summary.deficitMinutes || 0)} cls="text-orange-600" />
           <Sum label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
           <Sum label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" />
           <Sum label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" />
@@ -210,7 +261,7 @@ export default function MyAttendancePage() {
                       <td className="px-2 text-theme-primary" dir="ltr">{fmtMin(r.workedMinutes)}</td>
                       <td className="px-2 text-amber-600" dir="ltr">{r.delayMinutes ? fmtMin(r.delayMinutes) : "—"}</td>
                       <td className="px-2 text-yellow-600" dir="ltr">{r.earlyLeaveMinutes ? fmtMin(r.earlyLeaveMinutes) : "—"}</td>
-                      <td className="px-2 text-orange-600 font-medium" dir="ltr">{(r.delayMinutes + r.earlyLeaveMinutes) ? fmtMin(r.delayMinutes + r.earlyLeaveMinutes) : "—"}</td>
+                      <td className="px-2 text-orange-600 font-medium" dir="ltr">{r.deficitMinutes ? fmtMin(r.deficitMinutes) : "—"}</td>
                       <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
                       <td className="px-2 text-rose-600" dir="ltr">{r.holidayOvertimeMinutes ? fmtMin(r.holidayOvertimeMinutes) : "—"}</td>
                       <td className="px-2"><span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[ls] || ""}`}>{needsResolve && <AlertTriangle className="w-3 h-3" />}{STATUS_FA[ls] || r.status}</span></td>
@@ -252,7 +303,12 @@ export default function MyAttendancePage() {
 
       {/* My requests */}
       <div className="bg-theme-card border border-theme rounded-xl p-4">
-        <h2 className="font-semibold text-theme-primary text-sm mb-3">درخواست‌های من</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-theme-primary text-sm">درخواست‌های من</h2>
+          <button onClick={openLeaveModal} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs">
+            <Send className="w-3.5 h-3.5" /> ثبت مرخصی جدید
+          </button>
+        </div>
         {myReqs.length === 0 ? <p className="text-theme-muted text-sm">درخواستی ثبت نکرده‌اید</p> : (
           <div className="space-y-2">
             {myReqs.map(q => (
@@ -268,6 +324,81 @@ export default function MyAttendancePage() {
           </div>
         )}
       </div>
+
+      {/* New leave request modal (for upcoming days) */}
+      <Modal
+        open={leaveModal}
+        onClose={() => setLeaveModal(false)}
+        title="ثبت مرخصی / ماموریت جدید"
+        size="md"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button onClick={() => setLeaveModal(false)} className="btn-theme-secondary text-sm">انصراف</button>
+            <button onClick={submitLeaveRequest} disabled={leaveSending} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
+              {leaveSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} ثبت درخواست
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block mb-1 text-theme-secondary text-xs">تاریخ مرخصی</label>
+            <div className="flex gap-2" dir="ltr">
+              {(() => {
+                const { jy: ty } = todayJ();
+                const years = Array.from({ length: 5 }, (_, i) => ty - 1 + i);
+                const toFaN = (n: number) => n.toLocaleString("fa-IR", { useGrouping: false });
+                const upd = (ny: number, nm: number, nd: number) => {
+                  if (!ny || !nm || !nd) return;
+                  setLeaveForm(s => ({ ...s, jy: ny, jm: nm, jd: Math.min(nd, jMonthLen(ny, nm)) }));
+                };
+                return (
+                  <>
+                    <select value={leaveForm.jy || ""} onChange={e => upd(+e.target.value, leaveForm.jm, leaveForm.jd || 1)}
+                      className="input-theme text-sm text-center flex-1">
+                      {!leaveForm.jy && <option value="">سال</option>}
+                      {years.map(y => <option key={y} value={y}>{toFaN(y)}</option>)}
+                    </select>
+                    <select value={leaveForm.jm || ""} onChange={e => upd(leaveForm.jy, +e.target.value, leaveForm.jd || 1)}
+                      className="input-theme text-sm text-center flex-1">
+                      {!leaveForm.jm && <option value="">ماه</option>}
+                      {J_MONTHS_NAMES.map((name, i) => <option key={i+1} value={i+1}>{name}</option>)}
+                    </select>
+                    <select value={leaveForm.jd || ""} onChange={e => upd(leaveForm.jy, leaveForm.jm, +e.target.value)}
+                      className="input-theme text-sm text-center flex-1">
+                      {!leaveForm.jd && <option value="">روز</option>}
+                      {Array.from({ length: leaveForm.jy && leaveForm.jm ? jMonthLen(leaveForm.jy, leaveForm.jm) : 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{toFaN(d)}</option>)}
+                    </select>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+          <div>
+            <label className="block mb-1 text-theme-secondary text-xs">نوع درخواست</label>
+            <select value={leaveForm.type} onChange={e => setLeaveForm(s => ({ ...s, type: e.target.value }))} className="input-theme text-sm">
+              <option value="LEAVE">مرخصی (کل روز)</option>
+              <option value="HOURLY_LEAVE">مرخصی ساعتی</option>
+              <option value="MISSION">ماموریت (کل روز)</option>
+              <option value="REMOTE_WORK">دورکاری (کل روز)</option>
+            </select>
+          </div>
+          {leaveForm.type === "HOURLY_LEAVE" && (
+            <div>
+              <label className="block mb-1 text-theme-secondary text-xs">مدت مرخصی (ساعت)</label>
+              <input type="number" step="0.5" min="0.5" max="24" dir="ltr" value={leaveForm.leaveHours}
+                onChange={e => setLeaveForm(s => ({ ...s, leaveHours: e.target.value }))}
+                className="input-theme text-sm" placeholder="مثلاً 2" />
+              <p className="mt-1 text-[11px] text-theme-muted">بیشتر از ۳ ساعت = کل روز مرخصی</p>
+            </div>
+          )}
+          <div>
+            <label className="block mb-1 text-theme-secondary text-xs">توضیحات</label>
+            <textarea value={leaveForm.description} onChange={e => setLeaveForm(s => ({ ...s, description: e.target.value }))}
+              className="input-theme text-sm" rows={2} placeholder="دلیل یا توضیح درخواست..." />
+          </div>
+        </div>
+      </Modal>
 
       {/* Request modal (unified full-screen Modal) */}
       <Modal

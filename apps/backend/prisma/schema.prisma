@@ -645,8 +645,9 @@ model AttendanceDay {
   overtimeMinutes        Int              @default(0)   // اضافه‌کاری روزهای عادی
   holidayOvertimeMinutes Int              @default(0)   // تعطیل‌کاری (ضریب متفاوت)
   delayMinutes           Int              @default(0)
-  earlyLeaveMinutes Int              @default(0)
-  nightMinutes      Int              @default(0)
+  earlyLeaveMinutes      Int              @default(0)
+  deficitMinutes         Int              @default(0)   // shortfall vs required hours (delay+earlyLeave+unworked)
+  nightMinutes           Int              @default(0)
   leaveMinutes      Int              @default(0)        // approved leave for the day (hourly or full)
   status            AttendanceStatus
   isHolidayWork     Boolean          @default(false)

@@ -365,6 +365,40 @@ function AgendaTab({ group, holidays, overrides, groupName, onDelete, onEdit }: 
   );
 }
 
+// ── Jalali three-select date picker ─────────────────────────────────────────
+function JalaliDateSelect({ value, onChange, label, allowEmpty = false }: {
+  value: string; onChange: (v: string) => void; label: string; allowEmpty?: boolean;
+}) {
+  const { jy: ty } = todayJ();
+  const parts = value ? value.split("/").map(Number) : [0, 0, 0];
+  const jy = parts[0] || 0, jm = parts[1] || 0, jd = parts[2] || 0;
+  const years = Array.from({ length: 8 }, (_, i) => ty - 5 + i);
+  const toFaN = (n: number) => n.toLocaleString("fa-IR", { useGrouping: false });
+  function upd(ny: number, nm: number, nd: number) {
+    if (allowEmpty && !ny) { onChange(""); return; }
+    if (!ny || !nm || !nd) return;
+    onChange(`${ny}/${nm}/${Math.min(nd, jMonthLen(ny, nm))}`);
+  }
+  return (
+    <Field label={label}>
+      <div className="flex gap-1" dir="ltr">
+        <select value={jy || ""} onChange={e => upd(+e.target.value || 0, jm, jd || 1)} className={inputCls + " px-1 text-center"}>
+          {allowEmpty && <option value="">—</option>}
+          {years.map(y => <option key={y} value={y}>{toFaN(y)}</option>)}
+        </select>
+        <select value={jm || ""} onChange={e => upd(jy, +e.target.value, jd || 1)} className={inputCls + " px-1 text-center"} disabled={allowEmpty && !jy}>
+          {!jm && <option value="">{allowEmpty ? "ماه" : "—"}</option>}
+          {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{J_MONTHS[m - 1]}</option>)}
+        </select>
+        <select value={jd || ""} onChange={e => upd(jy, jm, +e.target.value)} className={inputCls + " px-1 text-center"} disabled={allowEmpty && !jm}>
+          {!jd && <option value="">{allowEmpty ? "روز" : "—"}</option>}
+          {Array.from({ length: jy && jm ? jMonthLen(jy, jm) : 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{toFaN(d)}</option>)}
+        </select>
+      </div>
+    </Field>
+  );
+}
+
 // ── Day action modal: view/edit existing + create holiday or hours override ──
 function DayActionModal({ open, ctx, group, onClose, onSaved, authHeaders }: any) {
   const [mode, setMode] = React.useState<"holiday" | "override">("holiday");
@@ -453,8 +487,8 @@ function DayActionModal({ open, ctx, group, onClose, onSaved, authHeaders }: any
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="از تاریخ"><input dir="ltr" className={inputCls} value={startStr} onChange={e => setStartStr(e.target.value)} placeholder="1405/04/01" /></Field>
-          <Field label="تا تاریخ (اختیاری — بازه)"><input dir="ltr" className={inputCls} value={endStr} onChange={e => setEndStr(e.target.value)} placeholder="مثلاً 1405/04/10" /></Field>
+          <JalaliDateSelect label="از تاریخ" value={startStr} onChange={setStartStr} />
+          <JalaliDateSelect label="تا تاریخ (اختیاری — بازه)" value={endStr} onChange={setEndStr} allowEmpty />
         </div>
         <label className="flex items-center gap-2 text-sm text-theme-primary"><input type="checkbox" checked={allGroups} onChange={e => setAllGroups(e.target.checked)} /> برای همهٔ گروه‌ها</label>
         {!allGroups && group && <p className="text-[11px] text-theme-muted">اعمال برای گروه: <b>{group.isDefault ? "پیش‌فرض" : group.name}</b></p>}

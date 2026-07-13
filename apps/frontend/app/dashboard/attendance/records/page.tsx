@@ -216,7 +216,7 @@ export default function AttendanceRecordsPage() {
           <SumCard label="کارکرد" value={fmtMin(summary.workedMinutes)} />
           <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
           <SumCard label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" />
-          <SumCard label="کسری" value={fmtMin((summary.delayMinutes || 0) + (summary.earlyLeaveMinutes || 0))} cls="text-orange-600" />
+          <SumCard label="کسری" value={fmtMin(summary.deficitMinutes || 0)} cls="text-orange-600" />
           <SumCard label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
           <SumCard label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" />
           <SumCard label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" />
@@ -287,7 +287,7 @@ export default function AttendanceRecordsPage() {
                     <td className="px-2 text-theme-primary" dir="ltr">{fmtMin(r.workedMinutes)}</td>
                     <td className="px-2 text-amber-600" dir="ltr">{r.delayMinutes ? fmtMin(r.delayMinutes) : "—"}</td>
                     <td className="px-2 text-yellow-600" dir="ltr">{r.earlyLeaveMinutes ? fmtMin(r.earlyLeaveMinutes) : "—"}</td>
-                    <td className="px-2 text-orange-600 font-medium" dir="ltr">{(r.delayMinutes + r.earlyLeaveMinutes) ? fmtMin(r.delayMinutes + r.earlyLeaveMinutes) : "—"}</td>
+                    <td className="px-2 text-orange-600 font-medium" dir="ltr">{r.deficitMinutes ? fmtMin(r.deficitMinutes) : "—"}</td>
                     <td className="px-2 text-violet-600" dir="ltr">{r.overtimeMinutes ? fmtMin(r.overtimeMinutes) : "—"}</td>
                     <td className="px-2 text-rose-600" dir="ltr">{r.holidayOvertimeMinutes ? fmtMin(r.holidayOvertimeMinutes) : "—"}</td>
                     <td className="px-2"><span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[liveStatus(r)] || "bg-theme-secondary"}`}>{STATUS_FA[liveStatus(r)] || r.status}</span></td>
