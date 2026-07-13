@@ -57,6 +57,16 @@ model User {
   chatReactions ChatReaction[] @relation("UserChatReactions")
   chatReads     ChatRead[]     @relation("UserChatReads")
   presence      UserPresence?  @relation("UserPresenceRecord")
+  // ── Ticketing ──
+  ticketsRequested   Ticket[]             @relation("TicketRequester")
+  ticketsAssigned    Ticket[]             @relation("TicketAssignee")
+  ticketsRelated     Ticket[]             @relation("TicketRelatedUser")
+  ticketComments     TicketComment[]      @relation("TicketCommentAuthor")
+  ticketAttachments  TicketAttachment[]   @relation("TicketAttachmentUploader")
+  ticketEvents       TicketEvent[]        @relation("TicketEventActor")
+  ticketNotifications TicketNotification[] @relation("TicketNotifUser")
+  managedDeptConfigs TicketDeptManager[]
+  defaultAssigneeConfigs TicketDeptAssignee[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -75,6 +85,8 @@ model Department {
   userDepartments UserDepartment[]
   assetAssignments AssetAssignment[]
   pagePermissions PagePermission[]
+  ticketConfig    TicketDepartmentConfig?
+  tickets         Ticket[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1095,4 +1107,260 @@ model ChatSettings {
   retentionDays          Int      @default(0)
   updatedAt              DateTime @updatedAt
   updatedById            String?
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Help Desk / Ticketing System
+// ════════════════════════════════════════════════════════════════════
+
+enum TicketStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_USER
+  USER_REPLIED
+  RESOLVED
+  CLOSED
+  CANCELLED
+  REJECTED
+  REOPENED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// Singleton configuration for ticketing system
+model TicketSettings {
+  id                 String   @id @default("singleton")
+  maxFileSizeMb      Int      @default(10)
+  allowedExtensions  String[] @default(["jpg","jpeg","png","gif","pdf","doc","docx","xls","xlsx","zip","txt"])
+  autoCloseAfterDays Int      @default(7)
+  allowUserPriority  Boolean  @default(false)
+  ticketPrefix       String   @default("TKT")
+  updatedAt          DateTime @updatedAt
+  updatedById        String?
+}
+
+// Per-department ticketing configuration
+model TicketDepartmentConfig {
+  id                    String     @id @default(cuid())
+  departmentId          String     @unique
+  department            Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  isEnabled             Boolean    @default(false)
+  // SLA in business hours
+  slaFirstResponseHours Int        @default(4)
+  slaResolutionHours    Int        @default(24)
+  // Work hours for SLA calculation (HH:MM)
+  workHoursStart        String     @default("08:00")
+  workHoursEnd          String     @default("17:00")
+  // Work days: 6=Sat,0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri (Persian week: 6,0,1,2,3)
+  workDays              Int[]      @default([6, 0, 1, 2, 3])
+  autoAssignRoundRobin  Boolean    @default(false)
+  notifyOnCreate        Boolean    @default(true)
+  notifyOnReply         Boolean    @default(true)
+  notifyOnClose         Boolean    @default(true)
+  updatedAt             DateTime   @updatedAt
+
+  categories       TicketCategory[]
+  managers         TicketDeptManager[]
+  defaultAssignees TicketDeptAssignee[]
+}
+
+// Junction: managers of a ticket department config
+model TicketDeptManager {
+  configId String
+  userId   String
+  config   TicketDepartmentConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([configId, userId])
+}
+
+// Junction: default assignees for a department config (used for round-robin)
+model TicketDeptAssignee {
+  configId String
+  userId   String
+  config   TicketDepartmentConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([configId, userId])
+}
+
+// Predefined ticket subjects per department — users MUST pick one, no free text
+model TicketCategory {
+  id           String                 @id @default(cuid())
+  configId     String
+  config       TicketDepartmentConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  isActive     Boolean                @default(true)
+  order        Int                    @default(0)
+  // Override department-level SLA for this specific category
+  slaFirstResponseHours Int?
+  slaResolutionHours    Int?
+  tickets      Ticket[]
+
+  @@unique([configId, name])
+  @@index([configId, isActive])
+}
+
+// Main Ticket entity
+model Ticket {
+  id           String         @id @default(cuid())
+  // Human-readable sequential number (e.g. TKT-1042)
+  number       Int            @default(autoincrement())
+  departmentId String
+  department   Department     @relation(fields: [departmentId], references: [id])
+  categoryId   String
+  category     TicketCategory @relation(fields: [categoryId], references: [id])
+
+  requesterId  String
+  requester    User           @relation("TicketRequester", fields: [requesterId], references: [id])
+  assigneeId   String?
+  assignee     User?          @relation("TicketAssignee", fields: [assigneeId], references: [id])
+
+  status   TicketStatus   @default(OPEN)
+  priority TicketPriority @default(MEDIUM)
+
+  description String @db.Text
+
+  // Optional references
+  relatedUserId String?
+  relatedUser   User?  @relation("TicketRelatedUser", fields: [relatedUserId], references: [id])
+
+  tags      String[]
+  ccUserIds String[]
+
+  // SLA timestamps
+  dueAt          DateTime?
+  firstResponseAt DateTime?
+  resolvedAt     DateTime?
+  closedAt       DateTime?
+  isOverSla      Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comments      TicketComment[]
+  attachments   TicketAttachment[]
+  events        TicketEvent[]
+  notifications TicketNotification[]
+  slaMetric     TicketSlaMetric?
+
+  @@index([status])
+  @@index([departmentId, status])
+  @@index([requesterId])
+  @@index([assigneeId])
+  @@index([createdAt])
+  @@index([number])
+}
+
+// Replies AND internal notes in a single table (isInternal flag)
+model TicketComment {
+  id         String    @id @default(cuid())
+  ticketId   String
+  ticket     Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User      @relation("TicketCommentAuthor", fields: [authorId], references: [id])
+  content    String    @db.Text
+  isInternal Boolean   @default(false)
+  isEdited   Boolean   @default(false)
+  editedAt   DateTime?
+  isDeleted  Boolean   @default(false)
+  replyToId  String?
+  replyTo    TicketComment?  @relation("CommentReplies", fields: [replyToId], references: [id])
+  replies    TicketComment[] @relation("CommentReplies")
+
+  attachments TicketAttachment[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ticketId, createdAt])
+  @@index([ticketId, isInternal])
+}
+
+// File attachments — linked to ticket directly or to a specific comment
+model TicketAttachment {
+  id           String         @id @default(cuid())
+  ticketId     String
+  ticket       Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  commentId    String?
+  comment      TicketComment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  uploadedById String
+  uploadedBy   User           @relation("TicketAttachmentUploader", fields: [uploadedById], references: [id])
+  url          String
+  name         String
+  size         Int
+  mimeType     String?
+  createdAt    DateTime       @default(now())
+
+  @@index([ticketId])
+}
+
+// Full activity timeline — every meaningful action becomes an event row
+model TicketEvent {
+  id       String   @id @default(cuid())
+  ticketId String
+  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorId  String?
+  actor    User?    @relation("TicketEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  // CREATED | ASSIGNED | REASSIGNED | TRANSFERRED | STATUS_CHANGED | PRIORITY_CHANGED |
+  // COMMENT_ADDED | INTERNAL_NOTE | ATTACHMENT_ADDED | CLOSED | REOPENED | SLA_BREACHED
+  type     String
+  meta     Json?
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+// In-app notifications for ticket events
+model TicketNotification {
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation("TicketNotifUser", fields: [userId], references: [id], onDelete: Cascade)
+  ticketId String
+  ticket   Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  // ASSIGNED | REPLIED | MENTIONED | STATUS_CHANGED | TRANSFERRED | SLA_WARNING | OVER_SLA
+  type     String
+  title    String
+  body     String
+  isRead   Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([ticketId])
+}
+
+// Computed SLA metrics per ticket — updated whenever relevant timestamps change
+model TicketSlaMetric {
+  id       String @id @default(cuid())
+  ticketId String @unique
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  // Targets (copied from dept config at creation time)
+  slaFirstResponseHours Int
+  slaResolutionHours    Int
+
+  // Elapsed durations in minutes (null until the event happens)
+  minutesToFirstResponse  Int?
+  minutesToFirstAssignment Int?
+  minutesToResolution     Int?
+  minutesToClose          Int?
+
+  // Business-hours breakdown
+  businessMinutesTotal  Int @default(0)
+  waitingUserMinutes    Int @default(0)
+  waitingDeptMinutes    Int @default(0)
+
+  // SLA breach tracking
+  firstResponseDueAt DateTime?
+  resolutionDueAt    DateTime?
+  firstResponseBreached Boolean @default(false)
+  resolutionBreached    Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
 }

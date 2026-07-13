@@ -31,6 +31,10 @@ import {
   UserCog,
   GitMerge,
   RefreshCw,
+  Ticket,
+  TicketCheck,
+  PlusCircle,
+  PieChart,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -128,6 +132,21 @@ export const MENU: MenuItem[] = [
     page: '/dashboard/accounting',
     icon: Landmark,
     roles: ['ADMIN', 'MANAGER'],
+  },
+
+  // ── سرویس‌دهی / Help Desk ─────────────────────────────────
+  {
+    id: 'tickets',
+    title: 'میز خدمت',
+    icon: Ticket,
+    section: 'سرویس‌دهی',
+    children: [
+      { id: 'tickets.my',        title: 'تیکت‌های من',    page: '/dashboard/tickets/my',        icon: TicketCheck },
+      { id: 'tickets.list',      title: 'همه تیکت‌ها',    page: '/dashboard/tickets',           icon: ClipboardList, roles: ['ADMIN', 'MANAGER', 'EXPERT'] as Role[] },
+      { id: 'tickets.new',       title: 'تیکت جدید',      page: '/dashboard/tickets/new',       icon: PlusCircle },
+      { id: 'tickets.dashboard', title: 'داشبورد تیکت‌ها', page: '/dashboard/tickets/dashboard', icon: PieChart, roles: ['ADMIN', 'MANAGER'] as Role[] },
+      { id: 'tickets.settings',  title: 'تنظیمات',         page: '/dashboard/tickets/settings',  icon: Settings, roles: ['ADMIN'] as Role[] },
+    ],
   },
 
   // ── تحلیل ─────────────────────────────────────────────────

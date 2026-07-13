@@ -1,5 +1,6 @@
 // Canonical list of all dashboard pages — single source of truth.
 export const ADMIN_PAGES: string[] = [
+  '/dashboard/tickets/settings',
   '/dashboard/settings',
   '/dashboard/ai-settings',
   '/dashboard/access',
@@ -53,4 +54,10 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/security/sessions',   label: 'مدیریت نشست‌ها',       adminOnly: true },
   { page: '/dashboard/settings',            label: 'تنظیمات سامانه',        adminOnly: true },
   { page: '/dashboard/messaging',           label: 'پیام‌رسانی' },
+
+  // ── Ticketing / Help Desk ──
+  { page: '/dashboard/tickets',             label: 'تیکت‌ها' },
+  { page: '/dashboard/tickets/my',          label: 'تیکت‌های من' },
+  { page: '/dashboard/tickets/dashboard',   label: 'داشبورد تیکت‌ها' },
+  { page: '/dashboard/tickets/settings',    label: 'تنظیمات تیکت‌ها', adminOnly: true },
 ];
