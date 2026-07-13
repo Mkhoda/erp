@@ -1,9 +1,8 @@
 "use client";
 import React from "react";
 import {
-  Megaphone, Plus, Pencil, Trash2, Send, Eye, Users, Globe, Tag,
-  Calendar, AlertCircle, CheckCircle2, X, ChevronRight, ChevronLeft,
-  Search, Filter, BarChart3, Clock,
+  Megaphone, Plus, Pencil, Trash2, Send, BarChart3, X,
+  ChevronRight, ChevronLeft, Search, Clock, CheckCircle2,
 } from "lucide-react";
 import { useToast } from "../../../components/ui/Toast";
 import SearchSelect from "../../../components/ui/SearchSelect";
@@ -25,13 +24,128 @@ const TYPE_COLORS: Record<string, string> = {
   POPUP: "bg-amber-50 text-amber-700 dark:bg-amber-950/30",
   NOTIFICATION: "bg-blue-50 text-blue-700 dark:bg-blue-950/30",
 };
-
 const ROLES = [
   { id: "ADMIN", name: "مدیر سیستم" },
   { id: "MANAGER", name: "مدیر" },
   { id: "USER", name: "کاربر" },
   { id: "EXPERT", name: "کارشناس" },
 ];
+const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
+
+// ── Jalali ↔ Gregorian ──────────────────────────────────────────────────────
+function toJalali(gy0: number, gm: number, gd: number) {
+  const gdm = [0,31,59,90,120,151,181,212,243,273,304,334];
+  let jy: number, gy: number;
+  if (gy0 > 1600) { jy = 979; gy = gy0 - 1600; } else { jy = 0; gy = gy0 - 621; }
+  const gy2 = gm > 2 ? gy + 1 : gy;
+  let days = 365*gy + Math.floor((gy2+3)/4) - Math.floor((gy2+99)/100) + Math.floor((gy2+399)/400) - 80 + gd + gdm[gm-1];
+  jy += 33*Math.floor(days/12053); days %= 12053;
+  jy += 4*Math.floor(days/1461); days %= 1461;
+  if (days > 365) { jy += Math.floor((days-1)/365); days = (days-1)%365; }
+  const jm = days < 186 ? 1 + Math.floor(days/31) : 7 + Math.floor((days-186)/30);
+  const jd = 1 + (days < 186 ? days%31 : (days-186)%30);
+  return { jy, jm, jd };
+}
+function jalaliToGregorian(jy0: number, jm: number, jd: number) {
+  let gy: number, jy: number;
+  if (jy0 > 979) { gy = 1600; jy = jy0 - 979; } else { gy = 621; jy = jy0; }
+  let days = 365*jy + Math.floor(jy/33)*8 + Math.floor(((jy%33)+3)/4) + 78 + jd + (jm < 7 ? (jm-1)*31 : (jm-7)*30 + 186);
+  gy += 400*Math.floor(days/146097); days %= 146097;
+  if (days > 36524) { gy += 100*Math.floor(--days/36524); days %= 36524; if (days >= 365) days++; }
+  gy += 4*Math.floor(days/1461); days %= 1461;
+  if (days > 365) { gy += Math.floor((days-1)/365); days = (days-1)%365; }
+  let gd2 = days + 1;
+  const sal = [0,31,(gy%4===0&&gy%100!==0)||gy%400===0?29:28,31,30,31,30,31,31,30,31,30,31];
+  let gm2 = 1;
+  for (; gm2 <= 12; gm2++) { if (gd2 <= sal[gm2]) break; gd2 -= sal[gm2]; }
+  return { y: gy, m: gm2, d: gd2 };
+}
+const jMonthLen = (jy: number, jm: number) => (jm <= 6 ? 31 : jm <= 11 ? 30 : jy % 4 === 3 ? 30 : 29);
+const todayJ = () => { const t = new Date(); return toJalali(t.getFullYear(), t.getMonth()+1, t.getDate()); };
+
+function toISO(jy: number, jm: number, jd: number, h: number, min: number): string {
+  const g = jalaliToGregorian(jy, jm, jd);
+  return `${g.y}-${String(g.m).padStart(2,"0")}-${String(g.d).padStart(2,"0")}T${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`;
+}
+function parseISO(iso: string) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  const j = toJalali(d.getFullYear(), d.getMonth()+1, d.getDate());
+  return { jy: j.jy, jm: j.jm, jd: j.jd, h: d.getHours(), min: d.getMinutes() };
+}
+
+// ── Jalali Date+Time Picker ─────────────────────────────────────────────────
+function JalaliDateTimePicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const def = () => { const t = todayJ(); return { jy: t.jy, jm: t.jm, jd: 1, h: 8, min: 0 }; };
+  const [on, setOn] = React.useState(!!value);
+  const [state, setState] = React.useState(() => {
+    const p = parseISO(value);
+    return p ?? def();
+  });
+
+  const update = (patch: Partial<typeof state>, nextOn = on) => {
+    const ns = { ...state, ...patch };
+    setState(ns);
+    if (nextOn) onChange(toISO(ns.jy, ns.jm, ns.jd, ns.h, ns.min));
+    else onChange("");
+  };
+
+  const toggleOn = (v: boolean) => {
+    setOn(v);
+    if (v) onChange(toISO(state.jy, state.jm, state.jd, state.h, state.min));
+    else onChange("");
+  };
+
+  const maxDay = jMonthLen(state.jy, state.jm);
+  const clampedJd = Math.min(state.jd, maxDay);
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-theme-secondary mb-1.5">{label}</label>
+      <div className="flex items-start gap-2 flex-wrap">
+        <label className="flex items-center gap-1.5 mt-1 cursor-pointer">
+          <input type="checkbox" checked={on} onChange={e => toggleOn(e.target.checked)} className="w-3.5 h-3.5 rounded" />
+          <span className="text-xs text-theme-muted">{on ? "تعریف شده" : "تعریف نشده"}</span>
+        </label>
+        {on && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <select value={state.jy} onChange={e => update({ jy: Number(e.target.value) })}
+              className="input-theme text-sm py-1 w-24" dir="ltr">
+              {Array.from({ length: 15 }, (_, i) => 1400 + i).map(y =>
+                <option key={y} value={y}>{y.toLocaleString("fa-IR")}</option>
+              )}
+            </select>
+            <select value={state.jm} onChange={e => update({ jm: Number(e.target.value) })}
+              className="input-theme text-sm py-1">
+              {J_MONTHS.map((name, i) => <option key={i+1} value={i+1}>{name}</option>)}
+            </select>
+            <select value={clampedJd} onChange={e => update({ jd: Number(e.target.value) })}
+              className="input-theme text-sm py-1 w-16" dir="ltr">
+              {Array.from({ length: maxDay }, (_, i) => i + 1).map(d =>
+                <option key={d} value={d}>{d.toLocaleString("fa-IR")}</option>
+              )}
+            </select>
+            <span className="text-theme-muted text-xs">ساعت</span>
+            <select value={state.h} onChange={e => update({ h: Number(e.target.value) })}
+              className="input-theme text-sm py-1 w-16" dir="ltr">
+              {Array.from({ length: 24 }, (_, i) => i).map(h =>
+                <option key={h} value={h}>{String(h).padStart(2,"0")}</option>
+              )}
+            </select>
+            <span className="text-theme-muted">:</span>
+            <select value={state.min} onChange={e => update({ min: Number(e.target.value) })}
+              className="input-theme text-sm py-1 w-16" dir="ltr">
+              {[0,5,10,15,20,25,30,35,40,45,50,55].map(m =>
+                <option key={m} value={m}>{String(m).padStart(2,"0")}</option>
+              )}
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 type Ann = {
   id: string; title: string; body: string; type: string; priority: string;
@@ -40,7 +154,7 @@ type Ann = {
   publishAt: string | null; expireAt: string | null;
   author: { firstName: string; lastName: string };
   _count: { acks: number };
-  createdAt: string; updatedAt: string;
+  createdAt: string;
 };
 
 const emptyForm = () => ({
@@ -108,11 +222,7 @@ export default function AnnouncementsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm(emptyForm());
-    setModal("create");
-  };
+  const openCreate = () => { setEditing(null); setForm(emptyForm()); setModal("create"); };
 
   const openEdit = (ann: Ann) => {
     setEditing(ann);
@@ -131,14 +241,29 @@ export default function AnnouncementsPage() {
     if (!form.title.trim() || !form.body.trim()) { toast.warning("عنوان و متن الزامی است"); return; }
     setSaving(true);
     try {
-      const body: any = { ...form, publishAt: form.publishAt || undefined, expireAt: form.expireAt || undefined };
-      const url = modal === "edit" && editing ? `${API}/notifications/announcements/${editing.id}` : `${API}/notifications/announcements`;
+      const payload: any = {
+        ...form,
+        publishAt: form.publishAt || undefined,
+        expireAt: form.expireAt || undefined,
+      };
+      const url = modal === "edit" && editing
+        ? `${API}/notifications/announcements/${editing.id}`
+        : `${API}/notifications/announcements`;
       const method = modal === "edit" ? "PATCH" : "POST";
-      const r = await fetch(url, { method, headers: { ...h, "Content-Type": "application/json" } as any, body: JSON.stringify(body) });
-      if (!r.ok) { toast.error("خطا در ذخیره"); return; }
+      const r = await fetch(url, {
+        method,
+        headers: { ...h, "Content-Type": "application/json" } as any,
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        toast.error(err?.message ?? "خطا در ذخیره");
+        return;
+      }
       toast.success(modal === "edit" ? "اطلاعیه ویرایش شد" : "اطلاعیه ایجاد شد");
       setModal(null);
-      load(page);
+      setPage(1);
+      await load(1);
     } finally { setSaving(false); }
   };
 
@@ -229,7 +354,7 @@ export default function AnnouncementsPage() {
                   <th className="text-right px-3 py-2.5 font-medium">اولویت</th>
                   <th className="text-right px-3 py-2.5 font-medium">مخاطب</th>
                   <th className="text-right px-3 py-2.5 font-medium">وضعیت</th>
-                  <th className="text-right px-3 py-2.5 font-medium">تاریخ انقضا</th>
+                  <th className="text-right px-3 py-2.5 font-medium">انقضا</th>
                   <th className="text-right px-3 py-2.5 font-medium">تاییدیه</th>
                   <th className="px-3 py-2.5" />
                 </tr>
@@ -301,27 +426,27 @@ export default function AnnouncementsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
-          <button onClick={() => { setPage(p => p + 1); load(page + 1); }} disabled={page >= totalPages}
+          <button onClick={() => { const np = page + 1; setPage(np); load(np); }} disabled={page >= totalPages}
             className="p-2 rounded-lg border border-theme text-theme-secondary hover:bg-theme-hover disabled:opacity-40">
             <ChevronRight className="w-4 h-4" />
           </button>
           <span className="text-sm text-theme-muted">صفحه {page} از {totalPages}</span>
-          <button onClick={() => { setPage(p => p - 1); load(page - 1); }} disabled={page <= 1}
+          <button onClick={() => { const np = page - 1; setPage(np); load(np); }} disabled={page <= 1}
             className="p-2 rounded-lg border border-theme text-theme-secondary hover:bg-theme-hover disabled:opacity-40">
             <ChevronLeft className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Create/Edit Modal */}
+      {/* Create/Edit Modal — z-[9999] to clear sidebar */}
       {(modal === "create" || modal === "edit") && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-theme-card border border-theme rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" dir="rtl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-theme">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-theme-card border border-theme rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col" dir="rtl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-theme shrink-0">
               <h2 className="font-bold text-theme-primary text-lg">
                 {modal === "edit" ? "ویرایش اطلاعیه" : "اطلاعیه جدید"}
               </h2>
-              <button onClick={() => setModal(null)} className="text-theme-muted hover:text-theme-secondary">
+              <button onClick={() => setModal(null)} className="text-theme-muted hover:text-theme-secondary p-1 rounded-lg hover:bg-theme-hover">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -368,32 +493,26 @@ export default function AnnouncementsPage() {
                 <select className="input-theme w-full text-sm mb-2" value={form.targetType} onChange={e => pf("targetType", e.target.value)}>
                   {Object.entries(TARGET_FA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
-
                 {form.targetType === "DEPARTMENT" && (
-                  <SearchSelect
-                    options={deptOptions} value="" onChange={(id) => {
-                      if (id && !form.targetDeptIds.includes(id))
-                        pf("targetDeptIds", [...form.targetDeptIds, id]);
-                    }}
-                    placeholder="دپارتمان را انتخاب کنید" emptyLabel="انتخاب دپارتمان"
-                  />
+                  <>
+                    <SearchSelect options={deptOptions} value="" onChange={(id) => {
+                      if (id && !form.targetDeptIds.includes(id)) pf("targetDeptIds", [...form.targetDeptIds, id]);
+                    }} placeholder="دپارتمان را انتخاب کنید" emptyLabel="انتخاب دپارتمان" />
+                    {form.targetDeptIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {form.targetDeptIds.map(id => {
+                          const dept = departments.find((d: any) => d.id === id);
+                          return (
+                            <span key={id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-50 dark:bg-blue-950/40 text-blue-700 border border-blue-200 dark:border-blue-800">
+                              {dept?.name ?? id}
+                              <button onClick={() => pf("targetDeptIds", form.targetDeptIds.filter(x => x !== id))}><X className="w-3 h-3" /></button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
                 )}
-                {form.targetType === "DEPARTMENT" && form.targetDeptIds.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {form.targetDeptIds.map(id => {
-                      const dept = departments.find((d: any) => d.id === id);
-                      return (
-                        <span key={id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-50 dark:bg-blue-950/40 text-blue-700 border border-blue-200 dark:border-blue-800">
-                          {dept?.name ?? id}
-                          <button onClick={() => pf("targetDeptIds", form.targetDeptIds.filter(x => x !== id))}>
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
                 {form.targetType === "ROLE" && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {ROLES.map(r => (
@@ -404,16 +523,11 @@ export default function AnnouncementsPage() {
                     ))}
                   </div>
                 )}
-
                 {form.targetType === "USER" && (
                   <>
-                    <SearchSelect
-                      options={users} value="" onChange={(id) => {
-                        if (id && !form.targetUserIds.includes(id))
-                          pf("targetUserIds", [...form.targetUserIds, id]);
-                      }}
-                      placeholder="کاربر را انتخاب کنید" emptyLabel="انتخاب کاربر"
-                    />
+                    <SearchSelect options={users} value="" onChange={(id) => {
+                      if (id && !form.targetUserIds.includes(id)) pf("targetUserIds", [...form.targetUserIds, id]);
+                    }} placeholder="کاربر را انتخاب کنید" emptyLabel="انتخاب کاربر" />
                     {form.targetUserIds.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {form.targetUserIds.map(id => {
@@ -421,9 +535,7 @@ export default function AnnouncementsPage() {
                           return (
                             <span key={id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-50 dark:bg-green-950/40 text-green-700 border border-green-200 dark:border-green-800">
                               {user?.name ?? id}
-                              <button onClick={() => pf("targetUserIds", form.targetUserIds.filter(x => x !== id))}>
-                                <X className="w-3 h-3" />
-                              </button>
+                              <button onClick={() => pf("targetUserIds", form.targetUserIds.filter(x => x !== id))}><X className="w-3 h-3" /></button>
                             </span>
                           );
                         })}
@@ -433,22 +545,14 @@ export default function AnnouncementsPage() {
                 )}
               </div>
 
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-theme-secondary mb-1.5">تاریخ انتشار (اختیاری)</label>
-                  <input type="datetime-local" className="input-theme w-full text-sm"
-                    value={form.publishAt} onChange={e => pf("publishAt", e.target.value)} dir="ltr" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-theme-secondary mb-1.5">تاریخ انقضا (اختیاری)</label>
-                  <input type="datetime-local" className="input-theme w-full text-sm"
-                    value={form.expireAt} onChange={e => pf("expireAt", e.target.value)} dir="ltr" />
-                </div>
+              {/* Jalali Date Pickers */}
+              <div className="grid grid-cols-1 gap-4">
+                <JalaliDateTimePicker label="تاریخ انتشار (اختیاری)" value={form.publishAt} onChange={v => pf("publishAt", v)} />
+                <JalaliDateTimePicker label="تاریخ انقضا (اختیاری)" value={form.expireAt} onChange={v => pf("expireAt", v)} />
               </div>
 
               {/* Options */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="flex flex-wrap gap-4 pt-2">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" className="w-4 h-4 rounded" checked={form.isSticky} onChange={e => pf("isSticky", e.target.checked)} />
                   <span className="text-sm text-theme-secondary">چسبنده (Sticky)</span>
@@ -461,20 +565,20 @@ export default function AnnouncementsPage() {
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" className="w-4 h-4 rounded" checked={form.showUntilAck} onChange={e => pf("showUntilAck", e.target.checked)} />
-                      <span className="text-sm text-theme-secondary">تا تایید نمایش بده</span>
+                      <span className="text-sm text-theme-secondary">تا تایید کاربر نمایش بده</span>
                     </label>
                   </>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-theme">
+            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-theme shrink-0">
               <button onClick={() => setModal(null)} className="px-4 py-2 rounded-xl border border-theme text-theme-secondary text-sm hover:bg-theme-hover">
                 انصراف
               </button>
               <button onClick={save} disabled={saving}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
-                {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                 {modal === "edit" ? "ذخیره" : "ایجاد"}
               </button>
             </div>
@@ -484,11 +588,11 @@ export default function AnnouncementsPage() {
 
       {/* Ack Stats Modal */}
       {modal === "ackstats" && ackStats && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-theme-card border border-theme rounded-2xl shadow-2xl w-full max-w-md" dir="rtl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-theme">
               <h2 className="font-bold text-theme-primary">آمار تاییدیه‌ها</h2>
-              <button onClick={() => setModal(null)} className="text-theme-muted hover:text-theme-secondary">
+              <button onClick={() => setModal(null)} className="text-theme-muted hover:text-theme-secondary p-1 rounded-lg hover:bg-theme-hover">
                 <X className="w-5 h-5" />
               </button>
             </div>

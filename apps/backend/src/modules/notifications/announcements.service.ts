@@ -141,17 +141,25 @@ export class AnnouncementsService {
   /** Returns active announcements visible to a specific user. */
   async getActiveForUser(userId: string, user: { role: string; departmentId?: string | null }) {
     const now = new Date();
+    // Resolve actual departmentId from DB since JWT doesn't carry it
+    let deptId = user.departmentId ?? null;
+    if (!deptId) {
+      const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { departmentId: true } });
+      deptId = u?.departmentId ?? null;
+    }
+    const resolvedUser = { ...user, departmentId: deptId };
+
     const all = await this.prisma.announcement.findMany({
       where: {
         isPublished: true,
         OR: [{ publishAt: null }, { publishAt: { lte: now } }],
         AND: [{ OR: [{ expireAt: null }, { expireAt: { gt: now } }] }],
       },
-      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+      include: { author: { select: { id: true, firstName: true, lastName: true } } },
+      orderBy: [{ isPinned: 'desc' }, { isSticky: 'desc' }, { createdAt: 'desc' }],
     });
 
-    // Filter by target
-    return all.filter((ann) => this.isTargetedAt(ann, userId, user));
+    return all.filter((ann) => this.isTargetedAt(ann, userId, resolvedUser));
   }
 
   /** Returns pending popup announcements the user hasn't seen (or hasn't acknowledged). */

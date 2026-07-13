@@ -103,6 +103,14 @@ export const MENU: MenuItem[] = [
     icon: TicketCheck,
   },
 
+  // ── اطلاعیه‌ها — visible to all ───────────────────────────
+  {
+    id: 'announcements',
+    title: 'اطلاعیه‌ها',
+    page: '/dashboard/announcements',
+    icon: Megaphone,
+  },
+
   // ── ERP ───────────────────────────────────────────────────
   {
     id: 'assets',

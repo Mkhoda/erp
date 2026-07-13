@@ -61,6 +61,7 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/notifications',                  label: 'مرکز اعلان‌ها' },
   { page: '/dashboard/notifications/announcements',    label: 'مدیریت اطلاعیه‌ها', adminOnly: true },
   { page: '/dashboard/notifications/dashboard',        label: 'آمار اعلان‌ها',      adminOnly: true },
+  { page: '/dashboard/announcements',                  label: 'اطلاعیه‌ها' },
 
   // ── Ticketing / Help Desk ──
   { page: '/dashboard/tickets',             label: 'تیکت‌ها' },
