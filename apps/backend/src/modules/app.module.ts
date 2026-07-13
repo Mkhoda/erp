@@ -18,6 +18,7 @@ import { AuthSettingsModule } from './auth-settings/auth-settings.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { TicketsModule } from './tickets/tickets.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
@@ -44,6 +45,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     SystemSettingsModule,
     MessagingModule,
     TicketsModule,
+    NotificationsModule,
   ],
   controllers: [ReportsController],
   providers: [

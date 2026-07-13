@@ -94,9 +94,11 @@ type MessagingState = {
   onlineCount: number;
   loadingMore: Record<string, boolean>;
   hasMore: Record<string, boolean>;
+  notifUnreadCount: number;
 };
 
 type MessagingActions = {
+  refreshNotifCount: () => void;
   openConversation: (userId: string) => Promise<void>;
   setActiveConv: (convId: string | null) => void;
   sendMessage: (convId: string, content: string, type?: string, replyToId?: string) => void;
@@ -143,6 +145,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     onlineCount: 0,
     loadingMore: {},
     hasMore: {},
+    notifUnreadCount: 0,
   });
 
   const stateRef = React.useRef(state);
@@ -152,6 +155,16 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, ...partial }));
 
   // ── Fetch helpers ──────────────────────────────────────────────
+
+  const fetchNotifCount = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/notifications/unread-count`, { headers: authHeader() });
+      if (!r.ok) return;
+      const { count } = await r.json();
+      patch({ notifUnreadCount: count });
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchConversations = React.useCallback(async () => {
     try {
@@ -202,7 +215,8 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     } catch {}
     fetchConversations();
     fetchUsers();
-  }, [fetchConversations, fetchUsers]);
+    fetchNotifCount();
+  }, [fetchConversations, fetchUsers, fetchNotifCount]);
 
   // ── Socket setup ───────────────────────────────────────────────
 
@@ -225,6 +239,11 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       patch({ isConnected: true });
       fetchConversations();
       fetchUsers();
+      fetchNotifCount();
+    });
+
+    socket.on("notification:new", (data: { unreadCount: number }) => {
+      patch({ notifUnreadCount: data.unreadCount });
     });
 
     socket.on("disconnect", () => patch({ isConnected: false }));
@@ -377,7 +396,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [fetchConversations, fetchUsers]);
+  }, [fetchConversations, fetchUsers, fetchNotifCount]);
 
   // ── Actions ────────────────────────────────────────────────────
 
@@ -567,6 +586,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
   const value: MessagingContextValue = {
     ...state,
+    refreshNotifCount: fetchNotifCount,
     openConversation,
     setActiveConv,
     sendMessage,

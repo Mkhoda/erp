@@ -35,6 +35,8 @@ import {
   TicketCheck,
   PlusCircle,
   PieChart,
+  Bell,
+  Megaphone,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -132,6 +134,19 @@ export const MENU: MenuItem[] = [
     page: '/dashboard/accounting',
     icon: Landmark,
     roles: ['ADMIN', 'MANAGER'],
+  },
+
+  // ── مرکز اعلان‌ها ─────────────────────────────────────────
+  {
+    id: 'notifications',
+    title: 'اعلان‌ها',
+    icon: Bell,
+    section: 'اعلان‌ها',
+    children: [
+      { id: 'notifications.center',       title: 'مرکز اعلان‌ها',     page: '/dashboard/notifications',                icon: Bell },
+      { id: 'notifications.announcements', title: 'اطلاعیه‌ها',         page: '/dashboard/notifications/announcements',  icon: Megaphone, roles: ['ADMIN'] as Role[] },
+      { id: 'notifications.dashboard',    title: 'آمار اعلان‌ها',      page: '/dashboard/notifications/dashboard',      icon: BarChart3, roles: ['ADMIN'] as Role[] },
+    ],
   },
 
   // ── سرویس‌دهی / Help Desk ─────────────────────────────────

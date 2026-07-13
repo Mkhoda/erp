@@ -7,17 +7,16 @@ import { CommentsService } from './comments.service';
 import { CategoriesService } from './categories.service';
 import { AnalyticsService } from './analytics.service';
 import { SlaService } from './sla.service';
-import { PrismaModule } from '../../prisma/prisma.module';
+import { PrismaService } from '../../prisma/prisma.service';
 import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
-    PrismaModule,
     PermissionsModule,
     MulterModule.register({ dest: join(process.cwd(), 'uploads', 'tickets') }),
   ],
   controllers: [TicketsController],
-  providers: [TicketsService, CommentsService, CategoriesService, AnalyticsService, SlaService],
+  providers: [PrismaService, TicketsService, CommentsService, CategoriesService, AnalyticsService, SlaService],
   exports: [TicketsService, CategoriesService],
 })
 export class TicketsModule {}

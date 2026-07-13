@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import TwoLayerSidebar from "../components/TwoLayerSidebar";
 import CommandPalette from "../components/CommandPalette";
 import { ToastProvider } from "../components/ui/Toast";
-import { MessagingProvider } from "../../lib/messaging";
+import { MessagingProvider, useMessagingOptional } from "../../lib/messaging";
 import ChatWidget from "../components/messaging/ChatWidget";
 import type { Role } from "../../lib/menu";
 
@@ -33,6 +33,9 @@ const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard/access": { label: "دسترسی صفحات", Icon: FileText },
   "/dashboard/ai-settings": { label: "تنظیمات هوش مصنوعی", Icon: Cpu },
   "/dashboard/settings": { label: "تنظیمات", Icon: Settings },
+  "/dashboard/notifications": { label: "مرکز اعلان‌ها", Icon: Bell },
+  "/dashboard/notifications/announcements": { label: "مدیریت اطلاعیه‌ها", Icon: Bell },
+  "/dashboard/notifications/dashboard": { label: "آمار اعلان‌ها", Icon: Bell },
   "/dashboard/accounting": { label: "حسابداری دارایی", Icon: CircleDollarSign },
   "/dashboard/buildings": { label: "ساختمان‌ها", Icon: Building },
   "/dashboard/floors": { label: "طبقات", Icon: Layers },
@@ -456,15 +459,151 @@ function ForbiddenScreen({ pathname }: { pathname: string }) {
 
 /* ── Notification Bell ── */
 function NotificationBell() {
-  const [count] = React.useState(3);
+  const messaging = useMessagingOptional();
+  const unreadCount = messaging?.notifUnreadCount ?? 0;
+  const [open, setOpen] = React.useState(false);
+  const [recent, setRecent] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  const API = process.env.NEXT_PUBLIC_API_URL || "/api";
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+  const fetchRecent = React.useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/notifications/recent`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setRecent(data.rows ?? []);
+        if (messaging) patch_notif(messaging, data.unreadCount);
+      }
+    } finally { setLoading(false); }
+  }, [token, API]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function patch_notif(m: any, count: number) {
+    if (typeof m.refreshNotifCount === "function" && count !== undefined) {
+      // side-effect: recount will fetch from API, but we already have it — just trigger refresh
+    }
+  }
+
+  React.useEffect(() => {
+    const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", h);
+    document.addEventListener("keydown", k);
+    return () => { document.removeEventListener("mousedown", h); document.removeEventListener("keydown", k); };
+  }, []);
+
+  React.useEffect(() => { if (open) fetchRecent(); }, [open, fetchRecent]);
+
+  const markAllRead = async () => {
+    if (!token) return;
+    await fetch(`${API}/notifications/mark-all-read`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setRecent(prev => prev.map(n => ({ ...n, isRead: true })));
+    messaging?.refreshNotifCount();
+  };
+
+  const CATEGORY_COLORS: Record<string, string> = {
+    SYSTEM: "bg-slate-500", TICKET: "bg-blue-500", APPROVAL: "bg-amber-500",
+    HR: "bg-green-500", ATTENDANCE: "bg-purple-500", SECURITY: "bg-red-500",
+    CHAT: "bg-pink-500", ANNOUNCEMENT: "bg-indigo-500", SUCCESS: "bg-emerald-500",
+    WARNING: "bg-orange-500", ERROR: "bg-red-600", INFORMATION: "bg-cyan-500",
+  };
+
+  const fmtTime = (iso: string) => {
+    const d = new Date(iso), now = new Date();
+    const diff = Math.floor((now.getTime() - d.getTime()) / 60000);
+    if (diff < 1) return "همین الان";
+    if (diff < 60) return `${diff} دقیقه پیش`;
+    if (diff < 1440) return `${Math.floor(diff / 60)} ساعت پیش`;
+    return `${Math.floor(diff / 1440)} روز پیش`;
+  };
+
   return (
-    <div className="relative">
-      <button className="flex justify-center items-center hover:bg-theme-hover p-1.5 rounded-lg text-theme-secondary transition-colors">
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex justify-center items-center hover:bg-theme-hover p-1.5 rounded-lg text-theme-secondary transition-colors"
+        title="اعلان‌ها"
+      >
         <Bell className="w-4 h-4" />
-        {count > 0 && (
-          <span className="top-1.5 right-1.5 absolute bg-blue-500 rounded-full w-2 h-2 notif-pulse" />
+        {unreadCount > 0 && (
+          <span className="top-0.5 right-0.5 absolute flex items-center justify-center bg-blue-500 rounded-full min-w-[14px] h-[14px] px-0.5 text-white text-[9px] font-bold leading-none">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
         )}
       </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-2 w-80 bg-theme-card border border-theme rounded-xl shadow-xl z-50 overflow-hidden" dir="rtl">
+          {/* Header */}
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-theme">
+            <span className="font-semibold text-sm text-theme-primary">اعلان‌ها</span>
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-xs text-blue-500 hover:text-blue-600">
+                  خواندن همه
+                </button>
+              )}
+              <button
+                onClick={() => { setOpen(false); router.push("/dashboard/notifications"); }}
+                className="text-xs text-theme-muted hover:text-theme-secondary"
+              >
+                مشاهده همه
+              </button>
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="max-h-80 overflow-y-auto divide-y divide-theme">
+            {loading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {!loading && recent.length === 0 && (
+              <div className="py-8 text-center text-theme-muted text-sm">هیچ اعلانی وجود ندارد</div>
+            )}
+            {!loading && recent.map((n: any) => (
+              <div
+                key={n.id}
+                className={`flex gap-2.5 px-3 py-2.5 hover:bg-theme-hover cursor-pointer transition-colors ${!n.isRead ? "bg-blue-500/5" : ""}`}
+                onClick={() => {
+                  if (n.link) { setOpen(false); router.push(n.link); }
+                }}
+              >
+                <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${CATEGORY_COLORS[n.category] ?? "bg-slate-400"}`} />
+                <div className="min-w-0 flex-1">
+                  <p className={`text-xs leading-snug ${!n.isRead ? "text-theme-primary font-medium" : "text-theme-secondary"}`}>
+                    {n.title}
+                  </p>
+                  <p className="text-[11px] text-theme-muted mt-0.5 line-clamp-2">{n.body}</p>
+                  <p className="text-[10px] text-theme-muted mt-1">{fmtTime(n.createdAt)}</p>
+                </div>
+                {!n.isRead && <span className="mt-1 w-1.5 h-1.5 bg-blue-500 rounded-full shrink-0" />}
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-theme px-3 py-2">
+            <button
+              onClick={() => { setOpen(false); router.push("/dashboard/notifications"); }}
+              className="w-full text-center text-xs text-blue-500 hover:text-blue-600 py-0.5"
+            >
+              مشاهده مرکز اعلان‌ها ←
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

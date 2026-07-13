@@ -67,6 +67,11 @@ model User {
   ticketNotifications TicketNotification[] @relation("TicketNotifUser")
   managedDeptConfigs TicketDeptManager[]
   defaultAssigneeConfigs TicketDeptAssignee[]
+  // ── Notifications ──
+  notifications          Notification[]          @relation("UserNotifications")
+  announcementAcks       AnnouncementAck[]       @relation("UserAnnouncementAcks")
+  announcementPopupSeens AnnouncementPopupSeen[] @relation("UserPopupSeens")
+  announcementsAuthored  Announcement[]          @relation("AnnouncementAuthor")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -1333,6 +1338,119 @@ model TicketNotification {
 
   @@index([userId, isRead])
   @@index([ticketId])
+}
+
+// ── Enterprise Notification Center ─────────────────────────────────────────
+
+enum NotificationCategory {
+  SYSTEM
+  TICKET
+  WORKFLOW
+  APPROVAL
+  HR
+  FINANCE
+  IT
+  ATTENDANCE
+  SECURITY
+  CHAT
+  REMINDER
+  INFORMATION
+  WARNING
+  SUCCESS
+  ERROR
+  ANNOUNCEMENT
+}
+
+enum NotificationPriority {
+  CRITICAL
+  HIGH
+  NORMAL
+  LOW
+  INFO
+}
+
+enum AnnouncementType {
+  BANNER
+  POPUP
+  NOTIFICATION
+}
+
+enum AnnouncementTarget {
+  ALL
+  DEPARTMENT
+  ROLE
+  USER
+}
+
+model Notification {
+  id           String               @id @default(cuid())
+  userId       String
+  user         User                 @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  category     NotificationCategory @default(SYSTEM)
+  priority     NotificationPriority @default(NORMAL)
+  title        String
+  body         String
+  link         String?
+  icon         String?
+  isRead       Boolean              @default(false)
+  isArchived   Boolean              @default(false)
+  isPinned     Boolean              @default(false)
+  sourceModule String?
+  sourceId     String?
+  readAt       DateTime?
+  createdAt    DateTime             @default(now())
+
+  @@index([userId, isRead, isArchived])
+  @@index([userId, createdAt])
+}
+
+model Announcement {
+  id            String               @id @default(cuid())
+  title         String
+  body          String               @db.Text
+  type          AnnouncementType     @default(NOTIFICATION)
+  priority      NotificationPriority @default(NORMAL)
+  targetType    AnnouncementTarget   @default(ALL)
+  targetDeptIds String[]
+  targetRoles   String[]
+  targetUserIds String[]
+  isSticky      Boolean              @default(false)
+  isPinned      Boolean              @default(false)
+  isPublished   Boolean              @default(false)
+  publishAt     DateTime?
+  expireAt      DateTime?
+  showOnce      Boolean              @default(false)
+  showUntilAck  Boolean              @default(false)
+  authorId      String
+  author        User                 @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  acks          AnnouncementAck[]
+  popupSeens    AnnouncementPopupSeen[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([isPublished, type])
+}
+
+model AnnouncementAck {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("UserAnnouncementAcks", fields: [userId], references: [id])
+  ackedAt        DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+}
+
+model AnnouncementPopupSeen {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("UserPopupSeens", fields: [userId], references: [id])
+  seenAt         DateTime     @default(now())
+
+  @@unique([announcementId, userId])
 }
 
 // Computed SLA metrics per ticket — updated whenever relevant timestamps change
