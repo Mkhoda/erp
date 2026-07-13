@@ -16,15 +16,10 @@ export class TodosService {
     return this.prisma.todo.create({ data: { userId, title } });
   }
 
-  toggle(id: string, userId: string) {
-    return this.prisma.todo.updateMany({
-      where: { id, userId },
-      data: { done: { set: undefined } }, // handled below via findFirst
-    }).then(async () => {
-      const todo = await this.prisma.todo.findFirst({ where: { id, userId } });
-      if (!todo) return null;
-      return this.prisma.todo.update({ where: { id }, data: { done: !todo.done } });
-    });
+  async toggle(id: string, userId: string) {
+    const todo = await this.prisma.todo.findFirst({ where: { id, userId } });
+    if (!todo) return null;
+    return this.prisma.todo.update({ where: { id }, data: { done: !todo.done } });
   }
 
   remove(id: string, userId: string) {

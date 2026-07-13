@@ -1,5 +1,6 @@
 // Canonical list of all dashboard pages — single source of truth.
 export const ADMIN_PAGES: string[] = [
+  '/dashboard/settings',
   '/dashboard/ai-settings',
   '/dashboard/access',
   '/dashboard/ai-usage',
@@ -8,8 +9,6 @@ export const ADMIN_PAGES: string[] = [
   '/dashboard/attendance/sync',
   '/dashboard/attendance/work-rules',
   '/dashboard/security/sessions',
-  '/dashboard/security/settings',
-  '/dashboard/messaging/admin',
 ];
 
 export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[] = [
@@ -52,7 +51,6 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/attendance/sync',     label: 'پایش همگام‌سازی',      adminOnly: true },
   { page: '/dashboard/attendance/work-rules', label: 'قوانین کارکرد',     adminOnly: true },
   { page: '/dashboard/security/sessions',   label: 'مدیریت نشست‌ها',       adminOnly: true },
-  { page: '/dashboard/security/settings',   label: 'تنظیمات امنیتی',       adminOnly: true },
+  { page: '/dashboard/settings',            label: 'تنظیمات سامانه',        adminOnly: true },
   { page: '/dashboard/messaging',           label: 'پیام‌رسانی' },
-  { page: '/dashboard/messaging/admin',     label: 'مدیریت پیام‌رسانی',     adminOnly: true },
 ];

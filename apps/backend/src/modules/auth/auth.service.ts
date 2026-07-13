@@ -100,7 +100,8 @@ export class AuthService {
     const phone = this.normalizePhone(dto.phone);
     const verbose = (process.env.LOG_BALE_VERBOSE || '').toLowerCase() === 'true' || process.env.LOG_BALE_VERBOSE === '1';
     if (verbose) console.log(`[AUTH] sendOtp requested for ${phone} (purpose=${dto.purpose})`);
-    const existingUser = await this.prisma.user.findFirst({ where: { phone } });
+    const phoneAlt = phone.startsWith('98') ? '0' + phone.slice(2) : '98' + phone.slice(1);
+    const existingUser = await this.prisma.user.findFirst({ where: { OR: [{ phone }, { phone: phoneAlt }] } });
     if (dto.purpose === 'signup') {
       if (existingUser) throw new BadRequestException('Phone already in use');
       if (verbose) console.log(`[AUTH] sendOtp permitted for unregistered phone ${phone} (purpose=signup)`);
