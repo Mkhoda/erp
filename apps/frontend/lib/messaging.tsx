@@ -102,6 +102,7 @@ type MessagingActions = {
   openConversation: (userId: string) => Promise<void>;
   setActiveConv: (convId: string | null) => void;
   sendMessage: (convId: string, content: string, type?: string, replyToId?: string) => void;
+  sendTyping: (convId: string, isTyping: boolean) => void;
   uploadFile: (convId: string, file: File) => Promise<void>;
   markRead: (convId: string) => void;
   deleteMessage: (messageId: string, forAll?: boolean) => void;
@@ -248,8 +249,19 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 
     socket.on("disconnect", () => patch({ isConnected: false }));
 
-    socket.on("connected", (data: { userId: string; onlineCount: number }) => {
-      patch({ onlineCount: data.onlineCount });
+    socket.on("connected", (data: { userId: string; onlineCount: number; onlineUserIds?: string[] }) => {
+      const presencePatch: Record<string, "ONLINE" | "OFFLINE"> = {};
+      (data.onlineUserIds ?? []).forEach((id) => { presencePatch[id] = "ONLINE"; });
+      setState((s) => ({
+        ...s,
+        onlineCount: data.onlineCount,
+        presence: { ...s.presence, ...presencePatch },
+        users: s.users.map((u) => ({ ...u, isOnline: presencePatch[u.id] === "ONLINE" || !!s.presence[u.id] })),
+        conversations: s.conversations.map((c) => ({
+          ...c,
+          members: c.members.map((m) => ({ ...m, isOnline: presencePatch[m.userId] === "ONLINE" || !!s.presence[m.userId] })),
+        })),
+      }));
     });
 
     socket.on("message:new", (msg: ChatMessage) => {
@@ -276,16 +288,18 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
           msg.senderId === myIdRef.current
             ? existing.filter((m) => !m.id.startsWith("_opt_"))
             : existing;
-        const updatedConvs = s.conversations.map((c) => {
-          if (c.id !== msg.conversationId) return c;
-          const isActive = s.activeConvId === c.id && s.isWidgetOpen;
-          return {
-            ...c,
-            messages: [msg],
-            unreadCount: isActive ? 0 : c.unreadCount + 1,
-            updatedAt: msg.createdAt,
-          };
-        });
+        const updatedConvs = s.conversations
+          .map((c) => {
+            if (c.id !== msg.conversationId) return c;
+            const isActive = s.activeConvId === c.id && s.isWidgetOpen;
+            return {
+              ...c,
+              messages: [msg],
+              unreadCount: isActive ? 0 : c.unreadCount + 1,
+              updatedAt: msg.createdAt,
+            };
+          })
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
         const total = updatedConvs.reduce((sum, c) => sum + c.unreadCount, 0);
         return {
           ...s,
@@ -429,13 +443,13 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchMessages]);
 
+  const sendTyping = React.useCallback((convId: string, isTyping: boolean) => {
+    socketRef.current?.emit(isTyping ? "typing:start" : "typing:stop", { conversationId: convId });
+  }, []);
+
   const sendMessage = React.useCallback(async (convId: string, content: string, type = "TEXT", replyToId?: string) => {
-    // Typing events are not real messages — only emit via socket, skip optimistic UI and REST fallback
     const isMsg = ["TEXT", "IMAGE", "VIDEO", "AUDIO", "DOCUMENT"].includes(type);
-    if (!isMsg || !content.trim()) {
-      socketRef.current?.emit("message:send", { conversationId: convId, content, type, replyToId });
-      return;
-    }
+    if (!isMsg || !content.trim()) return;
 
     // Optimistic: show the message immediately before server confirms
     const tempId = `_opt_${Date.now()}`;
@@ -590,6 +604,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     openConversation,
     setActiveConv,
     sendMessage,
+    sendTyping,
     uploadFile,
     markRead,
     deleteMessage,

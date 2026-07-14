@@ -230,8 +230,6 @@ export class TicketsController {
   // ── Settings ──────────────────────────────────────────────────────
 
   @Get('settings/global')
-  @UseGuards(RolesGuard)
-  @Roles('ADMIN')
   getSettings() {
     return this.categories.getSettings();
   }

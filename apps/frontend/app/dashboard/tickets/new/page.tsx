@@ -20,28 +20,23 @@ export default function NewTicketPage() {
   const [deptConfigs, setDeptConfigs] = React.useState<any[]>([]);
   const [categories, setCategories] = React.useState<any[]>([]);
   const [settings, setSettings] = React.useState<any>(null);
-  const [users, setUsers] = React.useState<any[]>([]);
 
   const [deptId, setDeptId] = React.useState("");
   const [categoryId, setCategoryId] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [priority, setPriority] = React.useState("MEDIUM");
-  const [relatedUserId, setRelatedUserId] = React.useState("");
-  const [ccUserIds, setCcUserIds] = React.useState<string[]>([]);
   const [tags, setTags] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [error, setError] = React.useState("");
 
-  // Load configs, settings, users
+  // Load configs + settings
   React.useEffect(() => {
     Promise.all([
       fetch(`${API}/tickets/config/enabled`, { headers: h as any }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/tickets/settings/global`, { headers: h as any }).then(r => r.ok ? r.json() : {}),
-      fetch(`${API}/users`, { headers: h as any }).then(r => r.ok ? r.json() : []),
-    ]).then(([cfgs, stg, us]) => {
+    ]).then(([cfgs, stg]) => {
       setDeptConfigs(cfgs);
       setSettings(stg);
-      setUsers(Array.isArray(us) ? us : (us.data ?? []));
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -69,10 +64,6 @@ export default function NewTicketPage() {
 
   const removeFile = (i: number) => setFiles(prev => prev.filter((_, j) => j !== i));
 
-  const toggleCc = (uid: string) => {
-    setCcUserIds(prev => prev.includes(uid) ? prev.filter(x => x !== uid) : [...prev, uid]);
-  };
-
   const submit = async () => {
     setError("");
     if (!deptId) { setError("لطفاً دپارتمان را انتخاب کنید"); return; }
@@ -84,9 +75,7 @@ export default function NewTicketPage() {
       const body: any = {
         departmentId: deptId, categoryId, description: description.trim(), priority,
         tags: tags ? tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-        ccUserIds,
       };
-      if (relatedUserId) body.relatedUserId = relatedUserId;
 
       const res = await fetch(`${API}/tickets`, {
         method: "POST",

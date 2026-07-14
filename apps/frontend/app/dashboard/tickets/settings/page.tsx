@@ -83,7 +83,8 @@ export default function TicketSettingsPage() {
       fetch(`${API}/tickets/settings/global`, { headers: h as any }).then(r => r.ok ? r.json() : {}),
     ]).then(([depts, us, stg]) => {
       setDepartments(Array.isArray(depts) ? depts : (depts.data ?? []));
-      setUsers(Array.isArray(us) ? us : (us.data ?? []));
+      const usArr = Array.isArray(us) ? us : (us.data ?? []);
+      setUsers(usArr.map((u: any) => ({ ...u, fullName: `${u.firstName} ${u.lastName}` })));
       setGlobalDraft(stg ?? {});
     }).finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -279,9 +280,7 @@ export default function TicketSettingsPage() {
                 {isOpen && cfg && (
                   <div className="border-t border-theme p-4 space-y-5">
                     {/* Enable toggle — prominent card */}
-                    <div
-                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${cfg.isEnabled ? "border-green-500/30 bg-green-500/5 hover:bg-green-500/8" : "border-theme bg-theme-secondary hover:bg-theme-hover"}`}
-                      onClick={() => patchDeptCfg(dept.id, { isEnabled: !cfg.isEnabled })}>
+                    <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${cfg.isEnabled ? "border-green-500/30 bg-green-500/5" : "border-theme bg-theme-secondary"}`}>
                       <div>
                         <div className="text-sm font-semibold text-theme-primary">فعال‌سازی پشتیبانی تیکت</div>
                         <div className="text-xs text-theme-muted mt-0.5">
@@ -357,7 +356,7 @@ export default function TicketSettingsPage() {
                         options={users.filter((u: any) => !cfg.managerIds.includes(u.id))}
                         value="" onChange={uid => { if (uid) patchDeptCfg(dept.id, { managerIds: [...cfg.managerIds, uid] }); }}
                         emptyLabel="افزودن مدیر" placeholder="جستجوی کاربر"
-                        displayKey="firstName" searchKey="lastName" />
+                        displayKey="fullName" searchKey="fullName" />
                     </div>
 
                     {/* Assignees */}
@@ -379,7 +378,7 @@ export default function TicketSettingsPage() {
                         options={users.filter((u: any) => !cfg.defaultAssigneeIds.includes(u.id))}
                         value="" onChange={uid => { if (uid) patchDeptCfg(dept.id, { defaultAssigneeIds: [...cfg.defaultAssigneeIds, uid] }); }}
                         emptyLabel="افزودن مسئول" placeholder="جستجوی کاربر"
-                        displayKey="firstName" searchKey="lastName" />
+                        displayKey="fullName" searchKey="fullName" />
                     </div>
 
                     {/* Save btn */}
@@ -479,13 +478,11 @@ export default function TicketSettingsPage() {
           </div>
 
           {/* allowUserPriority — redesigned as a prominent option card */}
-          <div
-            className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+          <div className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${
               globalDraft.allowUserPriority
-                ? "border-blue-500/50 bg-blue-500/5 hover:bg-blue-500/8"
-                : "border-theme bg-theme-secondary hover:bg-theme-hover"
-            }`}
-            onClick={() => patchGlobal("allowUserPriority", !globalDraft.allowUserPriority)}>
+                ? "border-blue-500/50 bg-blue-500/5"
+                : "border-theme bg-theme-secondary"
+            }`}>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-semibold text-theme-primary text-sm">انتخاب اولویت توسط کاربر</span>

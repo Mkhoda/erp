@@ -76,7 +76,11 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
     convIds.forEach((id) => socket.join(`conv:${id}`));
 
     this.server.emit('presence:update', { userId: user.userId, status: 'ONLINE' });
-    socket.emit('connected', { userId: user.userId, onlineCount: this.presence.getOnlineCount() });
+    socket.emit('connected', {
+      userId: user.userId,
+      onlineCount: this.presence.getOnlineCount(),
+      onlineUserIds: this.presence.getOnlineUserIds(),
+    });
   }
 
   async handleDisconnect(socket: Socket) {
@@ -94,6 +98,9 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
     @MessageBody() data: { conversationId: string; content?: string; type?: string; replyToId?: string },
   ) {
     if (!socket.data?.userId) return;
+    const VALID_TYPES = ['TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT'];
+    if (!VALID_TYPES.includes(data.type ?? '')) return;
+    if (!data.content?.trim() && data.type === 'TEXT') return;
     if (!(await this.convs.isMember(data.conversationId, socket.data.userId))) return;
     const msg = await this.msgs.create({
       conversationId: data.conversationId,

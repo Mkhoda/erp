@@ -47,8 +47,8 @@ const EVENT_FA: Record<string, string> = {
   SLA_BREACHED: "تأخیر SLA",
 };
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
-const faDate = (s: string) => new Date(s).toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran" });
-const faDateTime = (s: string) => new Date(s).toLocaleString("fa-IR", { timeZone: "Asia/Tehran" });
+const faDate = (s: string | null | undefined) => s ? new Date(s).toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran" }) : "—";
+const faDateTime = (s: string | null | undefined) => s ? new Date(s).toLocaleString("fa-IR", { timeZone: "Asia/Tehran" }) : "—";
 const fullName = (u: any) => u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : "—";
 
 type Tab = "conversation" | "timeline";
@@ -64,7 +64,13 @@ export default function TicketDetailPage() {
   const [loading, setLoading] = React.useState(true);
   const [tab, setTab] = React.useState<Tab>("conversation");
   const [users, setUsers] = React.useState<any[]>([]);
-  const [myRole, setMyRole] = React.useState<string>("");
+
+  // Decode role from JWT synchronously (no extra fetch needed)
+  const myRole = React.useMemo(() => {
+    if (!token) return "";
+    try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).role ?? ""; }
+    catch { return ""; }
+  }, [token]);
 
   // Compose
   const [replyText, setReplyText] = React.useState("");
@@ -92,15 +98,14 @@ export default function TicketDetailPage() {
   }, [id]);
 
   React.useEffect(() => {
+    const isStaffRole = ["ADMIN", "MANAGER", "EXPERT"].includes(myRole);
     setLoading(true);
     Promise.all([
       loadTicket(),
-      fetch(`${API}/auth/me`, { headers: h as any }).then(r => r.ok ? r.json() : {}),
-      fetch(`${API}/users`, { headers: h as any }).then(r => r.ok ? r.json() : []),
+      isStaffRole ? fetch(`${API}/users`, { headers: h as any }).then(r => r.ok ? r.json() : []) : Promise.resolve([]),
       fetch(`${API}/tickets/config/enabled`, { headers: h as any }).then(r => r.ok ? r.json() : []),
-    ]).then(([, me, us, cfgs]) => {
-      setMyRole(me.role ?? "");
-      setUsers(Array.isArray(us) ? us : (us.data ?? []));
+    ]).then(([, us, cfgs]) => {
+      setUsers((Array.isArray(us) ? us : (us.data ?? [])).map((u: any) => ({ ...u, fullName: `${u.firstName} ${u.lastName}` })));
       setDeptConfigs(cfgs);
     }).finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -445,7 +450,7 @@ export default function TicketDetailPage() {
             <h2 className="text-base font-bold text-theme-primary">تخصیص تیکت</h2>
             <SearchSelect options={users} value={assigneeId} onChange={setAssigneeId}
               emptyLabel="انتخاب مسئول" placeholder="جستجوی مسئول"
-              displayKey="firstName" searchKey="lastName" />
+              displayKey="fullName" searchKey="fullName" />
             <div className="flex gap-2 justify-end">
               <button onClick={() => setAssignModal(false)} className="px-4 py-2 rounded-xl border border-theme text-theme-secondary text-sm">انصراف</button>
               <button onClick={doAssign} disabled={actionLoading || !assigneeId}

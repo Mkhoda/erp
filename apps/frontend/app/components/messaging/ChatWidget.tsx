@@ -228,20 +228,21 @@ function ChatView({
 
   function handleInput(v: string) {
     setInput(v);
-    ctx.sendMessage(conv.id, "", "typing_start");
-    socketEmitTyping(true);
+    emitTyping(true);
   }
 
-  function socketEmitTyping(start: boolean) {
+  function emitTyping(start: boolean) {
     if (typingTimer.current) clearTimeout(typingTimer.current);
+    ctx.sendTyping(conv.id, start);
     if (start) {
-      typingTimer.current = setTimeout(() => socketEmitTyping(false), 3000);
+      typingTimer.current = setTimeout(() => emitTyping(false), 3000);
     }
   }
 
   function send() {
     const content = input.trim();
     if (!content) return;
+    emitTyping(false);
     ctx.sendMessage(conv.id, content, "TEXT", replyTo?.id);
     setInput("");
     setReplyTo(null);
