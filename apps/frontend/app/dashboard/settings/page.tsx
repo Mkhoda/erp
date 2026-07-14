@@ -7,6 +7,7 @@ import {
   CheckCircle, XCircle,
 } from "lucide-react";
 import { useToast } from "../../components/ui/Toast";
+import { DEFAULT_SYSTEM_NAME, pageTitle, refreshSystemName } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 function ah() {
@@ -335,9 +336,69 @@ function MessagingTab() {
   );
 }
 
+// ── General Tab ───────────────────────────────────────────────────────
+function GeneralTab() {
+  const toast = useToast();
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [orgName, setOrgName] = React.useState("");
+
+  React.useEffect(() => {
+    setLoading(true);
+    fetch(`${API}/system-settings`, { headers: ah() })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setOrgName(d.orgName || ""))
+      .catch(() => toast.error("دریافت تنظیمات ناموفق بود"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/system-settings`, { method: "PATCH", headers: ah(), body: JSON.stringify({ orgName: orgName.trim() }) });
+      if (!r.ok) throw new Error();
+      toast.success("تنظیمات عمومی ذخیره شد");
+      await refreshSystemName();
+    } catch { toast.error("خطا در ذخیره"); }
+    finally { setSaving(false); }
+  }
+
+  if (loading) return <div className="flex items-center justify-center py-12 text-theme-muted"><RefreshCw className="w-5 h-5 animate-spin" /></div>;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <label className="block text-sm font-medium text-theme-secondary mb-1.5">نام سامانه</label>
+        <input
+          className="input-theme w-full"
+          value={orgName}
+          onChange={e => setOrgName(e.target.value)}
+          placeholder={DEFAULT_SYSTEM_NAME}
+        />
+        <p className="text-xs text-theme-muted mt-1.5 flex items-center gap-1">
+          <Info className="w-3 h-3 shrink-0" />
+          در همه صفحات سامانه (عنوان تب مرورگر، نوار کناری و...) نمایش داده می‌شود. اگر خالی بگذارید، «{DEFAULT_SYSTEM_NAME}» استفاده می‌شود.
+        </p>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-theme-secondary mb-1.5">واحد پول</label>
+        <select className="select-theme w-full" defaultValue="IRR">
+          <option value="IRR">ریال ایران (IRR)</option>
+          <option value="IRT">تومان</option>
+        </select>
+      </div>
+      <div className="flex justify-end">
+        <button onClick={save} disabled={saving} className="btn-theme-primary flex items-center gap-2 disabled:opacity-50">
+          {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}ذخیره
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────
 export default function SettingsPage() {
-  React.useEffect(() => { document.title = "تنظیمات سامانه | Arzesh ERP"; }, []);
+  React.useEffect(() => { document.title = pageTitle("تنظیمات سامانه"); }, []);
   const [tab, setTab] = React.useState("bale");
 
   const tabs = [
@@ -377,24 +438,7 @@ export default function SettingsPage() {
           {tab === "security"  && <SecurityTab />}
           {tab === "messaging" && <MessagingTab />}
 
-          {tab === "general" && (
-            <div className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-theme-secondary mb-1.5">نام سامانه</label>
-                <input className="input-theme w-full" defaultValue="سامانه مدیریت ارزش" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-theme-secondary mb-1.5">واحد پول</label>
-                <select className="select-theme w-full" defaultValue="IRR">
-                  <option value="IRR">ریال ایران (IRR)</option>
-                  <option value="IRT">تومان</option>
-                </select>
-              </div>
-              <div className="flex justify-end">
-                <button className="btn-theme-primary flex items-center gap-2"><CheckCircle className="w-4 h-4" />ذخیره</button>
-              </div>
-            </div>
-          )}
+          {tab === "general" && <GeneralTab />}
 
           {tab === "database" && (
             <div className="space-y-4">

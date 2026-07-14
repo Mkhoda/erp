@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
+import { pageTitle } from "../../../../lib/branding";
 import {
   Server, Database, Clock, Save, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, Plug, ShieldCheck, AlertTriangle, Cpu, Plus,
@@ -40,7 +41,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputCls = "w-full bg-theme-primary border border-theme rounded-lg px-3 py-2 text-theme-primary text-sm focus:outline-none focus:border-blue-500";
 
 export default function AttendanceSettingsPage() {
-  React.useEffect(() => { document.title = "تنظیمات حضور و غیاب | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("تنظیمات حضور و غیاب"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 

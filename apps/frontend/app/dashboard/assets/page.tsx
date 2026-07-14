@@ -11,6 +11,7 @@ import Modal from "../../components/ui/Modal";
 import { useConfirm } from "../../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ui/Toast";
 import JalaliDatePicker from "../../components/ui/JalaliDatePicker";
+import { pageTitle } from "../../../lib/branding";
 
 type Asset = {
   id: string; name: string; barcode: string; oldBarcode?: string; description?: string;
@@ -36,7 +37,7 @@ const AVAIL: Record<string, { label: string; cls: string }> = {
 const avLabel = (a?: string) => AVAIL[a || ""] || { label: a || "-", cls: "bg-theme-secondary text-theme-muted border-theme" };
 
 export default function AssetsPage() {
-  React.useEffect(() => { document.title = "دارایی‌ها | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("دارایی‌ها"); }, []);
 
   const toast = useToast();
   const { confirm, Dialog: ConfirmDlg } = useConfirm();

@@ -2,7 +2,7 @@
 REM Script to generate APK from PWA using Bubblewrap for Windows
 REM Make sure you have Java 8+ and Android SDK installed
 
-echo 🚀 Generating APK for Arzesh ERP...
+echo 🚀 Generating APK for سامانه جامع ارزش...
 
 REM Check if bubblewrap is installed
 where bubblewrap >nul 2>nul
@@ -29,5 +29,5 @@ REM Optional: Sign the APK (uncomment if you have signing keys)
 REM echo Signing APK...
 REM bubblewrap build --skipPwaValidation
 
-echo 🎉 Your Arzesh ERP Android app is ready!
+echo 🎉 Your سامانه جامع ارزش Android app is ready!
 pause

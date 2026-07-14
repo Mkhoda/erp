@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Loader2, Plus, Filter, Download, AlertTriangle, Clock, CheckCircle2, RotateCcw, Search, Ticket } from "lucide-react";
 import SearchSelect from "../../components/ui/SearchSelect";
 import { useToast } from "../../components/ui/Toast";
+import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -47,7 +48,7 @@ function StatCard({ label, value, cls }: { label: string; value: string | number
 }
 
 export default function TicketsPage() {
-  React.useEffect(() => { document.title = "تیکت‌ها | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("تیکت‌ها"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   const toast = useToast();

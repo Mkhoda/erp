@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { Loader2, AlertTriangle, TrendingUp, Users, PieChart } from "lucide-react";
+import { pageTitle } from "../../../../lib/branding";
 import {
   BarChart, Bar, LineChart, Line, PieChart as RePieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
@@ -44,7 +45,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function TicketDashboardPage() {
-  React.useEffect(() => { document.title = "داشبورد تیکت | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("داشبورد تیکت"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}` };
   const toast = useToast();

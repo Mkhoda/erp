@@ -3,7 +3,7 @@
 # Script to generate APK from PWA using Bubblewrap
 # Make sure you have Java 8+ and Android SDK installed
 
-echo "🚀 Generating APK for Arzesh ERP..."
+echo "🚀 Generating APK for سامانه جامع ارزش..."
 
 # Check if bubblewrap is installed
 if ! command -v bubblewrap &> /dev/null; then
@@ -29,4 +29,4 @@ echo "📱 APK location: ./twa-project/app/build/outputs/apk/release/app-release
 # echo "Signing APK..."
 # bubblewrap build --skipPwaValidation
 
-echo "🎉 Your Arzesh ERP Android app is ready!"
+echo "🎉 Your سامانه جامع ارزش Android app is ready!"

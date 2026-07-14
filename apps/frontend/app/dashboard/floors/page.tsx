@@ -7,13 +7,14 @@ import { EmptyStateRow } from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import { useConfirm } from "../../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ui/Toast";
+import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 type Floor = { id: string; name: string; buildingId: string; description?: string; createdAt: string; building?: { id: string; name: string } };
 type BuildingType = { id: string; name: string };
 
 export default function FloorsPage() {
-  React.useEffect(() => { document.title = "طبقات | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("طبقات"); }, []);
   const toast = useToast();
   const { confirm, Dialog: ConfirmDlg } = useConfirm();
   const [floors, setFloors] = React.useState<Floor[]>([]);

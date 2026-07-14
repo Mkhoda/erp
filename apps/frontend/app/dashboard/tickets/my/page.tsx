@@ -3,6 +3,7 @@ import React from "react";
 import Link from "next/link";
 import { Loader2, Plus, AlertTriangle, Search, TicketCheck, Users, Inbox } from "lucide-react";
 import { useToast } from "../../../components/ui/Toast";
+import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -88,7 +89,7 @@ function TicketList({ rows, loading }: { rows: TicketRow[]; loading: boolean }) 
 }
 
 export default function MyTicketsPage() {
-  React.useEffect(() => { document.title = "تیکت‌های من | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("تیکت‌های من"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   const toast = useToast();

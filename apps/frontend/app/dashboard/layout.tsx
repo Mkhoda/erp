@@ -16,6 +16,7 @@ import { ToastProvider } from "../components/ui/Toast";
 import { MessagingProvider, useMessagingOptional } from "../../lib/messaging";
 import ChatWidget from "../components/messaging/ChatWidget";
 import type { Role } from "../../lib/menu";
+import { getSystemName, refreshSystemName } from "../../lib/branding";
 
 const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard": { label: "فضای کاری", Icon: LayoutDashboard },
@@ -77,6 +78,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [cmdOpen, setCmdOpen] = React.useState(false);
   const [authReady, setAuthReady] = React.useState(false);
   const [accessDenied, setAccessDenied] = React.useState(false);
+  const [orgName, setOrgName] = React.useState(getSystemName());
+
+  // Branding — refresh from /dashboard/settings ("عمومی" tab) on every dashboard load
+  React.useEffect(() => {
+    refreshSystemName().then(setOrgName);
+  }, []);
 
   // Auth
   React.useEffect(() => {
@@ -265,7 +272,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               {!sidebarCollapsed && (
                 <div className="min-w-0">
-                  <div className="font-bold text-theme-primary text-sm leading-tight">Arzesh AI</div>
+                  <div className="font-bold text-theme-primary text-sm leading-tight truncate">{orgName}</div>
                   <div className="text-[10px] text-theme-muted leading-tight">پلتفرم هوشمند سازمانی</div>
                 </div>
               )}

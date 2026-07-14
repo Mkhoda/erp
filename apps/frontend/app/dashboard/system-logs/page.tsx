@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
+import { pageTitle } from "../../../lib/branding";
 import {
   Activity, RefreshCw, Trash2, AlertCircle, Clock,
   ChevronDown, ChevronUp, Search, Filter,
@@ -63,7 +64,7 @@ export default function LogsPage() {
   const [filterStatus, setFilterStatus] = React.useState("");
   const [autoRefresh, setAutoRefresh] = React.useState(false);
 
-  React.useEffect(() => { document.title = "لاگ‌های سیستم | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("لاگ‌های سیستم"); }, []);
 
   const fetchData = React.useCallback(async () => {
     const token = localStorage.getItem("token");

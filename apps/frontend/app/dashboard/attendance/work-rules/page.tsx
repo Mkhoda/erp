@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { pageTitle } from "../../../../lib/branding";
 import {
   Save, Loader2, SlidersHorizontal, CalendarDays, Timer, Plus, Trash2, Users,
   CalendarRange, LayoutGrid, List, Settings, Activity, ChevronRight, ChevronLeft, X,
@@ -74,7 +75,7 @@ function Section({ title, icon: Icon, children }: { title: string; icon: any; ch
 }
 
 export default function WorkRulesPage() {
-  React.useEffect(() => { document.title = "قوانین و تقویم کاری | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("قوانین و تقویم کاری"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 

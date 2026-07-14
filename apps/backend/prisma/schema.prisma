@@ -1095,6 +1095,8 @@ model UserPresence {
 // System-wide settings managed via admin panel (Bale OTP, etc.)
 model SystemSettings {
   id              String   @id @default("singleton")
+  // Branding
+  orgName         String?  // display name shown app-wide; falls back to a hardcoded default when empty
   // Bale Safir OTP gateway
   baleSafirApiKey String?  // api-access-key from Bale Business Panel → Safir
   baleBotId       String?  // numeric bot ID

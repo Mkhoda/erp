@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { Megaphone, Loader2, Pin, AlertCircle, Info, AlertTriangle, Bell, CheckCircle2 } from "lucide-react";
+import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -17,7 +18,7 @@ const TYPE_FA: Record<string, string> = { BANNER: "بنر", POPUP: "پاپ‌آ�
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric" });
 
 export default function AnnouncementsBoard() {
-  React.useEffect(() => { document.title = "اطلاعیه‌ها | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("اطلاعیه‌ها"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}` };
 

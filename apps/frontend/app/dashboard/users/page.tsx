@@ -8,6 +8,7 @@ import { EmptyStateRow, EmptyStateBox } from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import { useConfirm } from "../../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ui/Toast";
+import { pageTitle } from "../../../lib/branding";
 
 type User = {
   id: string;
@@ -55,7 +56,7 @@ function StatCard({ label, value, sub, color }: { label: string; value: number; 
 }
 
 export default function UsersPage() {
-  React.useEffect(() => { document.title = "مدیریت کاربران | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("مدیریت کاربران"); }, []);
 
   const toast  = useToast();
   const { confirm, Dialog: ConfirmDlg } = useConfirm();

@@ -2,6 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { pageTitle } from "../../lib/branding";
 import {
   Sparkles, Send, ArrowLeft,
   Boxes, Users, Handshake, Building, BarChart3,
@@ -317,7 +318,7 @@ export default function WorkspacePage() {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const todayStr = React.useMemo(() => todayJalaliStr(), []);
 
-  React.useEffect(() => { document.title = "فضای کاری | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("فضای کاری"); }, []);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
 

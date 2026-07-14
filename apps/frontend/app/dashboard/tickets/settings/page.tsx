@@ -3,6 +3,7 @@ import React from "react";
 import { Loader2, Plus, Trash2, Edit2, Check, X, Settings, Save, ChevronDown, ChevronUp, ToggleLeft, ToggleRight } from "lucide-react";
 import SearchSelect from "../../../components/ui/SearchSelect";
 import { useToast } from "../../../components/ui/Toast";
+import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -53,7 +54,7 @@ const DEFAULT_DEPT_CFG: Omit<DeptCfgState, "id"> = {
 };
 
 export default function TicketSettingsPage() {
-  React.useEffect(() => { document.title = "تنظیمات تیکت | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("تنظیمات تیکت"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   const toast = useToast();

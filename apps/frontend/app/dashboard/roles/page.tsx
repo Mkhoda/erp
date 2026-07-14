@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import { Shield, Crown, User, Star, AlertCircle } from 'lucide-react';
+import { pageTitle } from "../../../lib/branding";
 
 // Backend defines roles as a fixed enum: 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT'
 type StaticRole = { 
@@ -49,7 +50,7 @@ const ROLES: StaticRole[] = [
 
 export default function RolesPage(){
   React.useEffect(() => {
-    document.title = "مدیریت نقش‌ها | Arzesh AI";
+    document.title = pageTitle("مدیریت نقش‌ها");
   }, []);
 
   return (

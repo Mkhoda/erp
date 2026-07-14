@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
+import { pageTitle } from "../../../../lib/branding";
 import {
   RefreshCw, Play, CheckCircle2, XCircle, Loader2, AlertTriangle,
   Activity, Database, Clock, ChevronDown, Stethoscope, Users, TimerReset,
@@ -30,7 +31,7 @@ const STATUS: Record<string, { label: string; cls: string; icon: any }> = {
 };
 
 export default function SyncMonitorPage() {
-  React.useEffect(() => { document.title = "پایش همگام‌سازی | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("پایش همگام‌سازی"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 

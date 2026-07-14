@@ -8,6 +8,7 @@ import {
   MessageSquare, Loader2, AlertCircle,
   Paperclip, Image as ImageIcon, Pin,
 } from "lucide-react";
+import { getSystemName, pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -76,7 +77,7 @@ function ChatPageInner() {
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => { document.title = "گفتگو با AI | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("گفتگو با AI"); }, []);
 
   const h    = () => ({ Authorization: `Bearer ${localStorage.getItem("token") || ""}` });
   const hj   = () => ({ "Content-Type": "application/json", ...h() });
@@ -443,7 +444,7 @@ function ChatPageInner() {
               <div className="w-16 h-16 bg-ai-gradient rounded-2xl flex items-center justify-center shadow-lg mb-4">
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-theme-primary mb-2">دستیار هوشمند Arzesh</h2>
+              <h2 className="text-xl font-bold text-theme-primary mb-2">دستیار هوشمند {getSystemName()}</h2>
               <p className="text-theme-muted text-sm max-w-sm mb-6">
                 {providers.length === 0 ? "هیچ مدل AI فعالی تنظیم نشده." : "یک گفتگوی جدید شروع کنید."}
               </p>

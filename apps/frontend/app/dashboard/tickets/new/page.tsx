@@ -4,13 +4,14 @@ import { useRouter } from "next/navigation";
 import { Loader2, Send, Paperclip, X, PlusCircle } from "lucide-react";
 import SearchSelect from "../../../components/ui/SearchSelect";
 import { useToast } from "../../../components/ui/Toast";
+import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const PRIORITY_FA = { LOW: "کم", MEDIUM: "متوسط", HIGH: "بالا", CRITICAL: "بحرانی" };
 
 export default function NewTicketPage() {
-  React.useEffect(() => { document.title = "تیکت جدید | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("تیکت جدید"); }, []);
   const router = useRouter();
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}` };

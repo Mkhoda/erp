@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { pageTitle } from "../../../lib/branding";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -185,7 +186,7 @@ const ChartTooltip = ({ active, payload, label }: any) => {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────
 export default function AttendanceDashboardPage() {
-  React.useEffect(() => { document.title = "داشبورد حضور و غیاب | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("داشبورد حضور و غیاب"); }, []);
 
   const token  = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const hdr = React.useMemo(() => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }), [token]);

@@ -3,10 +3,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { Mail, Phone, MapPin, Clock, Send, MessageCircle, Headphones } from 'lucide-react';
+import { pageTitle } from '../../../lib/branding';
 
 export default function ContactPage() {
   React.useEffect(() => {
-    document.title = 'تماس با ما | Arzesh ERP';
+    document.title = pageTitle('تماس با ما');
   }, []);
 
   const [formData, setFormData] = React.useState({

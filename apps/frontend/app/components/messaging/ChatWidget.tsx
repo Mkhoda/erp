@@ -32,18 +32,18 @@ function relTime(iso: string) {
 
 function ConvList({
   convs,
+  myId,
   onSelect,
   onClose,
 }: {
   convs: Conversation[];
+  myId: string;
   onSelect: (id: string) => void;
   onClose: () => void;
 }) {
   const ctx = useMessagingOptional()!;
   const [search, setSearch] = React.useState("");
   const [tab, setTab] = React.useState<"chats" | "users">("chats");
-
-  const myId = convs[0]?.members?.find(() => true)?.userId; // rough; we'll filter properly
 
   const filtered = tab === "chats"
     ? convs.filter((c) => {
@@ -535,6 +535,7 @@ export default function ChatWidget() {
             ) : (
               <ConvList
                 convs={conversations}
+                myId={myId}
                 onSelect={(id) => {
                   ctx.setActiveConv(id);
                   ctx.markRead(id);

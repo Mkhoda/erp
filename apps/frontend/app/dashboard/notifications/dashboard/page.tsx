@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { pageTitle } from "../../../../lib/branding";
 import {
   BarChart2, Bell, CheckCheck, TrendingUp, AlertTriangle,
   RefreshCw, Info,
@@ -47,7 +48,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function NotificationsDashboardPage() {
-  React.useEffect(() => { document.title = "آمار اعلان‌ها | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("آمار اعلان‌ها"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}` };
 

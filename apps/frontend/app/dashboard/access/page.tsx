@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { pageTitle } from "../../../lib/branding";
 import {
   Lock, ShieldCheck, Building2, Check, X, RefreshCw, ChevronDown,
   Boxes, Users, BarChart3, Fingerprint, MapPin, Navigation,
@@ -129,7 +130,7 @@ const UNIVERSAL_DISPLAY = [
 ];
 
 export default function AccessPage() {
-  React.useEffect(() => { document.title = "دسترسی صفحات | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("دسترسی صفحات"); }, []);
   const toast = useToast();
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const authH = { Authorization: `Bearer ${token}` };

@@ -2,7 +2,7 @@
   "name": "frontend",
   "private": true,
   "version": "0.1.0",
-  "description": "Arzesh ERP",
+  "description": "سامانه جامع ارزش",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

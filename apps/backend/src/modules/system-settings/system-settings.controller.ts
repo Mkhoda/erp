@@ -17,7 +17,7 @@ export class SystemSettingsController {
 
   @Patch()
   update(
-    @Body() dto: { baleSafirApiKey?: string; baleBotId?: string; baleMock?: boolean },
+    @Body() dto: { orgName?: string; baleSafirApiKey?: string; baleBotId?: string; baleMock?: boolean },
     @Req() req: any,
   ) {
     return this.svc.update(dto, req.user.userId);
@@ -26,5 +26,18 @@ export class SystemSettingsController {
   @Post('test-bale')
   testBale(@Body() dto: { phone: string; otp: string }) {
     return this.svc.testBale(dto.phone, dto.otp);
+  }
+}
+
+// Unauthenticated — the display name is non-sensitive and needed on public
+// pages (signin, landing) as well as every dashboard page, so it can't sit
+// behind the admin-only guards above.
+@Controller('branding')
+export class BrandingController {
+  constructor(private readonly svc: SystemSettingsService) {}
+
+  @Get()
+  async get() {
+    return { name: await this.svc.getOrgName() };
   }
 }

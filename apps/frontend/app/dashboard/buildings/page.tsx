@@ -7,12 +7,13 @@ import { EmptyStateRow } from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import { useConfirm } from "../../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ui/Toast";
+import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 type BuildingType = { id: string; name: string; address?: string; description?: string; createdAt: string };
 
 export default function BuildingsPage() {
-  React.useEffect(() => { document.title = "ساختمان‌ها | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("ساختمان‌ها"); }, []);
   const toast = useToast();
   const { confirm, Dialog: ConfirmDlg } = useConfirm();
   const [buildings, setBuildings] = React.useState<BuildingType[]>([]);

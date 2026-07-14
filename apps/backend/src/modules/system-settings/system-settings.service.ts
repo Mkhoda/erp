@@ -7,10 +7,13 @@ import { ConfigService } from '@nestjs/config';
 const SAFIR_URL = 'https://safir.bale.ai/api/v3/send_message';
 
 export interface SystemSettingsData {
+  orgName: string | null;
   baleSafirApiKey: string | null;
   baleBotId: string | null;
   baleMock: boolean;
 }
+
+export const DEFAULT_ORG_NAME = 'سامانه جامع ارزش';
 
 @Injectable()
 export class SystemSettingsService {
@@ -35,6 +38,7 @@ export class SystemSettingsService {
     });
 
     this.cache = {
+      orgName: row.orgName,
       baleSafirApiKey: row.baleSafirApiKey,
       baleBotId: row.baleBotId,
       baleMock: row.baleMock,
@@ -47,8 +51,14 @@ export class SystemSettingsService {
     this.cache = null;
   }
 
+  /** Public, unauthenticated read of just the display name — safe to expose broadly. */
+  async getOrgName(): Promise<string> {
+    const { orgName } = await this.get();
+    return orgName?.trim() || DEFAULT_ORG_NAME;
+  }
+
   async update(
-    data: Partial<{ baleSafirApiKey: string; baleBotId: string; baleMock: boolean }>,
+    data: Partial<{ orgName: string; baleSafirApiKey: string; baleBotId: string; baleMock: boolean }>,
     adminId: string,
   ) {
     const updated = await this.prisma.systemSettings.upsert({

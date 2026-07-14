@@ -1,13 +1,14 @@
 "use client";
 import React from "react";
 import { Loader2, CalendarOff, Plus, Trash2 } from "lucide-react";
+import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 const TYPE_FA: Record<string, string> = { OFFICIAL: "تعطیل رسمی", COMPANY: "تعطیل شرکت", HALF_DAY: "نیم‌روز" };
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone: "UTC" });
 
 export default function HolidaysPage() {
-  React.useEffect(() => { document.title = "تعطیلات | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("تعطیلات"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 

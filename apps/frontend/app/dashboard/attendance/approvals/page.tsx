@@ -2,6 +2,7 @@
 import React from "react";
 import { Loader2, CheckCircle2, XCircle, ClipboardCheck, ArrowLeftRight } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 const STATUS_FA: Record<string,string> = { LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری" };
@@ -11,7 +12,7 @@ const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
 
 export default function ApprovalsPage() {
-  React.useEffect(() => { document.title = "صف تایید حضور | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("صف تایید حضور"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 

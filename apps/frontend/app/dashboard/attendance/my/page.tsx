@@ -3,6 +3,7 @@ import React from "react";
 import { Loader2, Fingerprint, Pencil, AlertTriangle, Send, Hourglass } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import TimeSelect from "../../../components/ui/TimeSelect";
+import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
@@ -51,7 +52,7 @@ function currentJalali() {
 }
 
 export default function MyAttendancePage() {
-  React.useEffect(() => { document.title = "حضور من | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("حضور من"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 

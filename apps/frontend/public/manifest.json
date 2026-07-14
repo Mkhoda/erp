@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Arzesh ERP",
-  "short_name": "Arzesh",
-  "description": "سیستم برنامه‌ریزی و مدیریت ارزش (Arzesh ERP)",
+  "name": "سامانه جامع ارزش",
+  "short_name": "ارزش",
+  "description": "سیستم برنامه‌ریزی و مدیریت ارزش",
   "categories": ["productivity", "business", "utilities"],
   "start_url": "/",
   "scope": "/",

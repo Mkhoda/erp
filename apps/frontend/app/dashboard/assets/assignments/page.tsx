@@ -8,12 +8,13 @@ import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
 import { useConfirm } from "../../../components/ui/ConfirmDialog";
 import { useToast } from "../../../components/ui/Toast";
+import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 type Row = { id: string; assetId: string; userId?: string; departmentId?: string; assignedAt: string; returnedAt?: string; asset?: any; user?: any; department?: any };
 
 export default function AssignmentsPage() {
-  React.useEffect(() => { document.title = "واگذاری دارایی | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("واگذاری دارایی"); }, []);
   const toast = useToast();
   const { confirm, Dialog: ConfirmDlg } = useConfirm();
   const [rows, setRows] = React.useState<Row[]>([]);

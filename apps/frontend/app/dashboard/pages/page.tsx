@@ -2,12 +2,13 @@
 import React from "react";
 import { RefreshCw, BookOpen, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useToast } from "../../components/ui/Toast";
+import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 type PageRow = { id: string; path: string; label: string; isActive: boolean; createdAt: string };
 
 export default function PagesPage() {
-  React.useEffect(() => { document.title = "مدیریت صفحات | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("مدیریت صفحات"); }, []);
   const toast = useToast();
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const authH = { Authorization: `Bearer ${token}` };

@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { useRouter } from "next/navigation";
+import { pageTitle } from "../../../lib/branding";
 import {
   Bell, Search, Filter, CheckCheck, Archive, Pin, Trash2,
   ChevronRight, ChevronLeft, RefreshCw, X, AlertCircle,
@@ -65,7 +66,7 @@ function fmtTime(iso: string) {
 }
 
 export default function NotificationsPage() {
-  React.useEffect(() => { document.title = "مرکز اعلان‌ها | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("مرکز اعلان‌ها"); }, []);
   const router = useRouter();
   const toast = useToast();
   const messaging = useMessagingOptional();

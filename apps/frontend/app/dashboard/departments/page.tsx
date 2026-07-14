@@ -7,12 +7,13 @@ import { EmptyStateRow } from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import { useConfirm } from "../../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ui/Toast";
+import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 type Department = { id: string; name: string; description?: string; createdAt: string };
 
 export default function DepartmentsPage() {
-  React.useEffect(() => { document.title = "دپارتمان‌ها | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("دپارتمان‌ها"); }, []);
 
   const toast = useToast();
   const { confirm, Dialog: ConfirmDlg } = useConfirm();

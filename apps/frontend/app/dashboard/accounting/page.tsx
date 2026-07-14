@@ -2,12 +2,13 @@
 import React from 'react';
 import { CircleDollarSign, Search, TrendingUp, Boxes, BarChart3, Save, Check } from 'lucide-react';
 import JalaliDatePicker from '../../components/ui/JalaliDatePicker';
+import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 type AssetRow = { id: string; name: string; barcode: string; cost?: number; purchaseDate?: string };
 
 export default function AccountingPage() {
-  React.useEffect(() => { document.title = "حسابداری دارایی | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("حسابداری دارایی"); }, []);
 
   const [rows, setRows] = React.useState<AssetRow[]>([]);
   const [q, setQ] = React.useState('');

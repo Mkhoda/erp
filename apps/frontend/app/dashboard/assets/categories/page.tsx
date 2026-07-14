@@ -7,12 +7,13 @@ import { EmptyStateRow } from "../../../components/ui/EmptyState";
 import Modal from "../../../components/ui/Modal";
 import { useConfirm } from "../../../components/ui/ConfirmDialog";
 import { useToast } from "../../../components/ui/Toast";
+import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 type Item = { id: string; name: string; codePrefix?: string; description?: string };
 
 export default function AssetCategoriesPage() {
-  React.useEffect(() => { document.title = "دسته‌بندی دارایی | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("دسته‌بندی دارایی"); }, []);
   const toast = useToast();
   const { confirm, Dialog: ConfirmDlg } = useConfirm();
   const [items, setItems] = React.useState<Item[]>([]);

@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { pageTitle } from "../../../../lib/branding";
 import {
   FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, Pencil,
 } from "lucide-react";
@@ -41,7 +42,7 @@ function currentJalali() {
 }
 
 export default function AttendanceRecordsPage() {
-  React.useEffect(() => { document.title = "کارکرد روزانه | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("کارکرد روزانه"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 

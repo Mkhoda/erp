@@ -6,12 +6,13 @@ import { EmptyStateBox } from "../../../components/ui/EmptyState";
 import Modal from "../../../components/ui/Modal";
 import { useConfirm } from "../../../components/ui/ConfirmDialog";
 import { useToast } from "../../../components/ui/Toast";
+import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 type Item = { id: string; name: string; description?: string };
 
 export default function AssetTypesPage() {
-  React.useEffect(() => { document.title = "انواع دارایی | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("انواع دارایی"); }, []);
   const toast = useToast();
   const { confirm, Dialog: ConfirmDlg } = useConfirm();
   const [items, setItems] = React.useState<Item[]>([]);

@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { pageTitle } from "../../../lib/branding";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area,
@@ -31,7 +32,7 @@ function StatCard({ icon: Icon, label, value, sub, color }: { icon: any; label: 
 const faTooltip = (label: string) => ({ formatter: (v: any) => [v.toLocaleString("fa-IR"), label] });
 
 export default function ReportsPage() {
-  React.useEffect(() => { document.title = "گزارش‌ها | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("گزارش‌ها"); }, []);
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}` };
 

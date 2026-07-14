@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import SearchSelect from "../../../components/ui/SearchSelect";
 import { useToast } from "../../../components/ui/Toast";
+import { getSystemName } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -93,7 +94,7 @@ export default function TicketDetailPage() {
     if (!res.ok) { toast.error("تیکت یافت نشد"); return; }
     const data = await res.json();
     setTicket(data);
-    document.title = `#${data.number} | تیکت | Arzesh`;
+    document.title = `#${data.number} | تیکت | ${getSystemName()}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 

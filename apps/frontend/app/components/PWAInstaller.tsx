@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getSystemName } from '../../lib/branding';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -78,7 +79,7 @@ export default function PWAInstaller() {
     <div className="right-4 bottom-4 left-4 z-50 fixed flex justify-between items-center bg-blue-600 shadow-lg p-4 rounded-lg text-white">
       <div className="flex-1">
         <h3 className="font-bold text-sm">نصب اپلیکیشن</h3>
-        <p className="opacity-90 text-xs">Arzesh ERP را روی دستگاه خود نصب کنید</p>
+        <p className="opacity-90 text-xs">{getSystemName()} را روی دستگاه خود نصب کنید</p>
       </div>
       <div className="flex gap-2">
         <button

@@ -3,10 +3,11 @@ import React from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Target, Users, Award, Lightbulb, HeartHandshake, Rocket } from 'lucide-react';
+import { pageTitle } from '../../../lib/branding';
 
 export default function AboutPage() {
   React.useEffect(() => {
-    document.title = 'درباره ما | Arzesh ERP';
+    document.title = pageTitle('درباره ما');
   }, []);
 
   const values = [

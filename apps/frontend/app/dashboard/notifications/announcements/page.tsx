@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { pageTitle } from "../../../../lib/branding";
 import {
   Megaphone, Plus, Pencil, Trash2, Send, BarChart3, X,
   ChevronRight, ChevronLeft, Search, Clock, CheckCircle2,
@@ -165,7 +166,7 @@ const emptyForm = () => ({
 });
 
 export default function AnnouncementsPage() {
-  React.useEffect(() => { document.title = "مدیریت اطلاعیه‌ها | Arzesh"; }, []);
+  React.useEffect(() => { document.title = pageTitle("مدیریت اطلاعیه‌ها"); }, []);
   const toast = useToast();
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = { Authorization: `Bearer ${token}` };

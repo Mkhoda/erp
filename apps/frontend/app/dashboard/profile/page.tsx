@@ -2,6 +2,7 @@
 import React from 'react';
 import { User, Shield, Save, Key, Bell, Phone, Check, AlertCircle } from 'lucide-react';
 import { isValidPhone, normalizeTo98 } from '../../../lib/phone';
+import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -15,7 +16,7 @@ const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
 };
 
 export default function ProfilePage() {
-  React.useEffect(() => { document.title = "پروفایل | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("پروفایل"); }, []);
 
   const [me, setMe] = React.useState<Me | null>(null);
   const [edit, setEdit] = React.useState<Partial<Me>>({});

@@ -7,6 +7,7 @@ import { EmptyStateRow } from "../../components/ui/EmptyState";
 import Modal from "../../components/ui/Modal";
 import { useConfirm } from "../../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ui/Toast";
+import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 type Room = { id: string; name: string; buildingId: string; floorId?: string; description?: string; capacity?: number; createdAt: string; building?: { id: string; name: string }; floor?: { id: string; name: string } };
@@ -14,7 +15,7 @@ type BuildingType = { id: string; name: string };
 type Floor = { id: string; name: string; buildingId: string };
 
 export default function RoomsPage() {
-  React.useEffect(() => { document.title = "اتاق‌ها | Arzesh AI"; }, []);
+  React.useEffect(() => { document.title = pageTitle("اتاق‌ها"); }, []);
   const toast = useToast();
   const { confirm, Dialog: ConfirmDlg } = useConfirm();
   const [rooms, setRooms] = React.useState<Room[]>([]);
