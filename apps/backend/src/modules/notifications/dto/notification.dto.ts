@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsArray, IsBoolean, IsInt, Min, Max, IsNotEmpty, IsDateString } from 'class-validator';
+import { Type } from 'class-transformer';
 import { NotificationCategory, NotificationPriority, AnnouncementType, AnnouncementTarget } from '@prisma/client';
 
 export class PublishNotificationDto {
@@ -15,12 +16,12 @@ export class PublishNotificationDto {
 
 export class NotificationFilterDto {
   @IsOptional() @IsEnum(NotificationCategory) category?: NotificationCategory;
-  @IsOptional() @IsBoolean() isRead?: boolean;
-  @IsOptional() @IsBoolean() isArchived?: boolean;
-  @IsOptional() @IsBoolean() isPinned?: boolean;
+  @IsOptional() @Type(() => Boolean) @IsBoolean() isRead?: boolean;
+  @IsOptional() @Type(() => Boolean) @IsBoolean() isArchived?: boolean;
+  @IsOptional() @Type(() => Boolean) @IsBoolean() isPinned?: boolean;
   @IsOptional() @IsString() search?: string;
-  @IsOptional() @IsInt() @Min(1) page?: number;
-  @IsOptional() @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }
 
 export class MarkReadDto {
@@ -64,8 +65,8 @@ export class UpdateAnnouncementDto {
 
 export class AnnouncementFilterDto {
   @IsOptional() @IsEnum(AnnouncementType) type?: AnnouncementType;
-  @IsOptional() @IsBoolean() isPublished?: boolean;
+  @IsOptional() @Type(() => Boolean) @IsBoolean() isPublished?: boolean;
   @IsOptional() @IsString() search?: string;
-  @IsOptional() @IsInt() @Min(1) page?: number;
-  @IsOptional() @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }

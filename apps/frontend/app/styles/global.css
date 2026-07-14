@@ -985,10 +985,16 @@ html:not(.dark) body {
   background-size: 800px 100%;
 }
 
-/* Smooth page enter animation */
+/* Smooth page enter animation.
+   No `transform` here on purpose: an ancestor with an active (or
+   fill-mode: forwards) transform becomes the containing block for any
+   `position: fixed` descendant — every full-screen modal rendered inside a
+   dashboard page (this class wraps {children} in dashboard/layout.tsx) would
+   then be positioned relative to this scrollable, padded content box instead
+   of the real viewport, instead of centering on screen. */
 @keyframes page-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .page-enter {
