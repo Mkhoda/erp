@@ -7,7 +7,7 @@ import {
   Boxes, Users, Handshake, Building, BarChart3,
   MessageSquare, Plus, Activity, ArrowUpRight,
   Loader2, AlertCircle, Brain, Check, Trash2, ChevronLeft, ChevronRight,
-  CalendarDays, Zap, Fingerprint,
+  CalendarDays, Zap, Fingerprint, Bell, Ticket,
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -277,7 +277,7 @@ function LeaveCard({ leave }: { leave: any }) {
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Stats = { totalAssets: number; totalUsers: number; activeAssignments: number; totalDepartments: number };
+type Stats = { totalUsers: number; totalDepartments: number; unreadNotifications: number; myOpenTickets: number };
 type Message = { id: string; role: "user" | "assistant"; content: string; error?: boolean };
 type Provider = { id: string; name: string; type: string; model: string | null };
 type RecentConvo = { id: string; title: string | null; provider: string; updatedAt: string; messages: Array<{ content: string; role: string }> };
@@ -305,7 +305,7 @@ const ROLE_CLS: Record<string, string> = {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function WorkspacePage() {
   const [me, setMe] = React.useState<any>(null);
-  const [stats, setStats] = React.useState<Stats>({ totalAssets:0, totalUsers:0, activeAssignments:0, totalDepartments:0 });
+  const [stats, setStats] = React.useState<Stats>({ totalUsers:0, totalDepartments:0, unreadNotifications:0, myOpenTickets:0 });
   const [statsLoading, setStatsLoading] = React.useState(true);
   const [allProviders, setAllProviders] = React.useState<Provider[]>([]);
   const [provider, setProvider] = React.useState<Provider | null>(null);
@@ -327,21 +327,21 @@ export default function WorkspacePage() {
 
     Promise.all([
       fetch(`${API}/auth/me`,       { headers: h }).then(r => r.ok ? r.json() : null),
-      fetch(`${API}/assets`,        { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/users`,         { headers: h }).then(r => r.ok ? r.json() : []),
-      fetch(`${API}/asset-assignments`, { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/departments`,   { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/ai-settings/providers/active`, { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/chat-history/conversations/recent?limit=4`, { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/attendance/me/leave-balance?jYear=${currentJYear()}`, { headers: h }).then(r => r.ok ? r.json() : null),
-    ]).then(([meData, assets, users, assignments, depts, providers, recent, lb]) => {
+      fetch(`${API}/notifications/unread-count`, { headers: h }).then(r => r.ok ? r.json() : { count: 0 }),
+      fetch(`${API}/tickets/my?status=OPEN&limit=1`, { headers: h }).then(r => r.ok ? r.json() : { total: 0 }),
+    ]).then(([meData, users, depts, providers, recent, lb, notifCount, myTickets]) => {
       setMe(meData);
       setLeave(lb);
       setStats({
-        totalAssets: Array.isArray(assets) ? assets.length : (assets?.data?.length ?? 0),
-        totalUsers:  Array.isArray(users)  ? users.length  : (users?.data?.length  ?? 0),
-        activeAssignments: Array.isArray(assignments) ? assignments.filter((a: any) => !a.returnedAt).length : 0,
-        totalDepartments:  Array.isArray(depts) ? depts.length : (depts?.data?.length ?? 0),
+        totalUsers:           Array.isArray(users) ? users.length : (users?.data?.length ?? 0),
+        totalDepartments:     Array.isArray(depts) ? depts.length : (depts?.data?.length ?? 0),
+        unreadNotifications:  notifCount?.count ?? 0,
+        myOpenTickets:        myTickets?.total ?? 0,
       });
       if (Array.isArray(recent)) setRecentConvos(recent);
       if (Array.isArray(providers) && providers.length > 0) {
@@ -383,10 +383,10 @@ export default function WorkspacePage() {
   const isPrivileged     = role === "ADMIN" || role === "MANAGER" || role === "EXPERT";
 
   const statCards = [
-    { title: "کل دارایی‌ها",  value: stats.totalAssets,        icon: Boxes,     color: "blue",   href: "/dashboard/assets" },
-    { title: "کاربران سیستم", value: stats.totalUsers,          icon: Users,     color: "green",  href: "/dashboard/users",             show: isAdminOrManager },
-    { title: "واگذاری فعال",  value: stats.activeAssignments,   icon: Handshake, color: "amber",  href: "/dashboard/assets/assignments" },
-    { title: "دپارتمان‌ها",   value: stats.totalDepartments,    icon: Building,  color: "purple", href: "/dashboard/departments",        show: isAdminOrManager },
+    { title: "اعلان‌های خوانده‌نشده", value: stats.unreadNotifications, icon: Bell,     color: "blue",   href: "/dashboard/notifications" },
+    { title: "کاربران سیستم",          value: stats.totalUsers,           icon: Users,    color: "green",  href: "/dashboard/users",         show: isAdminOrManager },
+    { title: "تیکت‌های باز من",        value: stats.myOpenTickets,        icon: Ticket,   color: "amber",  href: "/dashboard/tickets/my" },
+    { title: "دپارتمان‌ها",            value: stats.totalDepartments,     icon: Building, color: "purple", href: "/dashboard/departments",    show: isAdminOrManager },
   ].filter(s => !("show" in s) || s.show || statsLoading);
 
   const quickActions = [

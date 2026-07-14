@@ -256,10 +256,10 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         ...s,
         onlineCount: data.onlineCount,
         presence: { ...s.presence, ...presencePatch },
-        users: s.users.map((u) => ({ ...u, isOnline: presencePatch[u.id] === "ONLINE" || !!s.presence[u.id] })),
+        users: s.users.map((u) => ({ ...u, isOnline: presencePatch[u.id] === "ONLINE" || s.presence[u.id] === "ONLINE" })),
         conversations: s.conversations.map((c) => ({
           ...c,
-          members: c.members.map((m) => ({ ...m, isOnline: presencePatch[m.userId] === "ONLINE" || !!s.presence[m.userId] })),
+          members: c.members.map((m) => ({ ...m, isOnline: presencePatch[m.userId] === "ONLINE" || s.presence[m.userId] === "ONLINE" })),
         })),
       }));
     });

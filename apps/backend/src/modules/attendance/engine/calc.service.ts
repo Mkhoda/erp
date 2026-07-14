@@ -305,9 +305,11 @@ export class CalcService {
       }
     }
 
-    // Net deficit: hours short of required. Zero for HOURLY staff, holidays, and weekends.
+    // Net deficit: hours short of required. Zero for HOURLY staff, holidays, weekends,
+    // and days still in progress (punched in but not yet out — workedMinutes is not
+    // final, so nothing must be finalized as deficit until check-out is recorded).
     // Formula: max(0, required - worked - approved_leave). Handles late, early, short, absent.
-    const deficitMinutes = (!holidayWork && sched.employeeType === 'FULL_TIME')
+    const deficitMinutes = (!holidayWork && sched.employeeType === 'FULL_TIME' && (bothPunches || !hasPunch))
       ? Math.max(0, sched.dailyMinutes - workedMinutes - leaveMinutes)
       : 0;
 

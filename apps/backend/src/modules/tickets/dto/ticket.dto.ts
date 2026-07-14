@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsArray, IsInt, IsBoolean, Min, Max, IsNotEmpty } from 'class-validator';
+import { Type } from 'class-transformer';
 import { TicketStatus, TicketPriority } from '@prisma/client';
 
 export class CreateTicketDto {
@@ -83,9 +84,9 @@ export class TicketFilterDto {
   @IsOptional() @IsString() search?: string;
   @IsOptional() @IsString() dateFrom?: string;
   @IsOptional() @IsString() dateTo?: string;
-  @IsOptional() @IsBoolean() isOverSla?: boolean;
-  @IsOptional() @IsInt() @Min(1) page?: number;
-  @IsOptional() @IsInt() @Min(1) @Max(200) limit?: number;
+  @IsOptional() @Type(() => Boolean) @IsBoolean() isOverSla?: boolean;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number;
 }
 
 export class UpdateTicketSettingsDto {

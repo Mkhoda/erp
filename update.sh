@@ -203,6 +203,82 @@ else
   pm2 save >/dev/null 2>&1 || true
 fi
 
+# ── 5. Nginx socket.io proxy check ─────────────────────────────
+# The live nginx config on this host is NOT generated from nginx/nginx.conf in
+# this repo — it's the file deploy.sh wrote to /etc/nginx/sites-available/arzesh-erp.
+# Older deploys wrote that file without a `location /socket.io` block, so
+# Socket.IO requests fell through to `location /` (the frontend) and 404'd.
+# This step is idempotent: checks each `location /api` block for a sibling
+# `location /socket.io` block and adds one if missing, then validates + reloads.
+header "Nginx"
+NGINX_CONF="/etc/nginx/sites-available/arzesh-erp"
+
+if ! command -v nginx >/dev/null 2>&1; then
+  warn "nginx not found on this host — skipping socket.io proxy check"
+elif [ ! -f "$NGINX_CONF" ]; then
+  warn "$NGINX_CONF not found — skipping socket.io proxy check (add it manually if your nginx layout differs)"
+else
+  step_start "Nginx socket.io proxy"
+  if grep -q 'location /socket.io' "$NGINX_CONF"; then
+    ok "socket.io proxy already present in $NGINX_CONF"
+    step_done
+  else
+    warn "socket.io proxy missing from $NGINX_CONF — real-time messaging would 404. Adding it now..."
+    TMP_CONF="$(mktemp)"
+    awk '
+      BEGIN { in_api = 0; depth = 0 }
+      {
+        line = $0
+        if (in_api == 0 && line ~ /^[[:space:]]*location \/api([[:space:]]|\{)/) {
+          in_api = 1
+          depth = 0
+        }
+        print line
+        if (in_api == 1) {
+          depth += gsub(/\{/, "{", line)
+          depth -= gsub(/\}/, "}", line)
+          if (depth == 0) {
+            in_api = 0
+            print "    location /socket.io {"
+            print "        proxy_pass http://localhost:3001;"
+            print "        proxy_http_version 1.1;"
+            print "        proxy_set_header Upgrade $http_upgrade;"
+            print "        proxy_set_header Connection \"upgrade\";"
+            print "        proxy_set_header Host $host;"
+            print "        proxy_set_header X-Real-IP $remote_addr;"
+            print "        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;"
+            print "        proxy_set_header X-Forwarded-Proto $scheme;"
+            print "        proxy_cache_bypass $http_upgrade;"
+            print "        proxy_read_timeout 86400s;"
+            print "    }"
+          }
+        }
+      }
+    ' "$NGINX_CONF" > "$TMP_CONF"
+
+    ADDED=$(grep -c 'location /socket.io' "$TMP_CONF" || true)
+    if [ "$ADDED" -eq 0 ]; then
+      err "Could not find a 'location /api' block to anchor the socket.io proxy — add it to $NGINX_CONF manually"
+      step_fail
+      rm -f "$TMP_CONF"
+    else
+      BACKUP="${NGINX_CONF}.bak-$(date +%s)"
+      sudo cp "$NGINX_CONF" "$BACKUP"
+      sudo cp "$TMP_CONF" "$NGINX_CONF"
+      rm -f "$TMP_CONF"
+      if sudo nginx -t >/dev/null 2>&1; then
+        sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload
+        ok "Added socket.io proxy to $ADDED server block(s) in $NGINX_CONF and reloaded nginx (backup: $BACKUP)"
+        step_done
+      else
+        err "nginx config test failed after edit — restoring backup"
+        sudo cp "$BACKUP" "$NGINX_CONF"
+        step_fail
+      fi
+    fi
+  fi
+fi
+
 # ── Summary ────────────────────────────────────────────────────
 TOTAL=$(( $(date +%s) - SCRIPT_START ))
 

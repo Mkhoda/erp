@@ -122,6 +122,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "/dashboard/profile",
     "/dashboard/change-password",
     "/dashboard/chat",
+    "/dashboard/messaging",
+    "/dashboard/attendance/my",
+    "/dashboard/tickets/my",
   ];
   React.useEffect(() => {
     if (!allowedPages || !pathname) return;
