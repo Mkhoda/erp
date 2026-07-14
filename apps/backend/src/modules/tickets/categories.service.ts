@@ -136,6 +136,9 @@ export class CategoriesService {
   async updateCategory(id: string, dto: UpdateCategoryDto) {
     const cat = await this.prisma.ticketCategory.findUnique({ where: { id } });
     if (!cat) throw new NotFoundException();
+    if (cat.name === OTHER_CATEGORY_NAME) {
+      throw new ConflictException('دسته‌بندی «سایر» قابل ویرایش نیست');
+    }
     if (dto.name && dto.name !== cat.name) {
       const dup = await this.prisma.ticketCategory.findUnique({
         where: { configId_name: { configId: cat.configId, name: dto.name } },
@@ -146,6 +149,11 @@ export class CategoriesService {
   }
 
   async deleteCategory(id: string) {
+    const cat = await this.prisma.ticketCategory.findUnique({ where: { id } });
+    if (!cat) throw new NotFoundException();
+    if (cat.name === OTHER_CATEGORY_NAME) {
+      throw new ConflictException('دسته‌بندی «سایر» قابل حذف نیست');
+    }
     const inUse = await this.prisma.ticket.count({ where: { categoryId: id } });
     if (inUse > 0) {
       return this.prisma.ticketCategory.update({ where: { id }, data: { isActive: false } });

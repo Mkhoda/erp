@@ -1,11 +1,12 @@
 "use client";
 import React from "react";
-import { Loader2, Plus, Trash2, Edit2, Check, X, Settings, Save, ChevronDown, ChevronUp, ToggleLeft, ToggleRight } from "lucide-react";
+import { Loader2, Plus, Trash2, Edit2, Check, X, Settings, Save, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Lock } from "lucide-react";
 import SearchSelect from "../../../components/ui/SearchSelect";
 import { useToast } from "../../../components/ui/Toast";
 import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
+const OTHER_CATEGORY_NAME = "سایر";
 
 type Tab = "departments" | "global";
 
@@ -398,9 +399,19 @@ export default function TicketSettingsPage() {
                         <p className="text-xs text-amber-600 mb-2">ابتدا پیکربندی را ذخیره کنید تا بتوانید دسته‌بندی اضافه کنید</p>
                       )}
                       <div className="space-y-2">
-                        {cfg.categories.map((cat: any) => (
+                        {cfg.categories.map((cat: any) => {
+                          const isProtected = cat.name === OTHER_CATEGORY_NAME;
+                          return (
                           <div key={cat.id} className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${cat.isActive ? "bg-theme-secondary border-theme" : "bg-theme-card border-theme/50 opacity-70"}`}>
-                            {editCat?.id === cat.id ? (
+                            {isProtected ? (
+                              <>
+                                <span className="flex-1 text-sm text-theme-primary">{cat.name}</span>
+                                <span title="این دسته‌بندی همیشه فعال است و قابل ویرایش یا حذف نیست"
+                                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border bg-theme-card border-theme text-theme-muted">
+                                  <Lock className="w-3 h-3" /> پیش‌فرض
+                                </span>
+                              </>
+                            ) : editCat?.id === cat.id ? (
                               <>
                                 <input className="input-theme text-sm flex-1" value={editCat.name}
                                   onChange={e => setEditCat((p: any) => ({ ...p, name: e.target.value }))} />
@@ -433,7 +444,8 @@ export default function TicketSettingsPage() {
                               </>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       {cfg.id && (
                         <div className="flex gap-2 mt-3">
