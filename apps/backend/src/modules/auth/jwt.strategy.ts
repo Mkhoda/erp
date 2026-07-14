@@ -36,6 +36,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       this.sessions.touchSession(payload.sid);
     }
 
-    return { userId: payload.sub, email: payload.email, role: payload.role, sessionId: payload.sid };
+    return { id: payload.sub, userId: payload.sub, email: payload.email, role: payload.role, sessionId: payload.sid };
   }
 }
