@@ -2,9 +2,22 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCategoryDto, UpdateCategoryDto, UpsertDeptConfigDto } from './dto/ticket.dto';
 
+// Every department gets this catch-all category automatically — lets a
+// requester file a ticket that doesn't fit any configured category, writing
+// their own subject instead (see Ticket.title / CreateTicketDto.title).
+export const OTHER_CATEGORY_NAME = 'سایر';
+
 @Injectable()
 export class CategoriesService {
   constructor(private prisma: PrismaService) {}
+
+  private async ensureOtherCategory(configId: string) {
+    await this.prisma.ticketCategory.upsert({
+      where: { configId_name: { configId, name: OTHER_CATEGORY_NAME } },
+      create: { configId, name: OTHER_CATEGORY_NAME, order: 999, isActive: true },
+      update: {},
+    });
+  }
 
   // ── Department Configs ────────────────────────────────────────────
 
@@ -21,12 +34,26 @@ export class CategoriesService {
   }
 
   async getEnabledConfigs() {
+    const include = {
+      department: { select: { id: true, name: true } },
+      categories: { where: { isActive: true }, orderBy: { order: 'asc' as const } },
+    };
+    const configs = await this.prisma.ticketDepartmentConfig.findMany({
+      where: { isEnabled: true },
+      include,
+      orderBy: { department: { name: 'asc' } },
+    });
+
+    // Backfill "سایر" for any department that doesn't have it yet (covers
+    // configs created before this fallback existed) so every department
+    // shows it by default without a manual migration.
+    const missing = configs.filter((c) => !c.categories.some((cat) => cat.name === OTHER_CATEGORY_NAME));
+    if (missing.length === 0) return configs;
+
+    await Promise.all(missing.map((c) => this.ensureOtherCategory(c.id)));
     return this.prisma.ticketDepartmentConfig.findMany({
       where: { isEnabled: true },
-      include: {
-        department: { select: { id: true, name: true } },
-        categories: { where: { isActive: true }, orderBy: { order: 'asc' } },
-      },
+      include,
       orderBy: { department: { name: 'asc' } },
     });
   }
@@ -75,6 +102,7 @@ export class CategoriesService {
       }
     }
 
+    await this.ensureOtherCategory(config.id);
     return this.getConfig(departmentId);
   }
 
@@ -90,6 +118,7 @@ export class CategoriesService {
   async getCategoriesByDept(departmentId: string) {
     const config = await this.prisma.ticketDepartmentConfig.findUnique({ where: { departmentId } });
     if (!config) return [];
+    await this.ensureOtherCategory(config.id);
     return this.prisma.ticketCategory.findMany({
       where: { configId: config.id, isActive: true },
       orderBy: { order: 'asc' },

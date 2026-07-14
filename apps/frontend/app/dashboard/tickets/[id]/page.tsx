@@ -216,7 +216,7 @@ export default function TicketDetailPage() {
               <span className={`text-xs font-medium ${PRIORITY_CLS[ticket.priority] ?? ""}`}>{PRIORITY_FA[ticket.priority] ?? ticket.priority}</span>
               {ticket.isOverSla && <span className="text-xs text-red-600 flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" /> تأخیر SLA</span>}
             </div>
-            <h1 className="text-lg font-bold text-theme-primary mt-1">{ticket.category?.name ?? "—"}</h1>
+            <h1 className="text-lg font-bold text-theme-primary mt-1">{ticket.title || ticket.category?.name || "—"}</h1>
             <div className="text-sm text-theme-muted mt-0.5">{ticket.department?.name}</div>
           </div>
           {/* Action buttons */}

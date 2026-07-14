@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { TicketStatus, TicketPriority, Role } from '@prisma/client';
 import { SlaService } from './sla.service';
 import { CreateTicketDto, UpdateTicketDto, AssignTicketDto, TransferTicketDto, TicketFilterDto } from './dto/ticket.dto';
+import { OTHER_CATEGORY_NAME } from './categories.service';
 
 const TICKET_INCLUDE = {
   department: { select: { id: true, name: true } },
@@ -63,6 +64,7 @@ export class TicketsService {
       const n = parseInt(filter.search.replace(/\D/g, ''), 10);
       where.OR = [
         { description: { contains: filter.search, mode: 'insensitive' } },
+        { title: { contains: filter.search, mode: 'insensitive' } },
         ...(n ? [{ number: n }] : []),
         { requester: { OR: [{ firstName: { contains: filter.search, mode: 'insensitive' } }, { lastName: { contains: filter.search, mode: 'insensitive' } }] } },
         { tags: { has: filter.search } },
@@ -124,6 +126,11 @@ export class TicketsService {
     });
     if (!category) throw new BadRequestException('موضوع انتخاب شده معتبر نیست');
 
+    const title = dto.title?.trim() || undefined;
+    if (category.name === OTHER_CATEGORY_NAME && !title) {
+      throw new BadRequestException('برای موضوع «سایر» نوشتن عنوان الزامی است');
+    }
+
     // Auto-assign via round-robin if configured
     let assigneeId: string | null = null;
     if (config.autoAssignRoundRobin && config.defaultAssignees.length > 0) {
@@ -144,6 +151,7 @@ export class TicketsService {
         departmentId: dto.departmentId,
         categoryId: dto.categoryId,
         requesterId,
+        title,
         description: dto.description,
         priority: dto.priority ?? TicketPriority.MEDIUM,
         relatedUserId: dto.relatedUserId,

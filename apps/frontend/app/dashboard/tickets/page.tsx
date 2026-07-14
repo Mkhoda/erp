@@ -205,7 +205,7 @@ export default function TicketsPage() {
                           {r.isOverSla && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                           <div>
                             <div className="text-xs text-theme-muted font-mono">#{faNum(r.number)}</div>
-                            <div className="text-theme-primary font-medium group-hover:text-blue-600 truncate max-w-48">{r.category?.name ?? "—"}</div>
+                            <div className="text-theme-primary font-medium group-hover:text-blue-600 truncate max-w-48">{r.title || r.category?.name || "—"}</div>
                           </div>
                         </div>
                       </Link>

@@ -70,7 +70,7 @@ function TicketList({ rows, loading }: { rows: TicketRow[]; loading: boolean }) 
                   <span className="text-xs text-amber-600 font-medium">⚠ منتظر پاسخ</span>
                 )}
               </div>
-              <div className="mt-1 font-medium text-theme-primary truncate">{r.category?.name ?? "—"}</div>
+              <div className="mt-1 font-medium text-theme-primary truncate">{r.title || r.category?.name || "—"}</div>
               <div className="mt-0.5 text-xs text-theme-muted flex items-center gap-3 flex-wrap">
                 <span>{r.department?.name ?? "—"}</span>
                 <span>{faDate(r.createdAt)}</span>

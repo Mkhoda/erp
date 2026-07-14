@@ -9,6 +9,7 @@ import { pageTitle } from "../../../../lib/branding";
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const PRIORITY_FA = { LOW: "کم", MEDIUM: "متوسط", HIGH: "بالا", CRITICAL: "بحرانی" };
+const OTHER_CATEGORY_NAME = "سایر";
 
 export default function NewTicketPage() {
   React.useEffect(() => { document.title = pageTitle("تیکت جدید"); }, []);
@@ -24,6 +25,7 @@ export default function NewTicketPage() {
 
   const [deptId, setDeptId] = React.useState("");
   const [categoryId, setCategoryId] = React.useState("");
+  const [customTitle, setCustomTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [priority, setPriority] = React.useState("MEDIUM");
   const [tags, setTags] = React.useState("");
@@ -47,9 +49,11 @@ export default function NewTicketPage() {
     const cfg = deptConfigs.find((c: any) => c.department.id === deptId);
     setCategories(cfg?.categories ?? []);
     setCategoryId("");
+    setCustomTitle("");
   }, [deptId, deptConfigs]);
 
   const deptOptions = deptConfigs.map((c: any) => ({ id: c.department.id, name: c.department.name }));
+  const isOtherCategory = categories.find((c: any) => c.id === categoryId)?.name === OTHER_CATEGORY_NAME;
 
   const addFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -69,12 +73,14 @@ export default function NewTicketPage() {
     setError("");
     if (!deptId) { setError("لطفاً دپارتمان را انتخاب کنید"); return; }
     if (!categoryId) { setError("لطفاً دسته‌بندی را انتخاب کنید"); return; }
+    if (isOtherCategory && !customTitle.trim()) { setError("برای موضوع «سایر» نوشتن عنوان الزامی است"); return; }
     if (!description.trim()) { setError("لطفاً توضیحات را وارد کنید"); return; }
 
     setLoading(true);
     try {
       const body: any = {
         departmentId: deptId, categoryId, description: description.trim(), priority,
+        title: isOtherCategory ? customTitle.trim() : undefined,
         tags: tags ? tags.split(",").map(t => t.trim()).filter(Boolean) : [],
       };
 
@@ -139,6 +145,15 @@ export default function NewTicketPage() {
             <p className="text-xs text-amber-600 mt-1">این دپارتمان دسته‌بندی فعالی ندارد</p>
           )}
         </div>
+
+        {/* Custom title — only for "سایر" */}
+        {isOtherCategory && (
+          <div>
+            <label className="block text-sm font-medium text-theme-secondary mb-1.5">عنوان <span className="text-red-500">*</span></label>
+            <input className="input-theme text-sm w-full" placeholder="عنوان درخواست خود را بنویسید"
+              value={customTitle} onChange={e => setCustomTitle(e.target.value)} />
+          </div>
+        )}
 
         {/* Priority */}
         {allowPriority && (

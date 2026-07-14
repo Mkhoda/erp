@@ -1233,6 +1233,11 @@ model Ticket {
   status   TicketStatus   @default(OPEN)
   priority TicketPriority @default(MEDIUM)
 
+  // Custom subject, set by the requester when category is the "سایر" (Other)
+  // catch-all; null for tickets under a normal category (category.name is
+  // used as the display title in that case).
+  title String?
+
   description String @db.Text
 
   // Optional references

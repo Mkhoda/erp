@@ -6,6 +6,8 @@ export class CreateTicketDto {
   @IsString() @IsNotEmpty() departmentId: string;
   @IsString() @IsNotEmpty() categoryId: string;
   @IsString() @IsNotEmpty() description: string;
+  // Custom subject — required by the service layer when categoryId resolves to "سایر" (Other).
+  @IsOptional() @IsString() title?: string;
   @IsOptional() @IsEnum(TicketPriority) priority?: TicketPriority;
   @IsOptional() @IsString() relatedUserId?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
