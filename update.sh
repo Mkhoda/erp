@@ -51,6 +51,7 @@ SCRIPT_START=$(date +%s)
 
 # ── Flags ──────────────────────────────────────────────────────
 USE_DOCKER=0; DO_INSTALL=1; DO_BUILD=1
+ORIG_ARGS=("$@")
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -63,41 +64,55 @@ while [ "$#" -gt 0 ]; do
 done
 
 # ── 1. Git pull ────────────────────────────────────────────────
-header "Git"
-step_start "Git pull"
+# This step is skipped on the re-exec'd run below (ARZESH_UPDATE_REEXEC=1) —
+# see the note before `exec` for why.
+if [ "${ARZESH_UPDATE_REEXEC:-0}" != "1" ]; then
+  header "Git"
+  step_start "Git pull"
 
-git fetch --all --prune
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-GIT_BEFORE=$(git rev-parse HEAD)
+  git fetch --all --prune
+  BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  GIT_BEFORE=$(git rev-parse HEAD)
 
-STASHED=0
-if [ -n "$(git status --porcelain)" ]; then
-  warn "Local changes detected — stashing before update"
-  git add -A
-  git stash push -u -m "auto-update-$(date +%s)" || true
-  STASHED=1
-fi
+  STASHED=0
+  if [ -n "$(git status --porcelain)" ]; then
+    warn "Local changes detected — stashing before update"
+    git add -A
+    git stash push -u -m "auto-update-$(date +%s)" || true
+    STASHED=1
+  fi
 
-if git pull --rebase origin "$BRANCH"; then
-  GIT_AFTER=$(git rev-parse HEAD)
-  step_done
-else
-  step_fail
-  [ "$STASHED" -eq 1 ] && { warn "Restoring stash..."; git stash pop || true; }
-  exit 1
-fi
+  if git pull --rebase origin "$BRANCH"; then
+    GIT_AFTER=$(git rev-parse HEAD)
+    step_done
+  else
+    step_fail
+    [ "$STASHED" -eq 1 ] && { warn "Restoring stash..."; git stash pop || true; }
+    exit 1
+  fi
 
-[ "$STASHED" -eq 1 ] && { info "Restoring stash..."; git stash pop && ok "Stash restored" || warn "Stash needs manual resolve"; }
+  [ "$STASHED" -eq 1 ] && { info "Restoring stash..."; git stash pop && ok "Stash restored" || warn "Stash needs manual resolve"; }
 
-# Show what changed
-if [ "$GIT_BEFORE" != "$GIT_AFTER" ]; then
-  COUNT=$(git rev-list --count "$GIT_BEFORE".."$GIT_AFTER" 2>/dev/null || echo "?")
-  echo -e "  ${CYAN}$COUNT new commit(s) on $BRANCH${NC}"
-  git log --oneline "$GIT_BEFORE".."$GIT_AFTER" | sed 's/^/  /'
-  CHANGED=$(git diff --name-only "$GIT_BEFORE" "$GIT_AFTER" 2>/dev/null | wc -l | tr -d ' ')
-  echo -e "  ${CYAN}$CHANGED files changed${NC}"
-else
-  echo -e "  ${YELLOW}Already up to date — building local state${NC}"
+  # Show what changed
+  if [ "$GIT_BEFORE" != "$GIT_AFTER" ]; then
+    COUNT=$(git rev-list --count "$GIT_BEFORE".."$GIT_AFTER" 2>/dev/null || echo "?")
+    echo -e "  ${CYAN}$COUNT new commit(s) on $BRANCH${NC}"
+    git log --oneline "$GIT_BEFORE".."$GIT_AFTER" | sed 's/^/  /'
+    CHANGED=$(git diff --name-only "$GIT_BEFORE" "$GIT_AFTER" 2>/dev/null | wc -l | tr -d ' ')
+    echo -e "  ${CYAN}$CHANGED files changed${NC}"
+  else
+    echo -e "  ${YELLOW}Already up to date — building local state${NC}"
+  fi
+
+  # Bash buffers script bytes as it reads this file, so if `git pull` just
+  # replaced update.sh on disk (e.g. this very step got a new section added),
+  # the running process may keep executing the OLD buffered content for
+  # everything below this line — silently skipping newly-added steps with no
+  # error. Re-exec under a fresh `bash` so the rest of the script is read from
+  # the just-pulled file. ORIG_ARGS preserves the flags this invocation was
+  # called with (the parsing loop above already consumed "$@").
+  export ARZESH_UPDATE_REEXEC=1
+  exec bash "$REPO_ROOT/update.sh" "${ORIG_ARGS[@]}"
 fi
 
 # ── Docker shortcut ────────────────────────────────────────────
