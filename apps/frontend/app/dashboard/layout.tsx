@@ -15,6 +15,7 @@ import CommandPalette from "../components/CommandPalette";
 import { ToastProvider } from "../components/ui/Toast";
 import { MessagingProvider, useMessagingOptional } from "../../lib/messaging";
 import ChatWidget from "../components/messaging/ChatWidget";
+import AnnouncementHost from "../components/announcements/AnnouncementHost";
 import type { Role } from "../../lib/menu";
 import { getSystemName, refreshSystemName } from "../../lib/branding";
 
@@ -420,6 +421,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Page content */}
         <main className="flex-1 p-4 overflow-auto">
           <ToastProvider>
+            <AnnouncementHost />
             {allowedPages === null ? (
               // Permissions still loading — don't render page content yet
               <div className="flex items-center justify-center min-h-[40vh]">

@@ -23,6 +23,7 @@ const sizeMap = {
 
 export default function Modal({ open, onClose, title, subtitle, children, size = "md", footer }: Props) {
   const [mounted, setMounted] = React.useState(false);
+  const panelRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => { setMounted(true); }, []);
 
@@ -47,11 +48,21 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
         >
           <motion.div
+            ref={panelRef}
             key="modal-panel"
             initial={{ opacity: 0, scale: 0.95, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 16 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            onAnimationComplete={(definition) => {
+              // Chromium refuses to open native <select> dropdowns when an ancestor
+              // has any `transform` set (even an at-rest identity one). Framer Motion
+              // leaves that inline transform in place after the enter animation, so
+              // clear it once settled — visually identical, but unblocks <select>s.
+              if (definition === "animate" && panelRef.current) {
+                panelRef.current.style.transform = "none";
+              }
+            }}
             className={`bg-theme-primary border border-theme rounded-2xl shadow-2xl w-full ${sizeMap[size]} max-h-[90vh] flex flex-col`}
             dir="rtl"
           >
