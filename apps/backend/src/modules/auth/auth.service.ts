@@ -57,11 +57,11 @@ export class AuthService {
   async login(dto: LoginDto, ctx: LoginContext = {}) {
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user) throw new UnauthorizedException('ایمیل یا رمز عبور اشتباه است');
     if (user.disabled) throw new UnauthorizedException('حساب کاربری غیرفعال است');
-    if (!user.password) throw new UnauthorizedException('Password not set');
+    if (!user.password) throw new UnauthorizedException('رمز عبوری برای این حساب تنظیم نشده است');
     const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!valid) throw new UnauthorizedException('ایمیل یا رمز عبور اشتباه است');
     return this.signUser(user.id, user.email, user.role, { ...ctx, maxSessions: user.maxSessions });
   }
 
@@ -69,11 +69,11 @@ export class AuthService {
     const phone = this.normalizePhone(dto.phone);
     const phoneAlt = phone.startsWith('98') ? '0' + phone.slice(2) : '98' + phone.slice(1);
     const user = await this.prisma.user.findFirst({ where: { OR: [{ phone }, { phone: phoneAlt }] } });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user) throw new UnauthorizedException('شماره موبایل یا رمز عبور اشتباه است');
     if (user.disabled) throw new UnauthorizedException('حساب کاربری غیرفعال است');
-    if (!user.password) throw new UnauthorizedException('Password not set');
+    if (!user.password) throw new UnauthorizedException('رمز عبوری برای این حساب تنظیم نشده است');
     const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!valid) throw new UnauthorizedException('شماره موبایل یا رمز عبور اشتباه است');
     return this.signUser(user.id, user.email, user.role, { ...ctx, maxSessions: user.maxSessions });
   }
 
@@ -131,14 +131,15 @@ export class AuthService {
 
   async verifyOtp(dto: VerifyOtpDto, ctx: LoginContext = {}) {
     const phone = this.normalizePhone(dto.phone);
+    const phoneAlt = phone.startsWith('98') ? '0' + phone.slice(2) : '98' + phone.slice(1);
     const record = await this.prisma.otp.findFirst({
       where: { phone, code: dto.otp },
       orderBy: { createdAt: 'desc' },
     } as any);
-    if (!record) throw new UnauthorizedException('Invalid OTP');
-    if (record.expiresAt.getTime() < Date.now()) throw new UnauthorizedException('OTP expired');
-    const user = await this.prisma.user.findFirst({ where: { phone } });
-    if (!user) throw new UnauthorizedException('Invalid OTP');
+    if (!record) throw new UnauthorizedException('کد تایید نامعتبر است');
+    if (record.expiresAt.getTime() < Date.now()) throw new UnauthorizedException('کد تایید منقضی شده است');
+    const user = await this.prisma.user.findFirst({ where: { OR: [{ phone }, { phone: phoneAlt }] } });
+    if (!user) throw new UnauthorizedException('کد تایید نامعتبر است');
     if (user.disabled) throw new UnauthorizedException('حساب کاربری غیرفعال است');
     await this.prisma.otp.deleteMany({ where: { phone } });
     const result = await this.signUser(user.id, user.email, user.role, { ...ctx, rememberMe: false, maxSessions: user.maxSessions });
@@ -147,14 +148,15 @@ export class AuthService {
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const phone = this.normalizePhone(dto.phone);
-    const user = await this.prisma.user.findFirst({ where: { phone } });
-    if (!user) throw new NotFoundException('User not found');
+    const phoneAlt = phone.startsWith('98') ? '0' + phone.slice(2) : '98' + phone.slice(1);
+    const user = await this.prisma.user.findFirst({ where: { OR: [{ phone }, { phone: phoneAlt }] } });
+    if (!user) throw new NotFoundException('کاربری با این شماره یافت نشد');
     const record = await this.prisma.otp.findFirst({
       where: { phone, code: dto.otp },
       orderBy: { createdAt: 'desc' },
     } as any);
-    if (!record) throw new UnauthorizedException('Invalid OTP');
-    if (record.expiresAt.getTime() < Date.now()) throw new UnauthorizedException('OTP expired');
+    if (!record) throw new UnauthorizedException('کد تایید نامعتبر است');
+    if (record.expiresAt.getTime() < Date.now()) throw new UnauthorizedException('کد تایید منقضی شده است');
     const hashed = await bcrypt.hash(dto.newPassword, 10);
     await this.prisma.user.update({ where: { id: user.id }, data: { password: hashed } });
     await this.prisma.otp.deleteMany({ where: { phone } });
@@ -163,14 +165,14 @@ export class AuthService {
 
   async changePassword(userId: string, dto: ChangePasswordDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.phone) throw new NotFoundException('User not found');
+    if (!user || !user.phone) throw new NotFoundException('کاربر یافت نشد');
     const phone = user.phone;
     const record = await this.prisma.otp.findFirst({
       where: { phone, code: dto.otp },
       orderBy: { createdAt: 'desc' },
     } as any);
-    if (!record) throw new UnauthorizedException('Invalid OTP');
-    if (record.expiresAt.getTime() < Date.now()) throw new UnauthorizedException('OTP expired');
+    if (!record) throw new UnauthorizedException('کد تایید نامعتبر است');
+    if (record.expiresAt.getTime() < Date.now()) throw new UnauthorizedException('کد تایید منقضی شده است');
     const hashed = await bcrypt.hash(dto.newPassword, 10);
     // Increment tokenVersion to invalidate all existing tokens for this user
     await this.prisma.user.update({
