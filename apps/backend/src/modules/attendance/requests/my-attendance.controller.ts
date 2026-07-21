@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../../auth/jwt.guard';
 import { RecordsService } from '../records/records.service';
 import { RequestsService } from './requests.service';
 import { toJalaliParts, workDateOf } from '../engine/jalali.util';
+import { parseWorkDate } from '../scope.util';
 
 // Employee self-service — every authenticated user sees only their own data.
 @UseGuards(JwtAuthGuard)
@@ -39,6 +40,11 @@ export class MyAttendanceController {
   @Get('periods')
   periods(@Req() req: any) {
     return this.records.periods({ userId: this.uid(req) });
+  }
+
+  @Get('day')
+  day(@Req() req: any, @Query('date') date: string) {
+    return this.records.dayDetail(this.uid(req), parseWorkDate(date));
   }
 
   @Get('leave-balance')

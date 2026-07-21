@@ -2,11 +2,11 @@
 import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
-  FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, Pencil, ScrollText,
+  FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, ScrollText,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
-import TimeSelect from "../../../components/ui/TimeSelect";
+import DayDetailModal from "../../../components/attendance/DayDetailModal";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -344,69 +344,16 @@ export default function AttendanceRecordsPage() {
         )}
       </div>
 
-      {/* Day detail modal */}
-      <Modal
+      <DayDetailModal
         open={!!detail}
         onClose={() => setDetail(null)}
-        title={detail ? `${detail.row.user ? `${detail.row.user.firstName} ${detail.row.user.lastName}` : ""} — ${faDate(detail.row.gregDate)}` : "جزئیات روز"}
-        size="md"
-        footer={<button onClick={() => setDetail(null)} className="btn-theme-secondary text-sm">بستن</button>}
-      >
-        {detail && (
-          <div>
-            <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-              <Info label="وضعیت" value={STATUS_FA[detail.row.status] || detail.row.status} />
-              <Info label="کارکرد" value={fmtMin(detail.row.workedMinutes)} />
-              <Info label="اضافه‌کار" value={fmtMin(detail.row.overtimeMinutes)} />
-              <Info label="تعطیل‌کاری" value={fmtMin(detail.row.holidayOvertimeMinutes)} />
-              <Info label="تاخیر" value={fmtMin(detail.row.delayMinutes)} />
-              <Info label="تعجیل" value={fmtMin(detail.row.earlyLeaveMinutes)} />
-              <Info label="شب‌کاری" value={fmtMin(detail.row.nightMinutes)} />
-              {detail.row.leaveMinutes > 0 && <Info label="مرخصی" value={`${fmtMin(detail.row.leaveMinutes)}${detail.row.autoConvertedLeave ? " (خودکار)" : ""}`} />}
-            </div>
-            <div className="text-sm font-medium text-theme-secondary mb-2 flex items-center gap-1">
-              <Clock className="w-4 h-4" /> پانچ‌های خام ({faNum(detail.punches?.length || 0)})
-            </div>
-            <div className="space-y-1">
-              {(detail.punches || []).map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between text-sm bg-theme-secondary/30 rounded-lg px-3 py-1.5">
-                  <span dir="ltr" className="text-theme-primary">{faTime(p.punchAt)}</span>
-                  <span className="text-theme-muted text-xs">دستگاه {p.deviceCode || "—"} · کد {p.rType ?? "—"}</span>
-                </div>
-              ))}
-              {(!detail.punches || detail.punches.length === 0) && <div className="text-theme-muted text-sm">پانچی ثبت نشده</div>}
-            </div>
-            {detail.override && <div className="mt-3 text-xs text-amber-600 bg-amber-500/10 rounded-lg p-2">اصلاح دستی توسط {detail.override.createdBy?.firstName} {detail.override.createdBy?.lastName}: {detail.override.reason}</div>}
-
-            {/* Admin edit (override) */}
-            <div className="mt-4 border-t border-theme pt-3">
-              <div className="text-sm font-medium text-theme-secondary mb-2 flex items-center gap-1"><Pencil className="w-4 h-4" /> اصلاح ساعت ورود/خروج</div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block mb-1 text-theme-secondary text-xs">ورود</label>
-                  <TimeSelect value={ov.inTime} onChange={v => setOv(s => ({ ...s, inTime: v }))} />
-                </div>
-                <div>
-                  <label className="block mb-1 text-theme-secondary text-xs">خروج</label>
-                  <TimeSelect value={ov.outTime} onChange={v => setOv(s => ({ ...s, outTime: v }))} />
-                </div>
-                <div><label className="block mb-1 text-theme-secondary text-xs">وضعیت (اختیاری)</label>
-                  <select value={ov.status} onChange={e => setOv(s => ({ ...s, status: e.target.value }))} className="input-theme text-sm">
-                    <option value="">— خودکار —</option>
-                    {["PRESENT","LEAVE","MISSION","REMOTE_WORK","ABSENT"].map(s => <option key={s} value={s}>{STATUS_FA[s]}</option>)}
-                  </select>
-                </div>
-                <div><label className="block mb-1 text-theme-secondary text-xs">مرخصی ساعتی (ساعت)</label><input type="number" step="0.5" min="0" dir="ltr" value={ov.leaveHours} onChange={e => setOv(s => ({ ...s, leaveHours: e.target.value }))} className="input-theme text-sm" placeholder="مثلاً 2" /></div>
-                <div className="sm:col-span-2"><label className="block mb-1 text-theme-secondary text-xs">دلیل</label><input value={ov.reason} onChange={e => setOv(s => ({ ...s, reason: e.target.value }))} className="input-theme text-sm" placeholder="دلیل اصلاح" /></div>
-              </div>
-              <button onClick={saveOverride} disabled={ovSaving} className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
-                {ovSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />} ذخیره اصلاح
-              </button>
-              <p className="mt-1 text-[11px] text-theme-muted">این اصلاح ثبت می‌شود و در پایش مجدد از بین نمی‌رود.</p>
-            </div>
-          </div>
-        )}
-      </Modal>
+        detail={detail}
+        allowOverride
+        ov={ov}
+        setOv={setOv}
+        onSaveOverride={saveOverride}
+        ovSaving={ovSaving}
+      />
 
       {/* Work-rules info panel — generated live from the effective schedule, never hardcoded */}
       <Modal
@@ -503,14 +450,6 @@ function SumCard({ label, value, cls }: { label: string; value: string; cls?: st
     <div className="bg-theme-card border border-theme rounded-xl p-3 text-center">
       <div className={`text-lg font-bold ${cls || "text-theme-primary"}`} dir="ltr">{value}</div>
       <div className="text-[11px] text-theme-muted">{label}</div>
-    </div>
-  );
-}
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-theme-secondary/30 rounded-lg px-3 py-1.5">
-      <div className="text-[11px] text-theme-muted">{label}</div>
-      <div className="text-theme-primary font-medium" dir="ltr">{value}</div>
     </div>
   );
 }

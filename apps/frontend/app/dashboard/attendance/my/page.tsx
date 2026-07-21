@@ -1,8 +1,9 @@
 "use client";
 import React from "react";
-import { Loader2, Fingerprint, Pencil, AlertTriangle, Send, Hourglass } from "lucide-react";
+import { Loader2, Fingerprint, Pencil, AlertTriangle, Send, Hourglass, Eye } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import TimeSelect from "../../../components/ui/TimeSelect";
+import DayDetailModal from "../../../components/attendance/DayDetailModal";
 import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -73,6 +74,7 @@ export default function MyAttendancePage() {
   const [leaveModal, setLeaveModal] = React.useState(false);
   const [leaveForm, setLeaveForm] = React.useState({ jy: 0, jm: 0, jd: 0, type: "LEAVE", leaveHours: "", description: "" });
   const [leaveSending, setLeaveSending] = React.useState(false);
+  const [detail, setDetail] = React.useState<any>(null);
 
   // Days that already have an open (pending) request — block re-submitting.
   const pendingDates = React.useMemo(
@@ -80,6 +82,12 @@ export default function MyAttendancePage() {
     [myReqs],
   );
   const toHHmm = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran", hour12: false }) : "";
+
+  async function openDetail(row: any) {
+    const date = row.gregDate.slice(0, 10);
+    const d = await fetch(`${API}/attendance/me/day?date=${date}`, { headers: h }).then(r => r.ok ? r.json() : null);
+    setDetail({ row, ...d });
+  }
 
   const qs = () => { const p = new URLSearchParams(); if (jYear) p.set("jYear", String(jYear)); if (jMonth) p.set("jMonth", String(jMonth)); return p.toString(); };
 
@@ -244,10 +252,10 @@ export default function MyAttendancePage() {
                 <th className="py-2 px-2 font-medium">تاریخ</th><th className="px-2 font-medium">ورود</th><th className="px-2 font-medium">خروج</th>
                 <th className="px-2 font-medium">کارکرد</th><th className="px-2 font-medium">تاخیر</th><th className="px-2 font-medium">تعجیل</th>
                 <th className="px-2 font-medium">کسری</th><th className="px-2 font-medium">اضافه‌کار</th><th className="px-2 font-medium">تعطیل‌کاری</th>
-                <th className="px-2 font-medium">وضعیت</th><th className="px-2 font-medium">درخواست</th>
+                <th className="px-2 font-medium">وضعیت</th><th className="px-2 font-medium">درخواست</th><th className="px-2 font-medium">جزئیات</th>
               </tr></thead>
               <tbody>
-                {rows.length === 0 ? <tr><td colSpan={11} className="py-10 text-theme-muted">رکوردی نیست</td></tr> : rows.slice((page-1)*pageSize, page*pageSize).map(r => {
+                {rows.length === 0 ? <tr><td colSpan={12} className="py-10 text-theme-muted">رکوردی نیست</td></tr> : rows.slice((page-1)*pageSize, page*pageSize).map(r => {
                   const ls = liveStatus(r);
                   const needsResolve = (ls === "INCOMPLETE" || ls === "ABSENT");
                   const isPending = pendingDates.has(r.gregDate.slice(0, 10));
@@ -275,6 +283,12 @@ export default function MyAttendancePage() {
                             <Pencil className="w-4 h-4" />
                           </button>
                         )}
+                      </td>
+                      <td className="px-2">
+                        <button onClick={() => openDetail(r)} title="مشاهده جزئیات"
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-theme-muted hover:bg-theme-hover hover:text-theme-primary">
+                          <Eye className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -461,6 +475,8 @@ export default function MyAttendancePage() {
           </div>
         )}
       </Modal>
+
+      <DayDetailModal open={!!detail} onClose={() => setDetail(null)} detail={detail} />
     </div>
   );
 }
