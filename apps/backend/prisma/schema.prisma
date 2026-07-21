@@ -666,6 +666,7 @@ model AttendanceDay {
   deficitMinutes         Int              @default(0)   // shortfall vs required hours (delay+earlyLeave+unworked)
   nightMinutes           Int              @default(0)
   leaveMinutes      Int              @default(0)        // approved leave for the day (hourly or full)
+  autoConvertedLeave Boolean         @default(false)    // leaveMinutes/status here came from automatic deficit→hourly or absence→daily conversion, not an approved request
   status            AttendanceStatus
   isHolidayWork     Boolean          @default(false)
   shiftId           String?
@@ -722,6 +723,9 @@ model WorkSchedule {
   otMaxMonthly   Int      @default(3600)
   otRounding     Int      @default(15)                 // round OT to nearest N minutes
   annualLeaveDays Int     @default(26)                 // yearly paid-leave entitlement (days)
+  deficitToLeaveEnabled Boolean @default(true)          // auto-cover daily shortfall from the hourly-leave balance
+  hourlyLeaveCapMinutes Int     @default(480)           // monthly cap on auto-converted hourly leave (default: one workday); excess rolls over to a full daily-leave conversion
+  absentToLeaveEnabled  Boolean @default(true)          // auto-convert an ABSENT day to LEAVE when annual balance allows
   userRules      UserAttendanceRule[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

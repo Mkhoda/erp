@@ -7,6 +7,7 @@ import { PagePermissionGuard } from '../../permissions/page.guard';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RecordsService, RecordFilter } from './records.service';
 import { resolveDeptScope, parseWorkDate } from '../scope.util';
+import { CalcService } from '../engine/calc.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard, PagePermissionGuard)
 @Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
@@ -16,6 +17,7 @@ export class RecordsController {
   constructor(
     private readonly records: RecordsService,
     private readonly prisma: PrismaService,
+    private readonly calc: CalcService,
   ) {}
 
   private async filterFrom(req: any, q: any): Promise<RecordFilter> {
@@ -57,5 +59,12 @@ export class RecordsController {
   @Get('leave-balance')
   async leaveBalance(@Query('userId') userId: string, @Query('jYear') jYear: string) {
     return this.records.leaveBalance(userId, +jYear);
+  }
+
+  // Effective rules for the "قوانین کارکرد" info panel — generated live from
+  // WorkSchedule/UserAttendanceRule, never hardcoded on the frontend.
+  @Get('rules-summary')
+  async rulesSummary(@Query('userId') userId?: string) {
+    return this.calc.getRulesSummary(userId);
   }
 }

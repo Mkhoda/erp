@@ -2,7 +2,7 @@
 import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
-  FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, Pencil,
+  FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, Pencil, ScrollText,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
@@ -34,6 +34,9 @@ const fmtMin = (m: number) => { const h = Math.floor(Math.abs(m||0)/60); const m
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
 const faDOW  = (g: string) => new Date(g).toLocaleDateString("fa-IR", { weekday:"long", timeZone:"UTC" });
+const hhmm = (min: number) => toFa(`${String(Math.floor((min||0)/60)).padStart(2,"0")}:${String((min||0)%60).padStart(2,"0")}`);
+const DOW_FA: Record<number,string> = { 6:"شنبه", 0:"یکشنبه", 1:"دوشنبه", 2:"سه‌شنبه", 3:"چهارشنبه", 4:"پنج‌شنبه", 5:"جمعه" };
+const FA_ORDER = [6,0,1,2,3,4,5];
 
 // Current Jalali year/month (Tehran) — used to default the filters on load.
 function currentJalali() {
@@ -58,6 +61,9 @@ export default function AttendanceRecordsPage() {
   const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string }>({ inTime: "", outTime: "", status: "", reason: "", leaveHours: "" });
   const [ovSaving, setOvSaving] = React.useState(false);
   const [leave, setLeave] = React.useState<any>(null);
+  const [rules, setRules] = React.useState<any>(null);
+  const [rulesOpen, setRulesOpen] = React.useState(false);
+  const [rulesLoading, setRulesLoading] = React.useState(false);
   // Pagination
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
@@ -107,6 +113,18 @@ export default function AttendanceRecordsPage() {
   }, []);
 
   const toHHmm = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran", hour12: false }) : "";
+
+  const loadRules = React.useCallback(async () => {
+    setRulesLoading(true);
+    try {
+      const qp = userId ? `?userId=${userId}` : "";
+      const r = await fetch(`${API}/attendance/records/rules-summary${qp}`, { headers: h });
+      setRules(r.ok ? await r.json() : null);
+    } finally { setRulesLoading(false); }
+    // eslint-disable-next-line
+  }, [userId]);
+  function openRules() { setRulesOpen(true); loadRules(); }
+  React.useEffect(() => { if (rulesOpen) loadRules(); }, [userId]); // eslint-disable-line
 
   async function openDetail(row: any) {
     const date = row.gregDate.slice(0, 10);
@@ -172,6 +190,9 @@ export default function AttendanceRecordsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link href="/dashboard/attendance" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> داشبورد</Link>
+          <button onClick={openRules} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary">
+            <ScrollText className="w-4 h-4" /> قوانین کارکرد
+          </button>
           <button onClick={() => exportFile("excel")} disabled={!!exporting} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white disabled:opacity-50">
             {exporting === "excel" ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />} اکسل
           </button>
@@ -341,7 +362,7 @@ export default function AttendanceRecordsPage() {
               <Info label="تاخیر" value={fmtMin(detail.row.delayMinutes)} />
               <Info label="تعجیل" value={fmtMin(detail.row.earlyLeaveMinutes)} />
               <Info label="شب‌کاری" value={fmtMin(detail.row.nightMinutes)} />
-              {detail.row.leaveMinutes > 0 && <Info label="مرخصی" value={fmtMin(detail.row.leaveMinutes)} />}
+              {detail.row.leaveMinutes > 0 && <Info label="مرخصی" value={`${fmtMin(detail.row.leaveMinutes)}${detail.row.autoConvertedLeave ? " (خودکار)" : ""}`} />}
             </div>
             <div className="text-sm font-medium text-theme-secondary mb-2 flex items-center gap-1">
               <Clock className="w-4 h-4" /> پانچ‌های خام ({faNum(detail.punches?.length || 0)})
@@ -386,6 +407,93 @@ export default function AttendanceRecordsPage() {
           </div>
         )}
       </Modal>
+
+      {/* Work-rules info panel — generated live from the effective schedule, never hardcoded */}
+      <Modal
+        open={rulesOpen}
+        onClose={() => setRulesOpen(false)}
+        title="قوانین کارکرد"
+        subtitle={rules ? `گروه: ${rules.scheduleName}${userId ? "" : " (پیش‌فرض سازمان)"}` : undefined}
+        size="lg"
+        footer={<button onClick={() => setRulesOpen(false)} className="btn-theme-secondary text-sm">بستن</button>}
+      >
+        {rulesLoading ? (
+          <div className="flex items-center justify-center h-40"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
+        ) : !rules ? (
+          <div className="text-theme-muted text-sm text-center py-8">دریافت قوانین ناموفق بود</div>
+        ) : (
+          <RulesPanel rules={rules} />
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function RulesPanel({ rules: r }: { rules: any }) {
+  const workDaysFa = FA_ORDER.filter(d => (r.workDays || []).includes(d)).map(d => DOW_FA[d]).join("، ") || "—";
+  const otParts: string[] = [];
+  if (r.otAllowed) {
+    otParts.push(`آستانه شروع اضافه‌کار: ${faNum(r.otMinThreshold)} دقیقه`);
+    otParts.push(`گرد کردن به نزدیک‌ترین: ${faNum(r.otRounding)} دقیقه`);
+    otParts.push(`سقف روزانه: ${r.otMaxDaily > 0 ? fmtMin(r.otMaxDaily) : "نامحدود"}`);
+    otParts.push(`سقف ماهانه: ${r.otMaxMonthly > 0 ? fmtMin(r.otMaxMonthly) : "نامحدود"}`);
+  } else {
+    otParts.push("اضافه‌کار برای این گروه فعال نیست");
+  }
+
+  const sections: Array<{ title: string; icon: any; items: string[] }> = [
+    {
+      title: "ساعت کار و بازه‌ها", icon: Clock,
+      items: [
+        `ساعت کار موردنیاز روزانه: ${fmtMin(r.dailyMinutes)}`,
+        `کسر ناهار/استراحت: ${fmtMin(r.lunchMinutes)}`,
+        `قانون تاخیر: ورود بعد از ${hhmm(r.checkInEnd)} تاخیر محسوب می‌شود`,
+        `قانون تعجیل: خروج قبل از ${hhmm(r.checkOutStart)} تعجیل محسوب می‌شود`,
+        `روزهای کاری: ${workDaysFa}`,
+      ],
+    },
+    {
+      title: "اضافه‌کار", icon: Fingerprint,
+      items: otParts,
+    },
+    {
+      title: "کسری کارکرد و تبدیل به مرخصی", icon: ScrollText,
+      items: [
+        "نحوه محاسبه کسری: حداکثر بین صفر و (ساعت موردنیاز − کارکرد − مرخصی تایید‌شده) — شامل تاخیر، تعجیل، کارکرد ناقص و غیبت",
+        r.deficitToLeaveEnabled
+          ? `کسری روزانه به‌صورت خودکار از مرخصی ساعتی کسر می‌شود، تا سقف ماهانه ${fmtMin(r.hourlyLeaveCapMinutes)}`
+          : "کسری روزانه به‌صورت خودکار تبدیل به مرخصی نمی‌شود",
+        r.deficitToLeaveEnabled
+          ? `اگر کسری یک روز از سقف باقی‌ماندهٔ مرخصی ساعتی همان ماه بیشتر باشد و مانده مرخصی سالانه کافی باشد، آن روز به‌طور کامل مرخصی روزانه محسوب می‌شود`
+          : "",
+        r.absentToLeaveEnabled
+          ? `روزهای غیبت در صورت کافی بودن مانده مرخصی سالانه (${faNum(r.annualLeaveDays)} روز)، به‌صورت خودکار به مرخصی روزانه تبدیل می‌شوند`
+          : "روزهای غیبت به‌صورت خودکار به مرخصی تبدیل نمی‌شوند و به‌عنوان غیبت باقی می‌مانند",
+      ].filter(Boolean),
+    },
+    {
+      title: "سایر", icon: Fingerprint,
+      items: [
+        `نوع استخدام: ${r.employeeType === "HOURLY" ? "ساعتی (فقط حضور، بدون تاخیر/اضافه‌کار)" : "تمام‌وقت"}`,
+        `مرخصی استحقاقی سالانه: ${faNum(r.annualLeaveDays)} روز`,
+      ],
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {sections.map(sec => (
+        <div key={sec.title}>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-theme-primary mb-2">
+            <sec.icon className="w-4 h-4 text-blue-500" /> {sec.title}
+          </div>
+          <ul className="space-y-1.5">
+            {sec.items.map((it, i) => (
+              <li key={i} className="text-sm text-theme-secondary bg-theme-secondary/30 rounded-lg px-3 py-2 leading-relaxed">{it}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }

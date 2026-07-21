@@ -54,14 +54,14 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 16 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            onAnimationComplete={(definition) => {
+            onAnimationComplete={() => {
               // Chromium refuses to open native <select> dropdowns when an ancestor
               // has any `transform` set (even an at-rest identity one). Framer Motion
               // leaves that inline transform in place after the enter animation, so
               // clear it once settled — visually identical, but unblocks <select>s.
-              if (definition === "animate" && panelRef.current) {
-                panelRef.current.style.transform = "none";
-              }
+              // (animate is a plain object here, not a variants label, so the
+              // callback's `definition` arg isn't the string "animate" — don't gate on it.)
+              if (panelRef.current) panelRef.current.style.transform = "none";
             }}
             className={`bg-theme-primary border border-theme rounded-2xl shadow-2xl w-full ${sizeMap[size]} max-h-[90vh] flex flex-col`}
             dir="rtl"

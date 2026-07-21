@@ -125,8 +125,10 @@ export class RecordsService {
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'MISSION' } }),
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'REMOTE_WORK' } }),
       // Delay + early-leave across the year are deducted from leave (hourly).
+      // Excludes days where the shortfall was auto-converted into leaveMinutes
+      // (hourlyAgg below) — otherwise the same lateness would be deducted twice.
       this.prisma.attendanceDay.aggregate({
-        where: { userId, jYear },
+        where: { userId, jYear, autoConvertedLeave: false },
         _sum: { delayMinutes: true, earlyLeaveMinutes: true },
       }),
       // Hourly leave = leaveMinutes on non-full-leave days (full-leave days are

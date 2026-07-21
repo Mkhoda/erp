@@ -28,6 +28,10 @@ export interface EffectiveSchedule {
   otMaxMonthly: number;
   otRounding: number;
   otAllowed: boolean;
+  annualLeaveDays: number;
+  deficitToLeaveEnabled: boolean;
+  hourlyLeaveCapMinutes: number;
+  absentToLeaveEnabled: boolean;
 }
 
 // Hardcoded fallback matching the WorkSchedule schema defaults — used when no
@@ -47,6 +51,10 @@ const DEFAULTS: EffectiveSchedule = {
   otMaxMonthly: 3600,
   otRounding: 15,
   otAllowed: true,
+  annualLeaveDays: 26,
+  deficitToLeaveEnabled: true,
+  hourlyLeaveCapMinutes: 480,
+  absentToLeaveEnabled: true,
 };
 
 @Injectable()
@@ -80,6 +88,10 @@ export class CalcService {
       s.otMaxDaily = base.otMaxDaily;
       s.otMaxMonthly = base.otMaxMonthly;
       s.otRounding = base.otRounding;
+      s.annualLeaveDays = base.annualLeaveDays;
+      s.deficitToLeaveEnabled = base.deficitToLeaveEnabled;
+      s.hourlyLeaveCapMinutes = base.hourlyLeaveCapMinutes;
+      s.absentToLeaveEnabled = base.absentToLeaveEnabled;
     }
     if (rule) {
       s.employeeType = rule.employeeType as 'FULL_TIME' | 'HOURLY';
@@ -94,6 +106,19 @@ export class CalcService {
     // Hourly staff: presence only — never accrue overtime or lateness penalties.
     if (s.employeeType === 'HOURLY') s.otAllowed = false;
     return s;
+  }
+
+  // Effective rules for a user (or the org default, when no userId matches any
+  // real user) in one place — used by the "قوانین کارکرد" info panel so it's
+  // always generated from live settings, never hardcoded.
+  async getRulesSummary(userId?: string) {
+    const sched = await this.getEffectiveSchedule(userId || '');
+    let scheduleName = 'پیش‌فرض سازمان';
+    if (sched.scheduleId) {
+      const row = await this.prisma.workSchedule.findUnique({ where: { id: sched.scheduleId } });
+      if (row && !row.isDefault) scheduleName = row.name;
+    }
+    return { scheduleName, ...sched };
   }
 
   // Holiday lookup for a Gregorian work date (covers ranges + yearly recurring).
@@ -309,9 +334,55 @@ export class CalcService {
     // and days still in progress (punched in but not yet out — workedMinutes is not
     // final, so nothing must be finalized as deficit until check-out is recorded).
     // Formula: max(0, required - worked - approved_leave). Handles late, early, short, absent.
-    const deficitMinutes = (!holidayWork && sched.employeeType === 'FULL_TIME' && (bothPunches || !hasPunch))
+    let deficitMinutes = (!holidayWork && sched.employeeType === 'FULL_TIME' && (bothPunches || !hasPunch))
       ? Math.max(0, sched.dailyMinutes - workedMinutes - leaveMinutes)
       : 0;
+
+    // ── Automatic leave conversion ───────────────────────────────────────
+    // Runs only for FULL_TIME staff on working days, and only when no human
+    // has already decided the day's outcome (forceStatus / granted leave >3h).
+    // Two rules, both gated by WorkSchedule toggles and the user's remaining
+    // annual balance (computed from PRIOR days only, same ascending-stability
+    // rule as the monthly OT cap above — a later day must never change an
+    // earlier day's numbers on recompute):
+    //   1) ABSENT → LEAVE, if a full day's balance remains.
+    //   2) Deficit → hourly leave, capped at a monthly minutes budget; once
+    //      that budget can't absorb the day's whole shortfall, the day rolls
+    //      over into a full LEAVE day instead of a partial hourly credit.
+    let autoConvertedLeave = false;
+    if (sched.employeeType === 'FULL_TIME' && !holidayWork && !override?.forceStatus && !forceLeaveFull) {
+      if (status === AttendanceStatus.ABSENT && sched.absentToLeaveEnabled) {
+        const remaining = await this.remainingLeaveMinutesBefore(userId, jYear, gregDate, sched);
+        if (remaining >= sched.dailyMinutes) {
+          status = AttendanceStatus.LEAVE;
+          leaveMinutes = sched.dailyMinutes;
+          deficitMinutes = 0;
+          autoConvertedLeave = true;
+        }
+      } else if (deficitMinutes > 0 && sched.deficitToLeaveEnabled) {
+        const remaining = await this.remainingLeaveMinutesBefore(userId, jYear, gregDate, sched);
+        if (remaining > 0) {
+          const usedHourlyThisMonth = await this.hourlyLeaveUsedThisMonth(userId, jYear, jMonth, gregDate);
+          const capRoom = Math.max(0, sched.hourlyLeaveCapMinutes - usedHourlyThisMonth);
+          const overflow = deficitMinutes - capRoom;
+          if (overflow > 0 && remaining >= sched.dailyMinutes) {
+            // Monthly hourly budget can't cover today's shortfall — roll the
+            // whole day into a full daily-leave conversion instead.
+            status = AttendanceStatus.LEAVE;
+            leaveMinutes = sched.dailyMinutes;
+            deficitMinutes = 0;
+            autoConvertedLeave = true;
+          } else {
+            const hourlyConvert = Math.min(deficitMinutes, capRoom, remaining);
+            if (hourlyConvert > 0) {
+              leaveMinutes += hourlyConvert;
+              deficitMinutes -= hourlyConvert;
+              autoConvertedLeave = true;
+            }
+          }
+        }
+      }
+    }
 
     await this.prisma.attendanceDay.upsert({
       where: { userId_gregDate: { userId, gregDate } },
@@ -320,16 +391,67 @@ export class CalcService {
         firstCheckIn: firstIn, lastCheckOut: lastOut,
         workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
         delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes,
-        status, isHolidayWork, hasOverride: !!override,
+        autoConvertedLeave, status, isHolidayWork, hasOverride: !!override,
       },
       update: {
         jYear, jMonth, jDay,
         firstCheckIn: firstIn, lastCheckOut: lastOut,
         workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
         delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes,
-        status, isHolidayWork, hasOverride: !!override, computedAt: new Date(),
+        autoConvertedLeave, status, isHolidayWork, hasOverride: !!override, computedAt: new Date(),
       },
     });
+  }
+
+  // Remaining annual leave balance in minutes, counting only days strictly
+  // before `gregDate` — mirrors RecordsService.leaveBalance()'s formula
+  // exactly so the two never disagree, and keeps a full-year recompute stable
+  // in ascending date order (a later day can never retroactively change an
+  // earlier day's conversion decision).
+  private async remainingLeaveMinutesBefore(
+    userId: string,
+    jYear: number,
+    gregDate: Date,
+    sched: EffectiveSchedule,
+  ): Promise<number> {
+    const dailyReq = sched.dailyMinutes;
+    const entitlementMin = sched.annualLeaveDays * dailyReq;
+    const [fullDays, absentDays, tardyAgg, hourlyAgg] = await Promise.all([
+      this.prisma.attendanceDay.count({
+        where: { userId, jYear, gregDate: { lt: gregDate }, status: AttendanceStatus.LEAVE },
+      }),
+      this.prisma.attendanceDay.count({
+        where: { userId, jYear, gregDate: { lt: gregDate }, status: AttendanceStatus.ABSENT },
+      }),
+      this.prisma.attendanceDay.aggregate({
+        where: { userId, jYear, gregDate: { lt: gregDate }, autoConvertedLeave: false },
+        _sum: { delayMinutes: true, earlyLeaveMinutes: true },
+      }),
+      this.prisma.attendanceDay.aggregate({
+        where: { userId, jYear, gregDate: { lt: gregDate }, status: { not: AttendanceStatus.LEAVE } },
+        _sum: { leaveMinutes: true },
+      }),
+    ]);
+    const tardyMinutes = (tardyAgg._sum.delayMinutes ?? 0) + (tardyAgg._sum.earlyLeaveMinutes ?? 0);
+    const hourlyLeaveMinutes = hourlyAgg._sum.leaveMinutes ?? 0;
+    const usedMin = fullDays * dailyReq + absentDays * dailyReq + hourlyLeaveMinutes + tardyMinutes;
+    return Math.max(0, entitlementMin - usedMin);
+  }
+
+  // Sum of auto-converted (deficit→hourly) leave minutes so far this Jalali
+  // month, counting only days strictly before `gregDate` — the running budget
+  // that hourlyLeaveCapMinutes is checked against.
+  private async hourlyLeaveUsedThisMonth(userId: string, jYear: number, jMonth: number, gregDate: Date): Promise<number> {
+    const agg = await this.prisma.attendanceDay.aggregate({
+      where: {
+        userId, jYear, jMonth,
+        gregDate: { lt: gregDate },
+        autoConvertedLeave: true,
+        status: { not: AttendanceStatus.LEAVE },
+      },
+      _sum: { leaveMinutes: true },
+    });
+    return agg._sum.leaveMinutes ?? 0;
   }
 }
 
