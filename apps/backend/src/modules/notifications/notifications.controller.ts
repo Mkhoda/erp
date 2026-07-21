@@ -101,6 +101,14 @@ export class NotificationsController {
     });
   }
 
+  @Get('announcements/unread-count')
+  getAnnouncementsUnreadCount(@Request() req: any) {
+    return this.announcements.getUnreadCount(req.user.id, {
+      role: req.user.role,
+      departmentId: req.user.departmentId,
+    });
+  }
+
   @Get('announcements/:id')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')

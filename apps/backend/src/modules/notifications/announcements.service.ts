@@ -162,6 +162,29 @@ export class AnnouncementsService {
     return all.filter((ann) => this.isTargetedAt(ann, userId, resolvedUser));
   }
 
+  /** Count of active announcements the user hasn't seen yet — badge for the "اطلاعیه‌ها" menu item. */
+  async getUnreadCount(userId: string, user: { role: string; departmentId?: string | null }) {
+    const now = new Date();
+    let deptId = user.departmentId ?? null;
+    if (!deptId) {
+      const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { departmentId: true } });
+      deptId = u?.departmentId ?? null;
+    }
+    const resolvedUser = { ...user, departmentId: deptId };
+
+    const all = await this.prisma.announcement.findMany({
+      where: {
+        isPublished: true,
+        OR: [{ publishAt: null }, { publishAt: { lte: now } }],
+        AND: [{ OR: [{ expireAt: null }, { expireAt: { gt: now } }] }],
+      },
+      include: { popupSeens: { where: { userId } } },
+    });
+
+    const count = all.filter((ann) => this.isTargetedAt(ann, userId, resolvedUser) && ann.popupSeens.length === 0).length;
+    return { count };
+  }
+
   /** Returns pending popup announcements the user hasn't seen (or hasn't acknowledged). */
   async getPendingPopups(userId: string, user: { role: string; departmentId?: string | null }) {
     const now = new Date();

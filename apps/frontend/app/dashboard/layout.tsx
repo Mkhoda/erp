@@ -15,7 +15,7 @@ import CommandPalette from "../components/CommandPalette";
 import { ToastProvider } from "../components/ui/Toast";
 import { MessagingProvider, useMessagingOptional } from "../../lib/messaging";
 import ChatWidget from "../components/messaging/ChatWidget";
-import AnnouncementHost from "../components/announcements/AnnouncementHost";
+import AnnouncementPopupHost from "../components/announcements/AnnouncementPopupHost";
 import type { Role } from "../../lib/menu";
 import { getSystemName, refreshSystemName } from "../../lib/branding";
 
@@ -33,7 +33,7 @@ const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard/users": { label: "کاربران", Icon: Users },
   "/dashboard/roles": { label: "نقش‌ها", Icon: Shield },
   "/dashboard/access": { label: "دسترسی صفحات", Icon: FileText },
-  "/dashboard/ai-settings": { label: "تنظیمات هوش مصنوعی", Icon: Cpu },
+  "/dashboard/ai-settings": { label: "هوش مصنوعی", Icon: Cpu },
   "/dashboard/settings": { label: "تنظیمات", Icon: Settings },
   "/dashboard/notifications": { label: "مرکز اعلان‌ها", Icon: Bell },
   "/dashboard/notifications/announcements": { label: "مدیریت اطلاعیه‌ها", Icon: Bell },
@@ -46,7 +46,6 @@ const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard/reports": { label: "گزارش‌ها", Icon: LayoutDashboard },
   "/dashboard/change-password": { label: "تغییر رمز عبور", Icon: Shield },
   "/dashboard/system-logs": { label: "لاگ سیستم", Icon: Bell },
-  "/dashboard/ai-usage": { label: "مصرف AI", Icon: Cpu },
   "/dashboard/messaging": { label: "پیام‌رسانی", Icon: MessageSquare },
   "/dashboard/messaging/admin": { label: "تنظیمات پیام‌رسانی", Icon: Settings },
 };
@@ -185,6 +184,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Close mobile sidebar on navigation
   React.useEffect(() => { setSidebarOpen(false); }, [pathname]);
+
+  // Announcements unread badge — refetched whenever the user navigates (e.g. after
+  // visiting /dashboard/announcements, which marks everything seen)
+  const [annUnread, setAnnUnread] = React.useState(0);
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const API = process.env.NEXT_PUBLIC_API_URL || "/api";
+    fetch(`${API}/notifications/announcements/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : { count: 0 }))
+      .then(data => setAnnUnread(data?.count ?? 0))
+      .catch(() => {});
+  }, [pathname]);
 
   // Breadcrumbs
   const breadcrumbs = React.useMemo(() => {
@@ -335,6 +347,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               role={role}
               collapsed={sidebarCollapsed}
               onNavigate={() => setSidebarOpen(false)}
+              counts={{ announcements: annUnread }}
             />
           </div>
 
@@ -421,7 +434,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Page content */}
         <main className="flex-1 p-4 overflow-auto">
           <ToastProvider>
-            <AnnouncementHost />
+            <AnnouncementPopupHost />
             {allowedPages === null ? (
               // Permissions still loading — don't render page content yet
               <div className="flex items-center justify-center min-h-[40vh]">

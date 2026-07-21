@@ -51,7 +51,7 @@ function ModelBadge({ provider }: { provider?: Provider | null }) {
   );
 }
 
-export default function QuotaPage() {
+export default function QuotaTab() {
   const [quotas, setQuotas] = React.useState<any[]>([]);
   const [users, setUsers] = React.useState<any[]>([]);
   const [providers, setProviders] = React.useState<Provider[]>([]);

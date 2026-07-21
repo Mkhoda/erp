@@ -6,7 +6,6 @@ export const ADMIN_PAGES: string[] = [
   '/dashboard/settings',
   '/dashboard/ai-settings',
   '/dashboard/access',
-  '/dashboard/ai-usage',
   '/dashboard/system-logs',
   '/dashboard/attendance/settings',
   '/dashboard/attendance/sync',
@@ -45,10 +44,8 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/attendance/reports',     label: 'گزارش‌های حضور' },
 
   // ── Admin-only pages ──
-  { page: '/dashboard/ai-settings',        label: 'تنظیمات هوش مصنوعی', adminOnly: true },
+  { page: '/dashboard/ai-settings',        label: 'هوش مصنوعی',          adminOnly: true },
   { page: '/dashboard/access',             label: 'دسترسی صفحات',       adminOnly: true },
-  { page: '/dashboard/ai-usage',           label: 'مصرف AI',             adminOnly: true },
-  { page: '/dashboard/quota',              label: 'سقف توکن',             adminOnly: true },
   { page: '/dashboard/system-logs',        label: 'لاگ سیستم',           adminOnly: true },
   { page: '/dashboard/attendance/settings', label: 'تنظیمات حضور و غیاب', adminOnly: true },
   { page: '/dashboard/attendance/sync',     label: 'پایش همگام‌سازی',      adminOnly: true },

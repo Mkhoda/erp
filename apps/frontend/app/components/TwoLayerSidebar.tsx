@@ -11,6 +11,7 @@ type Props = {
   role: Role | null;
   collapsed?: boolean;
   onNavigate?: () => void;
+  counts?: Record<string, number>;
 };
 
 function isAllowed(page: string | undefined, allowedPages: string[] | null): boolean {
@@ -44,18 +45,29 @@ function shouldShow(item: MenuItem, allowedPages: string[] | null, userRole: Rol
   return isRoleAllowed(item.roles, userRole) && isAllowed(item.page, allowedPages);
 }
 
+function CountBadge({ count }: { count?: number }) {
+  if (!count) return null;
+  return (
+    <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+      {count > 99 ? "۹۹+" : count.toLocaleString("fa-IR")}
+    </span>
+  );
+}
+
 function SidebarItem({
   item,
   allowedPages,
   role,
   collapsed,
   onNavigate,
+  counts,
 }: {
   item: MenuItem;
   allowedPages: string[] | null;
   role: Role | null;
   collapsed?: boolean;
   onNavigate?: () => void;
+  counts?: Record<string, number>;
 }) {
   const pathname = usePathname();
 
@@ -203,6 +215,11 @@ function SidebarItem({
         >
           {item.icon && <item.icon className="w-5 h-5" />}
         </Link>
+        {!!counts?.[item.id] && (
+          <span className="absolute -top-0.5 -left-0.5 flex items-center justify-center min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold leading-none">
+            {counts[item.id] > 99 ? "۹۹+" : counts[item.id].toLocaleString("fa-IR")}
+          </span>
+        )}
         <div className="top-1/2 right-full z-50 absolute opacity-0 group-hover:opacity-100 mr-2 transition-opacity -translate-y-1/2 pointer-events-none">
           <div className="flex items-center gap-1.5 bg-theme-primary shadow-lg px-2 py-1 rounded-lg text-white text-xs whitespace-nowrap">
             {item.title}
@@ -228,11 +245,12 @@ function SidebarItem({
       )}
       <span className="flex-1">{item.title}</span>
       {item.isNew && <span className="badge-new">جدید</span>}
+      <CountBadge count={counts?.[item.id]} />
     </Link>
   );
 }
 
-export default function TwoLayerSidebar({ allowedPages, role, collapsed, onNavigate }: Props) {
+export default function TwoLayerSidebar({ allowedPages, role, collapsed, onNavigate, counts }: Props) {
   // Track which sections we've already rendered a label for
   const renderedSections = new Set<string>();
 
@@ -259,6 +277,7 @@ export default function TwoLayerSidebar({ allowedPages, role, collapsed, onNavig
               role={role}
               collapsed={collapsed}
               onNavigate={onNavigate}
+              counts={counts}
             />
           </React.Fragment>
         );

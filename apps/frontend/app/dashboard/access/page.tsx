@@ -17,8 +17,6 @@ type PermRow = { page: string; role: string; canRead: boolean; canWrite: boolean
 const ADMIN_LOCKED = [
   "/dashboard/ai-settings",
   "/dashboard/access",
-  "/dashboard/ai-usage",
-  "/dashboard/quota",
   "/dashboard/system-logs",
   "/dashboard/attendance/settings",
   "/dashboard/attendance/sync",
@@ -111,10 +109,8 @@ const SECTIONS: Section[] = [
 ];
 
 const ADMIN_LOCKED_DISPLAY = [
-  { page: "/dashboard/ai-settings",          label: "تنظیمات هوش مصنوعی" },
+  { page: "/dashboard/ai-settings",          label: "هوش مصنوعی" },
   { page: "/dashboard/access",               label: "دسترسی صفحات" },
-  { page: "/dashboard/ai-usage",             label: "مصرف AI" },
-  { page: "/dashboard/quota",                label: "سقف توکن" },
   { page: "/dashboard/system-logs",          label: "لاگ سیستم" },
   { page: "/dashboard/attendance/settings",  label: "تنظیمات حضور و غیاب" },
   { page: "/dashboard/attendance/sync",      label: "پایش همگام‌سازی" },

@@ -35,7 +35,12 @@ export default function AnnouncementsBoard() {
         return r.json();
       })
       .then(data => {
-        setRows(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setRows(list);
+        // Mark everything visible as seen so the sidebar's unread badge clears.
+        list.forEach((ann: any) => {
+          fetch(`${API}/notifications/announcements/${ann.id}/seen`, { method: "POST", headers: h as any }).catch(() => {});
+        });
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));

@@ -5,7 +5,6 @@ import PageHeader from "../../components/ui/PageHeader";
 import SearchBar from "../../components/ui/SearchBar";
 import SkeletonTable from "../../components/ui/SkeletonTable";
 import { EmptyStateRow } from "../../components/ui/EmptyState";
-import { pageTitle } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -75,9 +74,7 @@ function StatCard({ icon: Icon, label, value, sub, color }: { icon: any; label: 
   );
 }
 
-export default function AiUsagePage() {
-  React.useEffect(() => { document.title = pageTitle("مصرف هوش مصنوعی"); }, []);
-
+export default function UsageTab() {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const [days, setDays] = React.useState(30);
   const [tab, setTab] = React.useState<"users" | "logs">("users");

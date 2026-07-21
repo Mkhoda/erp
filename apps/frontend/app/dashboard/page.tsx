@@ -3,6 +3,7 @@ import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { pageTitle } from "../../lib/branding";
+import AnnouncementBanner from "../components/announcements/AnnouncementBanner";
 import {
   Sparkles, Send, ArrowLeft,
   Boxes, Users, Handshake, Building, BarChart3,
@@ -430,6 +431,9 @@ export default function WorkspacePage() {
             <div className="text-xs text-theme-muted mt-0.5 text-left">امروز</div>
           </div>
         </motion.div>
+
+        {/* ── Announcement banners ── */}
+        <AnnouncementBanner />
 
         {/* ── Stat cards (2×2 grid for better visual weight) ── */}
         {statCards.length > 0 && (
