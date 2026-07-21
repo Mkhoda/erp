@@ -67,7 +67,7 @@ export class RecordsService {
   // Aggregated totals for the current filter (drives the records summary bar).
   async summary(f: RecordFilter) {
     const where = this.buildWhere(f);
-    const [agg, byStatus, byDate] = await Promise.all([
+    const [agg, byStatus, byDate, hourlyAgg] = await Promise.all([
       this.prisma.attendanceDay.aggregate({
         where,
         _sum: { workedMinutes: true, overtimeMinutes: true, holidayOvertimeMinutes: true, delayMinutes: true, earlyLeaveMinutes: true, deficitMinutes: true, nightMinutes: true },
@@ -75,6 +75,13 @@ export class RecordsService {
       }),
       this.prisma.attendanceDay.groupBy({ by: ['status'], where, _count: true }),
       this.prisma.attendanceDay.groupBy({ by: ['gregDate'], where }),
+      // Hourly leave = leaveMinutes on non-full-leave days within the same filter
+      // (year/month/user/dept) — full-leave days are counted separately as whole
+      // days (statusCounts.LEAVE) to avoid double counting, same convention as leaveBalance().
+      this.prisma.attendanceDay.aggregate({
+        where: { AND: [where, { status: { not: 'LEAVE' } }] },
+        _sum: { leaveMinutes: true },
+      }),
     ]);
     const statusCounts: Record<string, number> = {};
     for (const r of byStatus) statusCounts[r.status] = r._count;
@@ -89,6 +96,8 @@ export class RecordsService {
       earlyLeaveMinutes: agg._sum.earlyLeaveMinutes ?? 0,
       deficitMinutes: agg._sum.deficitMinutes ?? 0,
       nightMinutes: agg._sum.nightMinutes ?? 0,
+      hourlyLeaveMinutes: hourlyAgg._sum.leaveMinutes ?? 0,
+      leaveDays: statusCounts['LEAVE'] ?? 0,
       statusCounts,
     };
   }
