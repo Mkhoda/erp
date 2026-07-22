@@ -202,8 +202,10 @@ export class CalcService {
     // Resolve check-in / check-out, letting an override replace either side.
     let firstIn: Date | null = punches.length ? punches[0].punchAt : null;
     let lastOut: Date | null = punches.length > 1 ? punches[punches.length - 1].punchAt : null;
-    if (override?.newCheckIn) firstIn = override.newCheckIn;
-    if (override?.newCheckOut) lastOut = override.newCheckOut;
+    if (override?.clearCheckIn) firstIn = null;
+    else if (override?.newCheckIn) firstIn = override.newCheckIn;
+    if (override?.clearCheckOut) lastOut = null;
+    else if (override?.newCheckOut) lastOut = override.newCheckOut;
 
     let workedMinutes = 0;
     let overtimeMinutes = 0;

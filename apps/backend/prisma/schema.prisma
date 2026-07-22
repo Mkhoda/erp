@@ -686,6 +686,8 @@ model AttendanceOverride {
   gregDate    DateTime
   newCheckIn  DateTime?
   newCheckOut DateTime?
+  clearCheckIn  Boolean         @default(false)          // explicitly wipe the check-in punch for the day
+  clearCheckOut Boolean         @default(false)          // explicitly wipe the check-out punch for the day
   forceStatus AttendanceStatus?
   leaveMinutes Int?                                     // hourly-leave minutes granted for the day
   reason      String
@@ -870,6 +872,8 @@ model AttendanceRequest {
   gregDate     DateTime
   requestedIn  DateTime?
   requestedOut DateTime?
+  clearCheckIn  Boolean          @default(false)          // requesting deletion of the check-in punch
+  clearCheckOut Boolean          @default(false)          // requesting deletion of the check-out punch
   // For leave/mission/remote-work declarations — the status to force on approval.
   targetStatus AttendanceStatus?
   leaveMinutes Int?                                     // hourly-leave duration (minutes)

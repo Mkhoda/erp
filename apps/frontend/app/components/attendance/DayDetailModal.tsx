@@ -38,8 +38,8 @@ type Props = {
   detail: DayDetail | null;
   // Admin-only "اصلاح ساعت ورود/خروج" tab — omit for self-service (read-only) use.
   allowOverride?: boolean;
-  ov?: { inTime: string; outTime: string; status: string; reason: string; leaveHours: string };
-  setOv?: React.Dispatch<React.SetStateAction<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string }>>;
+  ov?: { inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean };
+  setOv?: React.Dispatch<React.SetStateAction<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean }>>;
   onSaveOverride?: () => void;
   ovSaving?: boolean;
 };
@@ -126,11 +126,27 @@ export default function DayDetailModal({ open, onClose, detail, allowOverride, o
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block mb-1 text-theme-secondary text-xs">ورود</label>
-                  <TimeSelect value={ov.inTime} onChange={v => setOv(s => ({ ...s, inTime: v }))} />
+                  {ov.clearCheckIn ? (
+                    <div className="input-theme text-sm text-theme-muted flex items-center justify-center">حذف می‌شود</div>
+                  ) : (
+                    <TimeSelect value={ov.inTime} onChange={v => setOv(s => ({ ...s, inTime: v }))} />
+                  )}
+                  <label className="mt-1 flex items-center gap-1.5 text-[11px] text-red-500 cursor-pointer">
+                    <input type="checkbox" checked={ov.clearCheckIn} onChange={e => setOv(s => ({ ...s, clearCheckIn: e.target.checked }))} />
+                    حذف رکورد ورود
+                  </label>
                 </div>
                 <div>
                   <label className="block mb-1 text-theme-secondary text-xs">خروج</label>
-                  <TimeSelect value={ov.outTime} onChange={v => setOv(s => ({ ...s, outTime: v }))} />
+                  {ov.clearCheckOut ? (
+                    <div className="input-theme text-sm text-theme-muted flex items-center justify-center">حذف می‌شود</div>
+                  ) : (
+                    <TimeSelect value={ov.outTime} onChange={v => setOv(s => ({ ...s, outTime: v }))} />
+                  )}
+                  <label className="mt-1 flex items-center gap-1.5 text-[11px] text-red-500 cursor-pointer">
+                    <input type="checkbox" checked={ov.clearCheckOut} onChange={e => setOv(s => ({ ...s, clearCheckOut: e.target.checked }))} />
+                    حذف رکورد خروج
+                  </label>
                 </div>
                 <div>
                   <label className="block mb-1 text-theme-secondary text-xs">وضعیت (اختیاری)</label>

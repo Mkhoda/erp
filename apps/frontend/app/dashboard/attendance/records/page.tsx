@@ -58,7 +58,7 @@ export default function AttendanceRecordsPage() {
   const [detail, setDetail] = React.useState<any>(null);
   const [exporting, setExporting] = React.useState<string | null>(null);
   // Admin edit (override) form in the detail modal.
-  const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string }>({ inTime: "", outTime: "", status: "", reason: "", leaveHours: "" });
+  const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean }>({ inTime: "", outTime: "", status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false });
   const [ovSaving, setOvSaving] = React.useState(false);
   const [leave, setLeave] = React.useState<any>(null);
   const [rules, setRules] = React.useState<any>(null);
@@ -129,7 +129,7 @@ export default function AttendanceRecordsPage() {
   async function openDetail(row: any) {
     const date = row.gregDate.slice(0, 10);
     const d = await fetch(`${API}/attendance/records/day?userId=${row.userId}&date=${date}`, { headers: h }).then(r => r.ok ? r.json() : null);
-    setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "", leaveHours: "" });
+    setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false });
     setDetail({ row, ...d });
   }
 
@@ -140,8 +140,10 @@ export default function AttendanceRecordsPage() {
       const body = {
         userId: detail.row.userId,
         date: detail.row.gregDate.slice(0, 10),
-        inTime: ov.inTime || undefined,
-        outTime: ov.outTime || undefined,
+        inTime: ov.clearCheckIn ? undefined : (ov.inTime || undefined),
+        outTime: ov.clearCheckOut ? undefined : (ov.outTime || undefined),
+        clearCheckIn: ov.clearCheckIn || undefined,
+        clearCheckOut: ov.clearCheckOut || undefined,
         forceStatus: ov.status || undefined,
         leaveMinutes: ov.leaveHours ? Math.round(Number(ov.leaveHours) * 60) : undefined,
         reason: ov.reason || "اصلاح توسط مدیر",

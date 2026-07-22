@@ -79,8 +79,8 @@ export default function ApprovalsPage() {
                     <td className="py-1.5 px-2 text-theme-primary whitespace-nowrap">{q.user ? `${q.user.firstName} ${q.user.lastName}` : "—"}</td>
                     <td className="px-2 text-theme-muted" dir="ltr">{faDate(q.gregDate)}</td>
                     <td className="px-2 text-theme-muted">{q.targetStatus ? STATUS_FA[q.targetStatus] : TYPE_FA[q.type] || q.type}</td>
-                    <td className="px-2 text-theme-primary" dir="ltr">{faTime(q.requestedIn)}</td>
-                    <td className="px-2 text-theme-primary" dir="ltr">{faTime(q.requestedOut)}</td>
+                    <td className={`px-2 ${q.clearCheckIn ? "text-red-600 font-medium" : "text-theme-primary"}`} dir="ltr">{q.clearCheckIn ? "حذف" : faTime(q.requestedIn)}</td>
+                    <td className={`px-2 ${q.clearCheckOut ? "text-red-600 font-medium" : "text-theme-primary"}`} dir="ltr">{q.clearCheckOut ? "حذف" : faTime(q.requestedOut)}</td>
                     <td className="px-2 text-theme-muted text-xs max-w-[180px] truncate" title={q.description}>{q.description || "—"}</td>
                     <td className="px-2"><span className={`text-xs px-2 py-0.5 rounded-full ${q.status === "APPROVED" ? "bg-green-500/15 text-green-600" : q.status === "REJECTED" ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600"}`}>{REQ_STATUS_FA[q.status] || q.status}</span></td>
                     <td className="px-2">
@@ -124,8 +124,8 @@ export default function ApprovalsPage() {
               {/* Requested */}
               <div className="border border-blue-500/40 bg-blue-500/5 rounded-lg p-3">
                 <div className="text-xs font-semibold text-blue-600 mb-2">درخواست</div>
-                <Row label="ورود" value={sel.req.requestedIn ? faTime(sel.req.requestedIn) : "بدون تغییر"} changed={!!sel.req.requestedIn} />
-                <Row label="خروج" value={sel.req.requestedOut ? faTime(sel.req.requestedOut) : "بدون تغییر"} changed={!!sel.req.requestedOut} />
+                <Row label="ورود" value={sel.req.clearCheckIn ? "حذف رکورد" : sel.req.requestedIn ? faTime(sel.req.requestedIn) : "بدون تغییر"} changed={!!sel.req.requestedIn || sel.req.clearCheckIn} />
+                <Row label="خروج" value={sel.req.clearCheckOut ? "حذف رکورد" : sel.req.requestedOut ? faTime(sel.req.requestedOut) : "بدون تغییر"} changed={!!sel.req.requestedOut || sel.req.clearCheckOut} />
                 <Row label="وضعیت" value={sel.req.targetStatus ? STATUS_FA[sel.req.targetStatus] : "بدون تغییر"} changed={!!sel.req.targetStatus} />
               </div>
             </div>

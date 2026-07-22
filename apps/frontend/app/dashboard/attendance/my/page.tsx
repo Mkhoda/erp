@@ -69,7 +69,7 @@ export default function MyAttendancePage() {
   const [pageSize, setPageSize] = React.useState(50);
   React.useEffect(() => { setPage(1); }, [jYear, jMonth, pageSize, rows.length]);
   const [modal, setModal] = React.useState<any>(null); // { row }
-  const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", fixIn: false, inTime: "", fixOut: false, outTime: "", description: "" });
+  const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", fixIn: false, inTime: "", delIn: false, fixOut: false, outTime: "", delOut: false, description: "" });
   const [sending, setSending] = React.useState(false);
   const [leaveModal, setLeaveModal] = React.useState(false);
   const [leaveForm, setLeaveForm] = React.useState({ jy: 0, jm: 0, jd: 0, type: "LEAVE", leaveHours: "", description: "" });
@@ -145,8 +145,8 @@ export default function MyAttendancePage() {
     setReqForm({
       kind: "FIX",
       // Pre-fill existing times; default to correcting the MISSING side.
-      fixIn: !hasIn, inTime: toHHmm(row.firstCheckIn),
-      fixOut: !hasOut, outTime: toHHmm(row.lastCheckOut),
+      fixIn: !hasIn, inTime: toHHmm(row.firstCheckIn), delIn: false,
+      fixOut: !hasOut, outTime: toHHmm(row.lastCheckOut), delOut: false,
       description: "",
     });
     setModal({ row });
@@ -158,10 +158,10 @@ export default function MyAttendancePage() {
       const k = reqForm.kind;
       const body: any = { date: modal.row.gregDate.slice(0, 10), description: reqForm.description };
       if (k === "FIX") {
-        const inT = reqForm.fixIn ? reqForm.inTime : undefined;
-        const outT = reqForm.fixOut ? reqForm.outTime : undefined;
-        body.type = inT && outT ? "FULL_DAY_FIX" : outT ? "CHECK_OUT_FIX" : "CHECK_IN_FIX";
-        body.inTime = inT; body.outTime = outT;
+        const doIn = reqForm.fixIn, doOut = reqForm.fixOut;
+        body.type = doIn && doOut ? "FULL_DAY_FIX" : doOut ? "CHECK_OUT_FIX" : "CHECK_IN_FIX";
+        if (doIn) { if (reqForm.delIn) body.clearCheckIn = true; else body.inTime = reqForm.inTime; }
+        if (doOut) { if (reqForm.delOut) body.clearCheckOut = true; else body.outTime = reqForm.outTime; }
       } else if (k === "EXPLANATION") { body.type = "EXPLANATION"; }
       else if (k === "HOURLY_LEAVE") { body.type = "LEAVE"; body.leaveMinutes = Math.round((Number(reqForm.leaveHours) || 0) * 60); }
       else { body.type = "LEAVE"; body.targetStatus = k; } // LEAVE | MISSION | REMOTE_WORK
@@ -333,7 +333,7 @@ export default function MyAttendancePage() {
               <div key={q.id} className="flex items-center justify-between text-sm border border-theme rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span dir="ltr" className="text-theme-primary">{faDate(q.gregDate)}</span>
-                  <span className="text-theme-muted">{q.targetStatus ? STATUS_FA[q.targetStatus] : "اصلاح ساعت"}</span>
+                  <span className="text-theme-muted">{q.targetStatus ? STATUS_FA[q.targetStatus] : (q.clearCheckIn || q.clearCheckOut) ? "حذف رکورد ورود/خروج" : "اصلاح ساعت"}</span>
                   {q.description && <span className="text-theme-muted text-xs">— {q.description}</span>}
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${q.status === "APPROVED" ? "bg-green-500/15 text-green-600" : q.status === "REJECTED" ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600"}`}>{REQ_STATUS_FA[q.status] || q.status}</span>
@@ -457,17 +457,41 @@ export default function MyAttendancePage() {
             {reqForm.kind === "FIX" && (
               <div className="space-y-2">
                 <p className="text-[11px] text-theme-muted">فقط بخشی که می‌خواهید اصلاح شود را تیک بزنید؛ بخش بدون تیک دست‌نخورده می‌ماند.</p>
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2 text-sm text-theme-primary w-32 shrink-0">
-                    <input type="checkbox" checked={reqForm.fixIn} onChange={e => setReqForm((s: any) => ({ ...s, fixIn: e.target.checked }))} /> اصلاح ورود
-                  </label>
-                  <TimeSelect disabled={!reqForm.fixIn} value={reqForm.inTime} onChange={v => setReqForm((s: any) => ({ ...s, inTime: v }))} />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 text-sm text-theme-primary w-32 shrink-0">
+                      <input type="checkbox" checked={reqForm.fixIn} onChange={e => setReqForm((s: any) => ({ ...s, fixIn: e.target.checked }))} /> اصلاح ورود
+                    </label>
+                    {reqForm.fixIn && reqForm.delIn ? (
+                      <div className="input-theme text-sm text-theme-muted flex items-center justify-center flex-1">حذف می‌شود</div>
+                    ) : (
+                      <TimeSelect disabled={!reqForm.fixIn} value={reqForm.inTime} onChange={v => setReqForm((s: any) => ({ ...s, inTime: v }))} />
+                    )}
+                  </div>
+                  {reqForm.fixIn && (
+                    <label className="flex items-center gap-1.5 text-[11px] text-red-500 cursor-pointer mr-32 pr-2">
+                      <input type="checkbox" checked={reqForm.delIn} onChange={e => setReqForm((s: any) => ({ ...s, delIn: e.target.checked }))} />
+                      به‌جای اصلاح، حذف رکورد ورود درخواست شود
+                    </label>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2 text-sm text-theme-primary w-32 shrink-0">
-                    <input type="checkbox" checked={reqForm.fixOut} onChange={e => setReqForm((s: any) => ({ ...s, fixOut: e.target.checked }))} /> اصلاح خروج
-                  </label>
-                  <TimeSelect disabled={!reqForm.fixOut} value={reqForm.outTime} onChange={v => setReqForm((s: any) => ({ ...s, outTime: v }))} />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 text-sm text-theme-primary w-32 shrink-0">
+                      <input type="checkbox" checked={reqForm.fixOut} onChange={e => setReqForm((s: any) => ({ ...s, fixOut: e.target.checked }))} /> اصلاح خروج
+                    </label>
+                    {reqForm.fixOut && reqForm.delOut ? (
+                      <div className="input-theme text-sm text-theme-muted flex items-center justify-center flex-1">حذف می‌شود</div>
+                    ) : (
+                      <TimeSelect disabled={!reqForm.fixOut} value={reqForm.outTime} onChange={v => setReqForm((s: any) => ({ ...s, outTime: v }))} />
+                    )}
+                  </div>
+                  {reqForm.fixOut && (
+                    <label className="flex items-center gap-1.5 text-[11px] text-red-500 cursor-pointer mr-32 pr-2">
+                      <input type="checkbox" checked={reqForm.delOut} onChange={e => setReqForm((s: any) => ({ ...s, delOut: e.target.checked }))} />
+                      به‌جای اصلاح، حذف رکورد خروج درخواست شود
+                    </label>
+                  )}
                 </div>
               </div>
             )}
