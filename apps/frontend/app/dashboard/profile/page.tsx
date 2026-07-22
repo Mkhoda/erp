@@ -77,7 +77,7 @@ export default function ProfilePage() {
     try {
       const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ phone: me.phone, purpose: 'change' }),
+        body: JSON.stringify({ phone: normalizeTo98(me.phone), purpose: 'change' }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || 'ارسال کد ناموفق');

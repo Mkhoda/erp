@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import { Key, Send, Check, AlertCircle } from 'lucide-react';
+import { normalizeTo98 } from '../../../lib/phone';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -21,7 +22,7 @@ export default function ChangePasswordPage() {
       const res = await fetch(`${API}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: me.phone, purpose: 'change' }),
+        body: JSON.stringify({ phone: normalizeTo98(me.phone), purpose: 'change' }),
       });
       if (res.ok) { setOtpSent(true); setMsg({ type: 'ok', text: 'کد تایید ارسال شد' }); }
       else setMsg({ type: 'err', text: 'ارسال کد ناموفق بود' });

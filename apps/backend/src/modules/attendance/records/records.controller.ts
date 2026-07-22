@@ -24,6 +24,7 @@ export class RecordsController {
     return {
       jYear: q.jYear ? +q.jYear : undefined,
       jMonth: q.jMonth ? +q.jMonth : undefined,
+      jDay: q.jDay ? +q.jDay : undefined,
       userId: q.userId || undefined,
       departmentId: q.departmentId || undefined,
       status: q.status || undefined,

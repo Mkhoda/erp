@@ -7,7 +7,7 @@ import TimeSelect from "../ui/TimeSelect";
 const STATUS_FA: Record<string, string> = {
   PRESENT: "حاضر", LATE: "تاخیر", EARLY_LEAVE: "تعجیل", ABSENT: "غیبت", INCOMPLETE: "ناقص",
   LEAVE: "مرخصی", MISSION: "ماموریت", REMOTE_WORK: "دورکاری", HOLIDAY: "تعطیل",
-  COMPANY_HOLIDAY: "تعطیل شرکت", WEEKEND: "آخر هفته",
+  COMPANY_HOLIDAY: "تعطیل شرکت", WEEKEND: "آخر هفته", OFF_DUTY: "استراحت (شیفت)",
 };
 
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");

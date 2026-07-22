@@ -199,6 +199,7 @@ export const MENU: MenuItem[] = [
       { id: 'attendance.records',   title: 'کارکرد روزانه',        page: '/dashboard/attendance/records',        icon: ClipboardList },
       { id: 'attendance.approvals', title: 'صف تایید',             page: '/dashboard/attendance/approvals',      icon: ClipboardCheck },
       { id: 'attendance.workRules', title: 'قوانین و تقویم کاری', page: '/dashboard/attendance/work-rules',     icon: SlidersHorizontal },
+      { id: 'attendance.shifts',    title: 'شیفت‌های نگهبانی',     page: '/dashboard/attendance/shifts',         icon: ShieldCheck },
     ],
   },
 

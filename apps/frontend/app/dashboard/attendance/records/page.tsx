@@ -12,13 +12,14 @@ import Link from "next/link";
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
-const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", WORKING:"در حال کار" };
+const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار" };
 const STATUS_CLS: Record<string,string> = {
   PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600",
   EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600",
   INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600",
   MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600",
   HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500",
+  OFF_DUTY:"bg-slate-300/20 text-slate-500",
   WORKING:"bg-teal-500/15 text-teal-600",
 };
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
@@ -72,6 +73,7 @@ export default function AttendanceRecordsPage() {
   // Default to the current Jalali month/year on load (0 = "all" once cleared).
   const [jYear, setJYear] = React.useState<number>(() => currentJalali().jYear);
   const [jMonth, setJMonth] = React.useState<number>(() => currentJalali().jMonth);
+  const [jDay, setJDay] = React.useState<number>(0);
   const [deptId, setDeptId] = React.useState("");
   const [userId, setUserId] = React.useState("");
   const [status, setStatus] = React.useState("");
@@ -80,11 +82,12 @@ export default function AttendanceRecordsPage() {
     const p = new URLSearchParams();
     if (jYear) p.set("jYear", String(jYear));
     if (jMonth) p.set("jMonth", String(jMonth));
+    if (jDay) p.set("jDay", String(jDay));
     if (deptId) p.set("departmentId", deptId);
     if (userId) p.set("userId", userId);
     if (status) p.set("status", status);
     return p.toString();
-  }, [jYear, jMonth, deptId, userId, status]);
+  }, [jYear, jMonth, jDay, deptId, userId, status]);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -205,14 +208,18 @@ export default function AttendanceRecordsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-theme-card border border-theme rounded-xl p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-        <select className="input-theme text-sm" value={jYear} onChange={e => { setJYear(+e.target.value); setJMonth(0); }}>
+      <div className="bg-theme-card border border-theme rounded-xl p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
+        <select className="input-theme text-sm" value={jYear} onChange={e => { setJYear(+e.target.value); setJMonth(0); setJDay(0); }}>
           <option value={0}>همه سال‌ها</option>
           {yearOpts.map(y => <option key={y} value={y}>سال {faY(y)}</option>)}
         </select>
-        <select className="input-theme text-sm" value={jMonth} onChange={e => setJMonth(+e.target.value)}>
+        <select className="input-theme text-sm" value={jMonth} onChange={e => { setJMonth(+e.target.value); setJDay(0); }}>
           <option value={0}>همه ماه‌ها</option>
           {monthOpts.map(m => <option key={m} value={m}>{J_MONTHS[m-1]}</option>)}
+        </select>
+        <select className="input-theme text-sm" value={jDay} onChange={e => setJDay(+e.target.value)}>
+          <option value={0}>همه روزها</option>
+          {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>روز {toFa(String(d))}</option>)}
         </select>
         <select className="input-theme text-sm" value={deptId} onChange={e => setDeptId(e.target.value)}>
           <option value="">همه دپارتمان‌ها</option>

@@ -32,6 +32,16 @@ export function workDateOf(instant: Date): Date {
   return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
 }
 
+// A work-date label (as produced by workDateOf/gregDate — "UTC midnight" of the
+// Tehran calendar day) is NOT the real instant of Tehran midnight: it's offset
+// +3:30 ahead of it (Date.UTC(Y,M,D) reads as Tehran 03:30, not Tehran 00:00).
+// Use this whenever you need the true UTC instant to bound a punchAt query
+// range for a work date — subtracting the raw label from itself would silently
+// query [Tehran 03:30, next-day 03:30) instead of [00:00, 24:00).
+export function tehranMidnightInstant(gregDate: Date): Date {
+  return new Date(gregDate.getTime() - TEHRAN_OFFSET_MIN * 60_000);
+}
+
 // Minutes elapsed since Tehran local midnight for the given instant (0..1439).
 export function minutesOfDay(instant: Date): number {
   const t = toTehran(instant);

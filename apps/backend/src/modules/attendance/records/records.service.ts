@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { tehranMidnightInstant } from '../engine/jalali.util';
 
 export interface RecordFilter {
   jYear?: number;
   jMonth?: number;
+  jDay?: number;
   userId?: string;
   departmentId?: string;
   status?: string;
@@ -29,6 +31,7 @@ export class RecordsService {
     const where: Prisma.AttendanceDayWhereInput = {};
     if (f.jYear) where.jYear = f.jYear;
     if (f.jMonth) where.jMonth = f.jMonth;
+    if (f.jDay) where.jDay = f.jDay;
     if (f.userId) where.userId = f.userId;
     if (f.status) where.status = f.status as any;
 
@@ -169,14 +172,15 @@ export class RecordsService {
 
   // Day detail: computed row + every raw punch + any override (audit view).
   async dayDetail(userId: string, gregDate: Date) {
-    const dayEnd = new Date(gregDate.getTime() + 24 * 60 * 60 * 1000);
+    const dayStart = tehranMidnightInstant(gregDate);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
     const [day, punches, override] = await Promise.all([
       this.prisma.attendanceDay.findUnique({
         where: { userId_gregDate: { userId, gregDate } },
         include: { user: { select: USER_SELECT } },
       }),
       this.prisma.rawAttendanceRecord.findMany({
-        where: { userId, punchAt: { gte: gregDate, lt: dayEnd } },
+        where: { userId, punchAt: { gte: dayStart, lt: dayEnd } },
         orderBy: { punchAt: 'asc' },
         select: { id: true, punchAt: true, deviceCode: true, rType: true, recordId: true },
       }),

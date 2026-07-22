@@ -40,7 +40,7 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/attendance/requests',    label: 'درخواست‌های اصلاح' },
   { page: '/dashboard/attendance/approvals',   label: 'صف تایید حضور' },
   { page: '/dashboard/attendance/holidays',    label: 'تعطیلات' },
-  { page: '/dashboard/attendance/shifts',      label: 'شیفت‌ها' },
+  { page: '/dashboard/attendance/shifts',      label: 'شیفت‌های ۲۴ ساعته (نگهبانی)' },
   { page: '/dashboard/attendance/reports',     label: 'گزارش‌های حضور' },
 
   // ── Admin-only pages ──

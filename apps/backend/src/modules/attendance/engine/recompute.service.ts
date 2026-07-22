@@ -1,10 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CalcService } from './calc.service';
+import { GuardCalcService } from './guard-calc.service';
 import { jalaliMonthRange, workDateOf } from './jalali.util';
 
-// Orchestrates recomputation of AttendanceDay rows. All entry points funnel into
-// CalcService.computeDay, which is idempotent — safe to call repeatedly.
+// Orchestrates recomputation of AttendanceDay rows. All entry points funnel
+// through recomputeDays(), which routes each user's dates to either
+// CalcService.computeDay (regular single-day schedule) or GuardCalcService
+// (manually-scheduled 24h guard rotations) — both idempotent, safe to re-run.
 @Injectable()
 export class RecomputeService {
   private readonly logger = new Logger(RecomputeService.name);
@@ -12,6 +15,7 @@ export class RecomputeService {
   constructor(
     private prisma: PrismaService,
     private calc: CalcService,
+    private guardCalc: GuardCalcService,
   ) {}
 
   // Recompute a specific set of (userId, gregDate) pairs (deduplicated).
@@ -27,13 +31,36 @@ export class RecomputeService {
         ? a.gregDate.getTime() - b.gregDate.getTime()
         : a.userId < b.userId ? -1 : 1,
     );
-    let n = 0;
+
+    // Group by user so a guard's whole batch is handed to GuardCalcService as
+    // one contiguous range (it needs neighboring days to resolve which dates a
+    // multi-day shift's check-out spans through, not just the requested dates).
+    const byUser = new Map<string, Date[]>();
     for (const { userId, gregDate } of ordered) {
-      try {
-        await this.calc.computeDay(userId, gregDate);
-        n++;
-      } catch (e: any) {
-        this.logger.error(`computeDay failed for ${userId} ${gregDate.toISOString()}: ${e.message}`);
+      if (!byUser.has(userId)) byUser.set(userId, []);
+      byUser.get(userId)!.push(gregDate);
+    }
+
+    let n = 0;
+    for (const [userId, dates] of byUser) {
+      const from = dates[0];
+      const to = dates[dates.length - 1];
+      const isGuard = await this.guardCalc.hasActiveGuardAssignment(userId, from, to);
+      if (isGuard) {
+        try {
+          n += await this.guardCalc.computeGuardRange(userId, from, to);
+        } catch (e: any) {
+          this.logger.error(`computeGuardRange failed for ${userId} ${from.toISOString()}-${to.toISOString()}: ${e.message}`);
+        }
+        continue;
+      }
+      for (const gregDate of dates) {
+        try {
+          await this.calc.computeDay(userId, gregDate);
+          n++;
+        } catch (e: any) {
+          this.logger.error(`computeDay failed for ${userId} ${gregDate.toISOString()}: ${e.message}`);
+        }
       }
     }
     return n;

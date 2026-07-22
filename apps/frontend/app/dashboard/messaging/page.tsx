@@ -635,9 +635,10 @@ export default function MessagingPage() {
                 </React.Fragment>
               ))}
 
-              {/* Typing indicator */}
+              {/* Typing indicator — always the other person, so it must mirror
+                  MessageBubble's !isMe layout (flex-row-reverse), not the default. */}
               {activeTyping.length > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-row-reverse items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center font-bold text-white text-xs shrink-0">
                     {activeConv.members.find((m) => m.userId === activeTyping[0])?.user?.firstName?.[0] ?? "؟"}
                   </div>

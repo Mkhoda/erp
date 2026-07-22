@@ -24,6 +24,7 @@ export class MyAttendanceController {
       userId: this.uid(req),
       jYear: q.jYear ? +q.jYear : undefined,
       jMonth: q.jMonth ? +q.jMonth : undefined,
+      jDay: q.jDay ? +q.jDay : undefined,
       status: q.status || undefined,
     });
   }
@@ -34,6 +35,7 @@ export class MyAttendanceController {
       userId: this.uid(req),
       jYear: q.jYear ? +q.jYear : undefined,
       jMonth: q.jMonth ? +q.jMonth : undefined,
+      jDay: q.jDay ? +q.jDay : undefined,
     });
   }
 

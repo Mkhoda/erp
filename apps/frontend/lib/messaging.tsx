@@ -523,14 +523,20 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     });
     if (!r.ok) throw new Error("آپلود فایل ناموفق بود");
     const msg: ChatMessage = await r.json();
-    // Always update state — socket may not deliver the event when disconnected
-    setState((s) => ({
-      ...s,
-      messages: { ...s.messages, [convId]: [msg, ...(s.messages[convId] ?? [])] },
-      conversations: s.conversations.map((c) =>
-        c.id === convId ? { ...c, messages: [msg], updatedAt: msg.createdAt } : c,
-      ),
-    }));
+    // The gateway also broadcasts this same message over the socket (message:new),
+    // which usually arrives around the same time — skip if it's already in state
+    // (same dedup-by-id the message:new handler itself does) so it isn't rendered twice.
+    setState((s) => {
+      const existing = s.messages[convId] ?? [];
+      if (existing.some((m) => m.id === msg.id)) return s;
+      return {
+        ...s,
+        messages: { ...s.messages, [convId]: [msg, ...existing] },
+        conversations: s.conversations.map((c) =>
+          c.id === convId ? { ...c, messages: [msg], updatedAt: msg.createdAt } : c,
+        ),
+      };
+    });
   }, []);
 
   const markRead = React.useCallback((convId: string) => {

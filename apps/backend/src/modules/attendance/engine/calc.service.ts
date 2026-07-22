@@ -5,6 +5,7 @@ import {
   dayOfWeek,
   minutesOfDay,
   parseHHmm,
+  tehranMidnightInstant,
   toJalaliParts,
   workDateOf,
 } from './jalali.util';
@@ -177,8 +178,10 @@ export class CalcService {
    * derives the row fresh and upserts it. Never reads/writes RawAttendanceRecord.
    */
   async computeDay(userId: string, gregDate: Date): Promise<void> {
-    const dayStart = gregDate; // UTC midnight of the Tehran calendar day
-    const dayEnd = new Date(gregDate.getTime() + 24 * 60 * 60 * 1000);
+    // gregDate is a work-date LABEL (Date.UTC of the Tehran calendar day), not the
+    // real instant of Tehran midnight — convert before bounding the punch query.
+    const dayStart = tehranMidnightInstant(gregDate);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
     // Resolve the schedule first — holiday scoping + day-overrides depend on group.
     const sched = await this.getEffectiveSchedule(userId);
@@ -336,8 +339,12 @@ export class CalcService {
     // and days still in progress (punched in but not yet out — workedMinutes is not
     // final, so nothing must be finalized as deficit until check-out is recorded).
     // Formula: max(0, required - worked - approved_leave). Handles late, early, short, absent.
+    // Minutes already paid out as overtime are excluded from "worked" here — otherwise
+    // staying late would silently cancel out a late arrival (same minutes counted both
+    // as paid overtime AND as covering the daily requirement), hiding real lateness.
+    const workedTowardRequirement = Math.max(0, workedMinutes - overtimeMinutes);
     let deficitMinutes = (!holidayWork && sched.employeeType === 'FULL_TIME' && (bothPunches || !hasPunch))
-      ? Math.max(0, sched.dailyMinutes - workedMinutes - leaveMinutes)
+      ? Math.max(0, sched.dailyMinutes - workedTowardRequirement - leaveMinutes)
       : 0;
 
     // ── Automatic leave conversion ───────────────────────────────────────

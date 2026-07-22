@@ -500,6 +500,7 @@ enum AttendanceStatus {
   HOLIDAY
   COMPANY_HOLIDAY
   WEEKEND
+  OFF_DUTY // rest day of a manually-scheduled guard shift (e.g. 24/24, 24/48) — not a weekend/holiday
 }
 
 enum HolidayType {
@@ -515,7 +516,8 @@ enum ShiftType {
   NIGHT
   WEEKLY_ROTATION
   MONTHLY_ROTATION
-  TWENTY_FOUR_FORTY_EIGHT
+  TWENTY_FOUR_TWENTY_FOUR // 24h on duty / 24h off (guard rotation)
+  TWENTY_FOUR_FORTY_EIGHT // 24h on duty / 48h off (guard rotation)
 }
 
 enum LeaveKind {
@@ -766,11 +768,19 @@ model Shift {
   id           String            @id @default(cuid())
   name         String            @unique
   type         ShiftType
-  startTime    String                                  // "HH:mm" (NIGHT may cross midnight)
-  endTime      String
+  startTime    String?                                 // "HH:mm" (NIGHT may cross midnight) — unused for guard rotations
+  endTime      String?
   breakMinutes Int               @default(0)
   cycleDays    Int?                                    // rotating / 24-48 patterns
   pattern      Json?                                   // e.g. ["D","D","N","off"]
+  // ── Guard rotation config (TWENTY_FOUR_TWENTY_FOUR / TWENTY_FOUR_FORTY_EIGHT) ──
+  // On-duty days are marked manually per user via ShiftCalendarDay, not derived
+  // from cycleDays/pattern. The engine only needs the duty length + two
+  // tolerance thresholds: worked >= fullCreditMinutes -> no deficit; worked <
+  // absentBelowMinutes -> full ABSENT; in between -> proportional deficit.
+  dutyMinutes         Int?                              // nominal duty length, e.g. 1440 for 24h
+  fullCreditMinutes   Int?                              // worked >= this -> zero deficit
+  absentBelowMinutes  Int?                              // worked < this -> ABSENT (no partial credit)
   isActive     Boolean           @default(true)
   assignments  ShiftAssignment[]
   calendar     ShiftCalendarDay[]

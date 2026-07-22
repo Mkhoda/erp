@@ -8,8 +8,8 @@ import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
-const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", WORKING:"در حال کار" };
-const STATUS_CLS: Record<string,string> = { PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600", EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600", INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600", MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600", HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500", WORKING:"bg-teal-500/15 text-teal-600" };
+const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار" };
+const STATUS_CLS: Record<string,string> = { PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600", EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600", INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600", MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600", HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500", OFF_DUTY:"bg-slate-300/20 text-slate-500", WORKING:"bg-teal-500/15 text-teal-600" };
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 function liveStatus(r: any): string {
   if (r.status === "INCOMPLETE" && r.firstCheckIn && !r.lastCheckOut && r.gregDate?.slice(0, 10) === TODAY_ISO) return "WORKING";
@@ -64,10 +64,11 @@ export default function MyAttendancePage() {
   const [leave, setLeave] = React.useState<any>(null);
   const [jYear, setJYear] = React.useState(() => currentJalali().jYear);
   const [jMonth, setJMonth] = React.useState(() => currentJalali().jMonth);
+  const [jDay, setJDay] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
-  React.useEffect(() => { setPage(1); }, [jYear, jMonth, pageSize, rows.length]);
+  React.useEffect(() => { setPage(1); }, [jYear, jMonth, jDay, pageSize, rows.length]);
   const [modal, setModal] = React.useState<any>(null); // { row }
   const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", fixIn: false, inTime: "", delIn: false, fixOut: false, outTime: "", delOut: false, description: "" });
   const [sending, setSending] = React.useState(false);
@@ -89,7 +90,7 @@ export default function MyAttendancePage() {
     setDetail({ row, ...d });
   }
 
-  const qs = () => { const p = new URLSearchParams(); if (jYear) p.set("jYear", String(jYear)); if (jMonth) p.set("jMonth", String(jMonth)); return p.toString(); };
+  const qs = () => { const p = new URLSearchParams(); if (jYear) p.set("jYear", String(jYear)); if (jMonth) p.set("jMonth", String(jMonth)); if (jDay) p.set("jDay", String(jDay)); return p.toString(); };
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -103,7 +104,7 @@ export default function MyAttendancePage() {
       setRows(Array.isArray(d) ? d : []); setSummary(s); setMyReqs(Array.isArray(r) ? r : []); setLeave(lb);
     } finally { setLoading(false); }
     // eslint-disable-next-line
-  }, [jYear, jMonth]);
+  }, [jYear, jMonth, jDay]);
 
   React.useEffect(() => { load(); }, [load]);
   React.useEffect(() => {
@@ -179,13 +180,17 @@ export default function MyAttendancePage() {
           <div><h1 className="text-xl font-bold text-theme-primary">حضور من</h1><p className="text-sm text-theme-muted">کارکرد روزانه و درخواست اصلاح</p></div>
         </div>
         <div className="flex items-center gap-2">
-          <select className="input-theme text-sm w-auto" value={jYear} onChange={e => { setJYear(+e.target.value); setJMonth(0); }}>
+          <select className="input-theme text-sm w-auto" value={jYear} onChange={e => { setJYear(+e.target.value); setJMonth(0); setJDay(0); }}>
             <option value={0}>همه سال‌ها</option>
             {yearOpts.map(y => <option key={y} value={y}>سال {toFa(String(y))}</option>)}
           </select>
-          <select className="input-theme text-sm w-auto" value={jMonth} onChange={e => setJMonth(+e.target.value)}>
+          <select className="input-theme text-sm w-auto" value={jMonth} onChange={e => { setJMonth(+e.target.value); setJDay(0); }}>
             <option value={0}>همه ماه‌ها</option>
             {monthOpts.map(m => <option key={m} value={m}>{J_MONTHS[m-1]}</option>)}
+          </select>
+          <select className="input-theme text-sm w-auto" value={jDay} onChange={e => setJDay(+e.target.value)}>
+            <option value={0}>همه روزها</option>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>روز {toFa(String(d))}</option>)}
           </select>
         </div>
       </div>

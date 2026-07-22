@@ -21,12 +21,14 @@ const STATUS_FA: Record<string,string> = {
   PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت",
   INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت",
   REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته",
+  OFF_DUTY:"استراحت (شیفت)",
   WORKING:"در حال کار",
 };
 const STATUS_CLR: Record<string,string> = {
   PRESENT:"#10b981", LATE:"#f59e0b", EARLY_LEAVE:"#eab308", ABSENT:"#ef4444",
   INCOMPLETE:"#f97316", LEAVE:"#3b82f6", MISSION:"#8b5cf6",
   REMOTE_WORK:"#06b6d4", HOLIDAY:"#94a3b8", COMPANY_HOLIDAY:"#64748b", WEEKEND:"#cbd5e1",
+  OFF_DUTY:"#cbd5e1",
   WORKING:"#10b981",
 };
 const STATUS_BADGE: Record<string,string> = {
@@ -41,6 +43,7 @@ const STATUS_BADGE: Record<string,string> = {
   HOLIDAY:"bg-slate-100 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400",
   COMPANY_HOLIDAY:"bg-slate-100 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400",
   WEEKEND:"bg-slate-100 text-slate-400 dark:bg-slate-800/40 dark:text-slate-500",
+  OFF_DUTY:"bg-slate-100 text-slate-400 dark:bg-slate-800/40 dark:text-slate-500",
   WORKING:"bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400",
 };
 
