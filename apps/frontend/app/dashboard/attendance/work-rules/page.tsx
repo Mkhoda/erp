@@ -32,7 +32,7 @@ const NEW_DEFAULTS = {
   name: "", isDefault: false, dailyMinutes: 500, lunchMinutes: 0,
   checkInStart: "06:30", checkInEnd: "09:00", checkOutStart: "14:50", checkOutEnd: "17:20", workDays: [6, 0, 1, 2, 3],
   otMinThreshold: 30, otRounding: 15, otMaxDaily: 240, otMaxMonthly: 3600, annualLeaveDays: 26,
-  deficitToLeaveEnabled: true, hourlyLeaveCapMinutes: 480, absentToLeaveEnabled: true,
+  deficitToLeaveEnabled: true, absentToLeaveEnabled: true,
 };
 
 // ── Jalali ↔ Gregorian (jdf algorithm) ─────────────────────────────────────
@@ -277,13 +277,8 @@ export default function WorkRulesPage() {
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-sm text-theme-primary">
                 <input type="checkbox" checked={!!form.deficitToLeaveEnabled} onChange={e => setF("deficitToLeaveEnabled", e.target.checked)} />
-                کسری کارکرد روزانه به‌صورت خودکار از مرخصی ساعتی کسر شود
+                کسری کارکرد روزانه به‌صورت خودکار (به همان میزان) از مرخصی سالانه کسر شود
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="سقف ماهانه مرخصی ساعتی خودکار (دقیقه)" hint={hrs(form.hourlyLeaveCapMinutes) + " — پس از عبور از این سقف، کسری آن روز به یک روز مرخصی روزانه تبدیل می‌شود"}>
-                  <input type="number" className={inputCls} disabled={!form.deficitToLeaveEnabled} value={form.hourlyLeaveCapMinutes ?? ""} onChange={e => setF("hourlyLeaveCapMinutes", +e.target.value)} />
-                </Field>
-              </div>
               <label className="flex items-center gap-2 text-sm text-theme-primary">
                 <input type="checkbox" checked={!!form.absentToLeaveEnabled} onChange={e => setF("absentToLeaveEnabled", e.target.checked)} />
                 روزهای غیبت به‌صورت خودکار به مرخصی روزانه تبدیل شوند (در صورت کافی بودن مانده مرخصی)

@@ -31,7 +31,6 @@ export interface EffectiveSchedule {
   otAllowed: boolean;
   annualLeaveDays: number;
   deficitToLeaveEnabled: boolean;
-  hourlyLeaveCapMinutes: number;
   absentToLeaveEnabled: boolean;
 }
 
@@ -54,7 +53,6 @@ const DEFAULTS: EffectiveSchedule = {
   otAllowed: true,
   annualLeaveDays: 26,
   deficitToLeaveEnabled: true,
-  hourlyLeaveCapMinutes: 480,
   absentToLeaveEnabled: true,
 };
 
@@ -91,7 +89,6 @@ export class CalcService {
       s.otRounding = base.otRounding;
       s.annualLeaveDays = base.annualLeaveDays;
       s.deficitToLeaveEnabled = base.deficitToLeaveEnabled;
-      s.hourlyLeaveCapMinutes = base.hourlyLeaveCapMinutes;
       s.absentToLeaveEnabled = base.absentToLeaveEnabled;
     }
     if (rule) {
@@ -355,9 +352,9 @@ export class CalcService {
     // rule as the monthly OT cap above — a later day must never change an
     // earlier day's numbers on recompute):
     //   1) ABSENT → LEAVE, if a full day's balance remains.
-    //   2) Deficit → hourly leave, capped at a monthly minutes budget; once
-    //      that budget can't absorb the day's whole shortfall, the day rolls
-    //      over into a full LEAVE day instead of a partial hourly credit.
+    //   2) Deficit → leave, exactly the shortfall amount (never inflated to a
+    //      full day just because a monthly hourly-conversion budget ran out —
+    //      a 10-minute deficit must never cost a full day of annual leave).
     let autoConvertedLeave = false;
     if (sched.employeeType === 'FULL_TIME' && !holidayWork && !override?.forceStatus && !forceLeaveFull) {
       if (status === AttendanceStatus.ABSENT && sched.absentToLeaveEnabled) {
@@ -370,25 +367,11 @@ export class CalcService {
         }
       } else if (deficitMinutes > 0 && sched.deficitToLeaveEnabled) {
         const remaining = await this.remainingLeaveMinutesBefore(userId, jYear, gregDate, sched);
-        if (remaining > 0) {
-          const usedHourlyThisMonth = await this.hourlyLeaveUsedThisMonth(userId, jYear, jMonth, gregDate);
-          const capRoom = Math.max(0, sched.hourlyLeaveCapMinutes - usedHourlyThisMonth);
-          const overflow = deficitMinutes - capRoom;
-          if (overflow > 0 && remaining >= sched.dailyMinutes) {
-            // Monthly hourly budget can't cover today's shortfall — roll the
-            // whole day into a full daily-leave conversion instead.
-            status = AttendanceStatus.LEAVE;
-            leaveMinutes = sched.dailyMinutes;
-            deficitMinutes = 0;
-            autoConvertedLeave = true;
-          } else {
-            const hourlyConvert = Math.min(deficitMinutes, capRoom, remaining);
-            if (hourlyConvert > 0) {
-              leaveMinutes += hourlyConvert;
-              deficitMinutes -= hourlyConvert;
-              autoConvertedLeave = true;
-            }
-          }
+        const hourlyConvert = Math.min(deficitMinutes, remaining);
+        if (hourlyConvert > 0) {
+          leaveMinutes += hourlyConvert;
+          deficitMinutes -= hourlyConvert;
+          autoConvertedLeave = true;
         }
       }
     }
@@ -445,22 +428,6 @@ export class CalcService {
     const hourlyLeaveMinutes = hourlyAgg._sum.leaveMinutes ?? 0;
     const usedMin = fullDays * dailyReq + absentDays * dailyReq + hourlyLeaveMinutes + tardyMinutes;
     return Math.max(0, entitlementMin - usedMin);
-  }
-
-  // Sum of auto-converted (deficit→hourly) leave minutes so far this Jalali
-  // month, counting only days strictly before `gregDate` — the running budget
-  // that hourlyLeaveCapMinutes is checked against.
-  private async hourlyLeaveUsedThisMonth(userId: string, jYear: number, jMonth: number, gregDate: Date): Promise<number> {
-    const agg = await this.prisma.attendanceDay.aggregate({
-      where: {
-        userId, jYear, jMonth,
-        gregDate: { lt: gregDate },
-        autoConvertedLeave: true,
-        status: { not: AttendanceStatus.LEAVE },
-      },
-      _sum: { leaveMinutes: true },
-    });
-    return agg._sum.leaveMinutes ?? 0;
   }
 }
 

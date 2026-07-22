@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
+import DayDetailModal from "../../../components/attendance/DayDetailModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -17,9 +18,18 @@ const WEEK = [
 ];
 const FA_ORDER = [6, 0, 1, 2, 3, 4, 5];
 const TYPE_FA: Record<string, string> = { TWENTY_FOUR_TWENTY_FOUR: "۲۴ کار / ۲۴ استراحت", TWENTY_FOUR_FORTY_EIGHT: "۲۴ کار / ۴۸ استراحت" };
+const STATUS_FA: Record<string, string> = { PRESENT: "حاضر", ABSENT: "غیبت", INCOMPLETE: "در انتظار تحویل", LEAVE: "مرخصی خودکار", OFF_DUTY: "استراحت", HOLIDAY: "تعطیل", COMPANY_HOLIDAY: "تعطیل شرکت", WEEKEND: "آخر هفته" };
+const STATUS_CLS: Record<string, string> = {
+  PRESENT: "bg-emerald-500/10 border-emerald-500/40 text-emerald-600",
+  ABSENT: "bg-red-500/10 border-red-500/40 text-red-600",
+  INCOMPLETE: "bg-amber-500/10 border-amber-500/40 text-amber-600",
+  LEAVE: "bg-blue-500/10 border-blue-500/40 text-blue-600",
+  OFF_DUTY: "bg-theme-secondary/40 border-theme text-theme-muted",
+};
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 const faDigits = (s: string) => s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const hoursOf = (min: number) => Math.round(((min || 0) / 60) * 100) / 100;
+const fmtHM = (min: number) => { const m = Math.abs(min || 0); return `${faNum(Math.floor(m / 60))}:${faDigits(String(m % 60).padStart(2, "0"))}`; };
 
 // ── Jalali ↔ Gregorian (jdf algorithm) — copy-pasted per project convention ──
 function toJalali(gy0: number, gm: number, gd: number) {
@@ -167,7 +177,8 @@ export default function GuardShiftsPage() {
     await load();
   }
 
-  // ── Calendar ──
+  // ── Calendar — shows the ENGINE'S computed result per day (auto-detected
+  // from the punch clock's handoff chain), not a manual toggle. ──
   const guardOptions = React.useMemo(() => {
     const ids = new Set(assignments.map((a: any) => a.userId));
     return personOptions.filter(p => ids.has(p.id));
@@ -175,35 +186,69 @@ export default function GuardShiftsPage() {
   const [guardUserId, setGuardUserId] = React.useState("");
   const [vy, setVy] = React.useState(tj.jy);
   const [vm, setVm] = React.useState(tj.jm);
-  const [calDays, setCalDays] = React.useState<any[]>([]);
+  const [calRows, setCalRows] = React.useState<any[]>([]);
   const [calLoading, setCalLoading] = React.useState(false);
-  const [calBusy, setCalBusy] = React.useState<string | null>(null);
+  const [recomputing, setRecomputing] = React.useState(false);
 
   const loadCalendar = React.useCallback(async () => {
-    if (!guardUserId) { setCalDays([]); return; }
+    if (!guardUserId) { setCalRows([]); return; }
     setCalLoading(true);
     try {
-      const r = await fetch(`${API}/attendance/guard-shifts/calendar?userId=${guardUserId}&jYear=${vy}&jMonth=${vm}`, { headers: h }).then(x => x.ok ? x.json() : []);
-      setCalDays(Array.isArray(r) ? r : []);
+      const r = await fetch(`${API}/attendance/records?userId=${guardUserId}&jYear=${vy}&jMonth=${vm}`, { headers: h }).then(x => x.ok ? x.json() : []);
+      setCalRows(Array.isArray(r) ? r : []);
     } finally { setCalLoading(false); }
     // eslint-disable-next-line
   }, [guardUserId, vy, vm]);
   React.useEffect(() => { loadCalendar(); }, [loadCalendar]);
 
-  const markedSet = React.useMemo(() => new Set(calDays.map((d: any) => d.gregDate.slice(0, 10))), [calDays]);
+  const rowByDate = React.useMemo(() => {
+    const m = new Map<string, any>();
+    for (const r of calRows) m.set(r.gregDate.slice(0, 10), r);
+    return m;
+  }, [calRows]);
 
-  async function toggleDay(jd: number) {
+  async function recomputeMonth() {
+    if (!guardUserId) return;
+    setRecomputing(true);
+    try {
+      await fetch(`${API}/attendance/maintenance/recompute-month`, { method: "POST", headers: h, body: JSON.stringify({ jYear: vy, jMonth: vm, userId: guardUserId }) });
+      await loadCalendar();
+    } finally { setRecomputing(false); }
+  }
+
+  // ── Day detail / manual override modal (same flow as "کارکرد روزانه") ──
+  const [detail, setDetail] = React.useState<any>(null);
+  const [ov, setOv] = React.useState<any>({ inTime: "", outTime: "", status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false });
+  const [ovSaving, setOvSaving] = React.useState(false);
+  const toHHmm = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran", hour12: false }) : "";
+
+  async function openDay(jd: number) {
     if (!guardUserId) return;
     const date = isoDate(vy, vm, jd);
-    setCalBusy(date);
+    const row = rowByDate.get(date);
+    const d = await fetch(`${API}/attendance/records/day?userId=${guardUserId}&date=${date}`, { headers: h }).then(r => r.ok ? r.json() : null);
+    setOv({ inTime: toHHmm(row?.firstCheckIn), outTime: toHHmm(row?.lastCheckOut), status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false });
+    setDetail({ row: row || { gregDate: `${date}T00:00:00.000Z`, status: "ABSENT" }, ...d });
+  }
+
+  async function saveOverride() {
+    if (!detail || !guardUserId) return;
+    setOvSaving(true);
     try {
-      if (markedSet.has(date)) {
-        await fetch(`${API}/attendance/guard-shifts/calendar?userId=${guardUserId}&date=${date}`, { method: "DELETE", headers: h });
-      } else {
-        await fetch(`${API}/attendance/guard-shifts/calendar`, { method: "POST", headers: h, body: JSON.stringify({ userId: guardUserId, date }) });
-      }
-      await loadCalendar();
-    } finally { setCalBusy(null); }
+      const body = {
+        userId: guardUserId,
+        date: detail.row.gregDate.slice(0, 10),
+        inTime: ov.clearCheckIn ? undefined : (ov.inTime || undefined),
+        outTime: ov.clearCheckOut ? undefined : (ov.outTime || undefined),
+        clearCheckIn: ov.clearCheckIn || undefined,
+        clearCheckOut: ov.clearCheckOut || undefined,
+        forceStatus: ov.status || undefined,
+        leaveMinutes: ov.leaveHours ? Math.round(Number(ov.leaveHours) * 60) : undefined,
+        reason: ov.reason || "اصلاح دستی شیفت نگهبانی",
+      };
+      const res = await fetch(`${API}/attendance/overrides`, { method: "POST", headers: h, body: JSON.stringify(body) });
+      if (res.ok) { setDetail(null); await loadCalendar(); }
+    } finally { setOvSaving(false); }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
@@ -218,7 +263,7 @@ export default function GuardShiftsPage() {
     <div className="max-w-5xl mx-auto p-4 space-y-4" dir="rtl">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center"><ShieldCheck className="w-5 h-5 text-white" /></div>
-        <div><h1 className="text-xl font-bold text-theme-primary">شیفت‌های نگهبانی</h1><p className="text-sm text-theme-muted">شیفت‌های ۲۴ ساعته با استراحت متغیر (۲۴/۲۴ یا ۲۴/۴۸) — تقویم حضور به‌صورت دستی توسط سرپرست مشخص می‌شود</p></div>
+        <div><h1 className="text-xl font-bold text-theme-primary">شیفت‌های نگهبانی</h1><p className="text-sm text-theme-muted">شیفت‌های ۲۴ ساعته با استراحت متغیر (۲۴/۲۴ یا ۲۴/۴۸) — تقویم حضور مستقیم از دستگاه ساعت‌زنی و تحویل بین نگهبان‌ها به‌صورت خودکار تشخیص داده می‌شود</p></div>
       </div>
 
       <div className="flex items-center gap-1 bg-theme-card border border-theme rounded-xl p-1 w-fit">
@@ -308,12 +353,19 @@ export default function GuardShiftsPage() {
       {/* ── Calendar tab ── */}
       {tab === "calendar" && (
         <div className="bg-theme-card border border-theme rounded-xl p-4">
-          <div className="mb-3">
-            <label className="block mb-1 text-theme-secondary text-xs">نگهبان</label>
-            <SearchSelect options={guardOptions} value={guardUserId} onChange={setGuardUserId} searchKey="search" placeholder="یک نگهبان انتخاب کنید" className="max-w-xs" />
+          <div className="flex items-end justify-between gap-3 mb-3">
+            <div className="flex-1 max-w-xs">
+              <label className="block mb-1 text-theme-secondary text-xs">نگهبان</label>
+              <SearchSelect options={guardOptions} value={guardUserId} onChange={setGuardUserId} searchKey="search" placeholder="یک نگهبان انتخاب کنید" />
+            </div>
+            {guardUserId && (
+              <button onClick={recomputeMonth} disabled={recomputing} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-theme-secondary border border-theme text-theme-primary text-xs hover:bg-theme-hover disabled:opacity-50">
+                {recomputing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />} بازمحاسبه این ماه
+              </button>
+            )}
           </div>
           {!guardUserId ? (
-            <p className="text-theme-muted text-sm">برای نمایش و تنظیم تقویم، ابتدا یک نگهبان انتخاب کنید.</p>
+            <p className="text-theme-muted text-sm">برای نمایش تقویم، ابتدا یک نگهبان انتخاب کنید.</p>
           ) : (
             <>
               <div className="flex items-center justify-between mb-3">
@@ -328,26 +380,46 @@ export default function GuardShiftsPage() {
                     {cells.map((day, i) => {
                       if (!day) return <div key={i} />;
                       const date = isoDate(vy, vm, day);
-                      const onDuty = markedSet.has(date);
+                      const row = rowByDate.get(date);
+                      const status = row?.status as string | undefined;
                       const isToday = vy === tj.jy && vm === tj.jm && day === tj.jd;
-                      const busy = calBusy === date;
+                      const cls = (status && STATUS_CLS[status]) || "bg-theme-primary border-theme";
                       return (
-                        <button key={i} disabled={busy} onClick={() => toggleDay(day)}
-                          className={`relative text-center rounded-lg border p-2 min-h-[50px] flex flex-col items-center justify-center gap-0.5 hover:ring-1 hover:ring-blue-400 transition-all disabled:opacity-50
-                            ${onDuty ? "bg-emerald-500/10 border-emerald-500/40" : "bg-theme-primary border-theme"} ${isToday ? "ring-2 ring-blue-500" : ""}`}>
-                          <span className={`text-xs font-bold ${onDuty ? "text-emerald-600" : "text-theme-primary"}`}>{faNum(day)}</span>
-                          {busy ? <Loader2 className="w-3 h-3 animate-spin text-theme-muted" /> : onDuty && <span className="text-[9px] text-emerald-600">شیفت</span>}
+                        <button key={i} onClick={() => openDay(day)}
+                          className={`relative text-center rounded-lg border p-1.5 min-h-[54px] flex flex-col items-center justify-center gap-0.5 hover:ring-1 hover:ring-blue-400 transition-all ${cls} ${isToday ? "ring-2 ring-blue-500" : ""}`}>
+                          <span className="text-xs font-bold text-theme-primary">{faNum(day)}</span>
+                          {status && <span className="text-[9px] leading-tight">{STATUS_FA[status] || status}</span>}
+                          {row?.workedMinutes > 0 && <span className="text-[9px] opacity-80" dir="ltr">{fmtHM(row.workedMinutes)}</span>}
                         </button>
                       );
                     })}
                   </div>
-                  <p className="mt-3 text-[11px] text-theme-muted">روی هر روز کلیک کنید تا آن روز به‌عنوان شروع شیفت (روشن) ثبت یا حذف شود. روزهای بدون علامت، استراحت محسوب می‌شوند.</p>
+                  <div className="flex flex-wrap items-center gap-3 mt-3 text-[11px] text-theme-muted">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> حاضر (شروع شیفت این نگهبان)</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400" /> استراحت (نگهبان دیگر پوشش می‌ده)</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> مرخصی خودکار (کسی پانچ نزده)</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> غیبت</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> در انتظار تحویل (شیفت باز)</span>
+                    <span className="opacity-70">— روی هر روز کلیک کنید تا جزئیات یا اصلاح دستی</span>
+                  </div>
                 </>
               )}
             </>
           )}
         </div>
       )}
+
+      {/* ── Day detail / manual override modal ── */}
+      <DayDetailModal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        detail={detail}
+        allowOverride
+        ov={ov}
+        setOv={setOv}
+        onSaveOverride={saveOverride}
+        ovSaving={ovSaving}
+      />
 
       {/* ── Template modal ── */}
       <Modal open={!!tplModal} onClose={() => setTplModal(null)} title={tplModal?.id ? "ویرایش قالب شیفت" : "قالب شیفت جدید"} size="md"

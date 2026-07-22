@@ -27,7 +27,6 @@ export class SchedulesService {
   private readonly INT = [
     'dailyMinutes', 'weeklyMinutes', 'lunchMinutes', 'graceMinutes',
     'otMinThreshold', 'otMaxDaily', 'otMaxMonthly', 'otRounding', 'annualLeaveDays',
-    'hourlyLeaveCapMinutes',
   ];
 
   private mapFields(dto: any) {

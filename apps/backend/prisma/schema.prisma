@@ -728,7 +728,6 @@ model WorkSchedule {
   otRounding     Int      @default(15)                 // round OT to nearest N minutes
   annualLeaveDays Int     @default(26)                 // yearly paid-leave entitlement (days)
   deficitToLeaveEnabled Boolean @default(true)          // auto-cover daily shortfall from the hourly-leave balance
-  hourlyLeaveCapMinutes Int     @default(480)           // monthly cap on auto-converted hourly leave (default: one workday); excess rolls over to a full daily-leave conversion
   absentToLeaveEnabled  Boolean @default(true)          // auto-convert an ABSENT day to LEAVE when annual balance allows
   userRules      UserAttendanceRule[]
   createdAt      DateTime @default(now())

@@ -32,28 +32,41 @@ export class RecomputeService {
         : a.userId < b.userId ? -1 : 1,
     );
 
-    // Group by user so a guard's whole batch is handed to GuardCalcService as
-    // one contiguous range (it needs neighboring days to resolve which dates a
-    // multi-day shift's check-out spans through, not just the requested dates).
+    // Group by user first to resolve each one's date range and guard status.
     const byUser = new Map<string, Date[]>();
     for (const { userId, gregDate } of ordered) {
       if (!byUser.has(userId)) byUser.set(userId, []);
       byUser.get(userId)!.push(gregDate);
     }
 
-    let n = 0;
+    // Guard users are re-grouped by shiftId: the handoff-chain algorithm needs
+    // ALL guards on the same shift template computed together (one guard's
+    // punch resolves another's checkout), not one user's dates in isolation.
+    const byShift = new Map<string, { from: Date; to: Date }>();
+    const regularUsers: Array<[string, Date[]]> = [];
     for (const [userId, dates] of byUser) {
       const from = dates[0];
       const to = dates[dates.length - 1];
-      const isGuard = await this.guardCalc.hasActiveGuardAssignment(userId, from, to);
-      if (isGuard) {
-        try {
-          n += await this.guardCalc.computeGuardRange(userId, from, to);
-        } catch (e: any) {
-          this.logger.error(`computeGuardRange failed for ${userId} ${from.toISOString()}-${to.toISOString()}: ${e.message}`);
-        }
-        continue;
+      const shiftId = await this.guardCalc.findActiveGuardShiftId(userId, from, to);
+      if (shiftId) {
+        const existing = byShift.get(shiftId);
+        byShift.set(shiftId, existing
+          ? { from: existing.from < from ? existing.from : from, to: existing.to > to ? existing.to : to }
+          : { from, to });
+      } else {
+        regularUsers.push([userId, dates]);
       }
+    }
+
+    let n = 0;
+    for (const [shiftId, { from, to }] of byShift) {
+      try {
+        n += await this.guardCalc.computeShiftRange(shiftId, from, to);
+      } catch (e: any) {
+        this.logger.error(`computeShiftRange failed for shift ${shiftId} ${from.toISOString()}-${to.toISOString()}: ${e.message}`);
+      }
+    }
+    for (const [userId, dates] of regularUsers) {
       for (const gregDate of dates) {
         try {
           await this.calc.computeDay(userId, gregDate);
