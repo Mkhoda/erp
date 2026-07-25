@@ -42,6 +42,21 @@ export class RecordsController {
     return this.records.summary(await this.filterFrom(req, q));
   }
 
+  // Per-user, per-month breakdown for the monthly report page. Gated by its own
+  // page permission so it can be granted/denied independently of daily records.
+  @Page('/dashboard/attendance/monthly')
+  @Get('monthly-summary')
+  async monthlySummary(@Req() req: any, @Query() q: any) {
+    const list = (v: any) => (v ? String(v).split(',').filter(Boolean) : []);
+    return this.records.monthlySummary({
+      jYears: list(q.jYears).map(Number),
+      jMonths: list(q.jMonths).map(Number),
+      userIds: list(q.userIds),
+      departmentId: q.departmentId || undefined,
+      scopeDepartmentIds: await resolveDeptScope(this.prisma, req.user),
+    });
+  }
+
   // Year/month periods that have data (for data-aware filters).
   @Get('periods')
   async periods(@Req() req: any, @Query() q: any) {

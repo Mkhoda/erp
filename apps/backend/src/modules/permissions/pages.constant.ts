@@ -36,6 +36,7 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/attendance',             label: 'حضور و غیاب' },
   { page: '/dashboard/attendance/my',          label: 'حضور من' },
   { page: '/dashboard/attendance/records',     label: 'کارکرد روزانه' },
+  { page: '/dashboard/attendance/monthly',     label: 'کارکرد ماهانه' },
   { page: '/dashboard/attendance/calendar',    label: 'تقویم حضور' },
   { page: '/dashboard/attendance/requests',    label: 'درخواست‌های اصلاح' },
   { page: '/dashboard/attendance/approvals',   label: 'صف تایید حضور' },

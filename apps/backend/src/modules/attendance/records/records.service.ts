@@ -14,6 +14,14 @@ export interface RecordFilter {
   scopeDepartmentIds?: string[];
 }
 
+export interface MonthlySummaryFilter {
+  jYears?: number[];
+  jMonths?: number[];
+  userIds?: string[];
+  departmentId?: string;
+  scopeDepartmentIds?: string[];
+}
+
 const USER_SELECT = {
   id: true,
   firstName: true,
@@ -103,6 +111,97 @@ export class RecordsService {
       leaveDays: statusCounts['LEAVE'] ?? 0,
       statusCounts,
     };
+  }
+
+  private buildMonthlyWhere(f: MonthlySummaryFilter): Prisma.AttendanceDayWhereInput {
+    const where: Prisma.AttendanceDayWhereInput = {};
+    if (f.jYears?.length) where.jYear = { in: f.jYears };
+    if (f.jMonths?.length) where.jMonth = { in: f.jMonths };
+    if (f.userIds?.length) where.userId = { in: f.userIds };
+
+    const conds: Prisma.UserWhereInput[] = [];
+    if (f.departmentId) {
+      conds.push({
+        OR: [
+          { departmentId: f.departmentId },
+          { userDepartments: { some: { departmentId: f.departmentId } } },
+        ],
+      });
+    }
+    if (f.scopeDepartmentIds && f.scopeDepartmentIds.length) {
+      conds.push({
+        OR: [
+          { departmentId: { in: f.scopeDepartmentIds } },
+          { userDepartments: { some: { departmentId: { in: f.scopeDepartmentIds } } } },
+        ],
+      });
+    }
+    if (conds.length) where.user = { AND: conds };
+    return where;
+  }
+
+  // Per-user, per-month aggregated totals — one row per (user, jYear, jMonth),
+  // used by the monthly report page to show each selected person's selected
+  // months side by side instead of one blended total.
+  async monthlySummary(f: MonthlySummaryFilter) {
+    if (!f.userIds?.length) return [];
+    const where = this.buildMonthlyWhere(f);
+    const [agg, hourlyAgg, leaveAgg] = await Promise.all([
+      this.prisma.attendanceDay.groupBy({
+        by: ['userId', 'jYear', 'jMonth'],
+        where,
+        _sum: { workedMinutes: true, overtimeMinutes: true, holidayOvertimeMinutes: true, delayMinutes: true, earlyLeaveMinutes: true, deficitMinutes: true, nightMinutes: true },
+        _count: true,
+      }),
+      // Hourly leave = leaveMinutes on non-full-leave days (same convention as summary()/leaveBalance()).
+      this.prisma.attendanceDay.groupBy({
+        by: ['userId', 'jYear', 'jMonth'],
+        where: { AND: [where, { status: { not: 'LEAVE' } }] },
+        _sum: { leaveMinutes: true },
+      }),
+      this.prisma.attendanceDay.groupBy({
+        by: ['userId', 'jYear', 'jMonth'],
+        where: { AND: [where, { status: 'LEAVE' }] },
+        _count: true,
+      }),
+    ]);
+
+    const key = (userId: string, jYear: number, jMonth: number) => `${userId}_${jYear}_${jMonth}`;
+    const hourlyMap = new Map(hourlyAgg.map((r) => [key(r.userId, r.jYear, r.jMonth), r._sum.leaveMinutes ?? 0]));
+    const leaveMap = new Map(leaveAgg.map((r) => [key(r.userId, r.jYear, r.jMonth), r._count]));
+
+    const userIds = [...new Set(agg.map((r) => r.userId))];
+    const usersList = userIds.length
+      ? await this.prisma.user.findMany({ where: { id: { in: userIds } }, select: USER_SELECT })
+      : [];
+    const usersMap = new Map(usersList.map((u) => [u.id, u]));
+
+    const rows = agg.map((r) => {
+      const k = key(r.userId, r.jYear, r.jMonth);
+      return {
+        userId: r.userId,
+        user: usersMap.get(r.userId) ?? null,
+        jYear: r.jYear,
+        jMonth: r.jMonth,
+        distinctDays: r._count,
+        workedMinutes: r._sum.workedMinutes ?? 0,
+        delayMinutes: r._sum.delayMinutes ?? 0,
+        earlyLeaveMinutes: r._sum.earlyLeaveMinutes ?? 0,
+        deficitMinutes: r._sum.deficitMinutes ?? 0,
+        hourlyLeaveMinutes: hourlyMap.get(k) ?? 0,
+        leaveDays: leaveMap.get(k) ?? 0,
+        overtimeMinutes: r._sum.overtimeMinutes ?? 0,
+        holidayOvertimeMinutes: r._sum.holidayOvertimeMinutes ?? 0,
+        nightMinutes: r._sum.nightMinutes ?? 0,
+      };
+    });
+
+    rows.sort((a, b) => {
+      const an = a.user ? `${a.user.firstName}${a.user.lastName}` : '';
+      const bn = b.user ? `${b.user.firstName}${b.user.lastName}` : '';
+      return an.localeCompare(bn, 'fa') || a.jYear - b.jYear || a.jMonth - b.jMonth;
+    });
+    return rows;
   }
 
   // Distinct (jYear, jMonth) periods that actually have computed data — drives

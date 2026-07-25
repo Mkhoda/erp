@@ -35,6 +35,7 @@ import {
   PieChart,
   Bell,
   Megaphone,
+  CalendarRange,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -197,6 +198,7 @@ export const MENU: MenuItem[] = [
     children: [
       { id: 'attendance.dashboard', title: 'داشبورد حضور',         page: '/dashboard/attendance',                icon: LayoutDashboard },
       { id: 'attendance.records',   title: 'کارکرد روزانه',        page: '/dashboard/attendance/records',        icon: ClipboardList },
+      { id: 'attendance.monthly',   title: 'کارکرد ماهانه',        page: '/dashboard/attendance/monthly',        icon: CalendarRange },
       { id: 'attendance.approvals', title: 'صف تایید',             page: '/dashboard/attendance/approvals',      icon: ClipboardCheck },
       { id: 'attendance.workRules', title: 'قوانین و تقویم کاری', page: '/dashboard/attendance/work-rules',     icon: SlidersHorizontal },
       { id: 'attendance.shifts',    title: 'شیفت‌های نگهبانی',     page: '/dashboard/attendance/shifts',         icon: ShieldCheck },
