@@ -48,7 +48,7 @@ function MultiSelectField({ options, value, onChange, placeholder }: { options: 
         ))}
       </button>
       {open && (
-        <div dir="rtl" className="absolute z-30 mt-1 w-full min-w-[240px] bg-theme-primary border border-theme rounded-xl shadow-2xl overflow-hidden">
+        <div dir="rtl" className="absolute z-[9999] mt-1 w-full min-w-[240px] bg-theme-primary border border-theme rounded-xl shadow-2xl overflow-hidden">
           <div className="p-2 border-b border-theme">
             <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="جستجوی نام/موبایل/کارت..."
               className="input-theme text-xs py-1.5" />
