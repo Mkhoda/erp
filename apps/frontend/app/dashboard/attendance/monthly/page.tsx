@@ -22,7 +22,9 @@ type PersonOpt = { id: string; name: string; search: string };
 function MultiSelectField({ options, value, onChange, placeholder }: { options: PersonOpt[]; value: string[]; onChange: (v: string[]) => void; placeholder?: string }) {
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
+  const [activeIdx, setActiveIdx] = React.useState(0);
   const ref = React.useRef<HTMLDivElement>(null);
+  const listRef = React.useRef<HTMLUListElement>(null);
 
   React.useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -34,9 +36,28 @@ function MultiSelectField({ options, value, onChange, placeholder }: { options: 
   const toggle = (id: string) => onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
   const selected = options.filter(o => value.includes(o.id));
 
+  React.useEffect(() => { setActiveIdx(0); }, [q, open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const el = listRef.current?.children[activeIdx] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeIdx, open]);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); setOpen(true); }
+      return;
+    }
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, filtered.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); const o = filtered[activeIdx]; if (o) toggle(o.id); }
+    else if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+  };
+
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(o => !o)}
+      <button type="button" onClick={() => setOpen(o => !o)} onKeyDown={onKeyDown}
         className="input-theme flex flex-wrap items-center gap-1 text-sm min-h-[38px] w-full text-right">
         {selected.length === 0 ? (
           <span className="text-theme-muted">{placeholder}</span>
@@ -50,16 +71,17 @@ function MultiSelectField({ options, value, onChange, placeholder }: { options: 
       {open && (
         <div dir="rtl" className="absolute z-[9999] mt-1 w-full min-w-[240px] bg-theme-primary border border-theme rounded-xl shadow-2xl overflow-hidden">
           <div className="p-2 border-b border-theme">
-            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="جستجوی نام/موبایل/کارت..."
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)} onKeyDown={onKeyDown} placeholder="جستجوی نام/موبایل/کارت..."
               className="input-theme text-xs py-1.5" />
           </div>
-          <ul className="max-h-56 overflow-auto text-sm">
-            {filtered.map(o => {
+          <ul ref={listRef} className="max-h-56 overflow-auto text-sm">
+            {filtered.map((o, i) => {
               const isSel = value.includes(o.id);
+              const isActive = i === activeIdx;
               return (
                 <li key={o.id}>
-                  <button type="button" onClick={() => toggle(o.id)}
-                    className={`flex w-full items-center gap-1.5 px-3 py-2 text-right hover:bg-theme-hover transition-colors ${isSel ? "text-blue-700 dark:text-blue-300 font-medium" : "text-theme-secondary"}`}>
+                  <button type="button" onClick={() => toggle(o.id)} onMouseEnter={() => setActiveIdx(i)}
+                    className={`flex w-full items-center gap-1.5 px-3 py-2 text-right hover:bg-theme-hover transition-colors ${isActive ? "bg-theme-hover" : ""} ${isSel ? "text-blue-700 dark:text-blue-300 font-medium" : "text-theme-secondary"}`}>
                     <Check className={`w-3.5 h-3.5 shrink-0 ${isSel ? "opacity-100" : "opacity-0"}`} />
                     <span className="truncate">{o.name}</span>
                   </button>
