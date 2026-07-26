@@ -179,7 +179,7 @@ export default function AttendanceMonthlyReportPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-theme-card border border-theme rounded-xl p-3 space-y-3">
+      <div className="relative z-20 bg-theme-card border border-theme rounded-xl p-3 space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <label className="text-xs text-theme-muted">سال‌ها</label>
