@@ -19,9 +19,15 @@ export class PagePermissionGuard implements CanActivate {
     // Admins bypass all page permission checks
     if (user.role === 'ADMIN') return true;
 
-    // Collect department ids from memberships
-    const memberships = await this.prisma.userDepartment.findMany({ where: { userId: user.userId ?? user.id } });
-    const deptIds = memberships.map(m => m.departmentId);
+    // Collect department ids from both the legacy single FK and the many-to-many memberships
+    const uid = user.userId ?? user.id;
+    const [dbUser, memberships] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: uid }, select: { departmentId: true } }),
+      this.prisma.userDepartment.findMany({ where: { userId: uid } }),
+    ]);
+    const deptIdSet = new Set<string>(memberships.map(m => m.departmentId));
+    if (dbUser?.departmentId) deptIdSet.add(dbUser.departmentId);
+    const deptIds = Array.from(deptIdSet);
 
     if (deptIds.length === 0) throw new ForbiddenException('No department assigned for page access');
 

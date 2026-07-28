@@ -189,6 +189,7 @@ function ChatPageInner() {
         fetch(`${API}/quota/me/${selectedProvider.id}`, { headers: h() })
           .then(r => r.ok ? r.json() : null).then(d => { if (d) setQuota(d); }).catch(() => {});
       }
+      requestAnimationFrame(() => inputRef.current?.focus());
     }
   };
 

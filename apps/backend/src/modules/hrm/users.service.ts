@@ -17,10 +17,29 @@ export class UsersService {
     private recompute: RecomputeService,
   ) {}
 
-  findAll(currentUser?: { role: string; userId?: string; departmentId?: string }) {
-    const where = (currentUser && currentUser.role === 'MANAGER')
-      ? { departmentId: currentUser.departmentId ?? undefined }
-      : undefined;
+  // Resolve the department ids a manager belongs to, merging the legacy single
+  // FK (User.departmentId) with the many-to-many UserDepartment memberships —
+  // the JWT payload never carries departmentId, so this must hit the DB.
+  private async resolveManagerDeptIds(currentUser?: { userId?: string; id?: string }): Promise<string[]> {
+    const uid = currentUser?.userId ?? currentUser?.id;
+    if (!uid) return [];
+    const [dbUser, memberships] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: uid }, select: { departmentId: true } }),
+      this.prisma.userDepartment.findMany({ where: { userId: uid }, select: { departmentId: true } }),
+    ]);
+    const ids = new Set<string>(memberships.map((m) => m.departmentId));
+    if (dbUser?.departmentId) ids.add(dbUser.departmentId);
+    return Array.from(ids);
+  }
+
+  async findAll(currentUser?: { role: string; userId?: string; id?: string; departmentId?: string }) {
+    let where: any = undefined;
+    if (currentUser && currentUser.role === 'MANAGER') {
+      const deptIds = await this.resolveManagerDeptIds(currentUser);
+      where = deptIds.length
+        ? { OR: [{ departmentId: { in: deptIds } }, { userDepartments: { some: { departmentId: { in: deptIds } } } }] }
+        : { id: { in: [] } };
+    }
     return this.prisma.user.findMany({
       where,
       select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, departmentId: true, department: true, disabled: true, maxSessions: true, attendanceCardNo: true, userDepartments: { select: { departmentId: true, department: true } } },
@@ -81,17 +100,21 @@ export class UsersService {
   
   // Bulk create users: accepts array of user-like objects.
   // For MANAGER role, restrict created users' department to manager's departmentId if not provided.
-  async bulkCreate(rows: any[], currentUser?: { role: string; userId?: string; departmentId?: string }) {
+  async bulkCreate(rows: any[], currentUser?: { role: string; userId?: string; id?: string; departmentId?: string }) {
     // Transactional: all-or-nothing bulk import
     if (!Array.isArray(rows) || rows.length === 0) {
       return { imported: 0, errors: [] };
     }
 
+    const managerDeptIds = (currentUser && currentUser.role === 'MANAGER')
+      ? await this.resolveManagerDeptIds(currentUser)
+      : [];
+
     // Preprocess rows: prepare payloads and hash passwords
     const payloads = await Promise.all(rows.map(async (row: any, idx: number) => {
       const payload: any = { ...row };
-      if (currentUser && currentUser.role === 'MANAGER') {
-        if (!payload.departmentId) payload.departmentId = currentUser.departmentId;
+      if (currentUser && currentUser.role === 'MANAGER' && !payload.departmentId) {
+        payload.departmentId = managerDeptIds[0];
       }
       if (payload.password) payload.password = await bcrypt.hash(payload.password, 10);
       const departmentIds: string[] | undefined = Array.isArray(payload.departmentIds) ? payload.departmentIds : (payload.departmentId ? [payload.departmentId] : undefined);

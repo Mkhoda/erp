@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   MessageCircle, X, Minus, Maximize2, Send, ArrowRight,
-  Paperclip, Smile, Users, Search, Check, CheckCheck,
+  Paperclip, Smile, Users, Search, Check, CheckCheck, RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMessagingOptional, type Conversation, type ChatMessage } from "../../../lib/messaging";
@@ -44,6 +44,16 @@ function ConvList({
   const ctx = useMessagingOptional()!;
   const [search, setSearch] = React.useState("");
   const [tab, setTab] = React.useState<"chats" | "users">("chats");
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await Promise.all([ctx.refreshConversations(), ctx.refreshUsers()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   const filtered = tab === "chats"
     ? convs.filter((c) => {
@@ -52,11 +62,14 @@ function ConvList({
         if (!other) return false;
         return fullName(other.user).includes(search);
       })
-    : ctx.users.filter((u) =>
-        !search ||
-        fullName(u).includes(search) ||
-        (u.department?.name || "").includes(search),
-      );
+    : ctx.users
+        .filter((u) =>
+          !search ||
+          fullName(u).includes(search) ||
+          (u.department?.name || "").includes(search),
+        )
+        .slice()
+        .sort((a, b) => (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0));
 
   return (
     <div className="flex flex-col h-full">
@@ -64,6 +77,14 @@ function ConvList({
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
         <span className="font-bold text-white text-sm">پیام‌رسانی</span>
         <div className="flex items-center gap-1">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/70 hover:text-white disabled:opacity-50"
+            title="بارگذاری مجدد"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
           <Link
             href="/dashboard/messaging"
             onClick={onClose}

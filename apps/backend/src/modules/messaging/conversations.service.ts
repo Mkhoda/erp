@@ -24,9 +24,7 @@ export class ConversationsService {
         },
       },
     });
-    if (existing) return existing;
-
-    return this.prisma.chatConversation.create({
+    const conv = existing ?? (await this.prisma.chatConversation.create({
       data: {
         type: 'DIRECT',
         members: {
@@ -41,7 +39,12 @@ export class ConversationsService {
           include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
         },
       },
-    });
+    }));
+
+    return {
+      ...conv,
+      members: conv.members.map((m) => ({ ...m, isOnline: this.presence.isOnline(m.userId) })),
+    };
   }
 
   async listForUser(userId: string) {

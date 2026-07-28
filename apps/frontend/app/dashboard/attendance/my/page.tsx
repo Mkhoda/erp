@@ -76,6 +76,7 @@ export default function MyAttendancePage() {
   const [leaveForm, setLeaveForm] = React.useState({ jy: 0, jm: 0, jd: 0, type: "LEAVE", leaveHours: "", description: "" });
   const [leaveSending, setLeaveSending] = React.useState(false);
   const [detail, setDetail] = React.useState<any>(null);
+  const [reqStatusFilter, setReqStatusFilter] = React.useState("ALL");
 
   // Days that already have an open (pending) request — block re-submitting.
   const pendingDates = React.useMemo(
@@ -83,6 +84,11 @@ export default function MyAttendancePage() {
     [myReqs],
   );
   const toHHmm = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran", hour12: false }) : "";
+
+  const filteredReqs = React.useMemo(
+    () => reqStatusFilter === "ALL" ? myReqs : myReqs.filter((q: any) => q.status === reqStatusFilter),
+    [myReqs, reqStatusFilter],
+  );
 
   async function openDetail(row: any) {
     const date = row.gregDate.slice(0, 10);
@@ -326,15 +332,25 @@ export default function MyAttendancePage() {
 
       {/* My requests */}
       <div className="bg-theme-card border border-theme rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="font-semibold text-theme-primary text-sm">درخواست‌های من</h2>
-          <button onClick={openLeaveModal} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs">
-            <Send className="w-3.5 h-3.5" /> ثبت مرخصی جدید
-          </button>
+          <div className="flex items-center gap-2">
+            <select className="input-theme text-xs w-auto py-1" value={reqStatusFilter} onChange={e => setReqStatusFilter(e.target.value)}>
+              <option value="ALL">همه وضعیت‌ها</option>
+              <option value="PENDING">در انتظار</option>
+              <option value="MANAGER_APPROVED">تایید مدیر</option>
+              <option value="HR_APPROVED">تایید HR</option>
+              <option value="APPROVED">تایید شده</option>
+              <option value="REJECTED">رد شده</option>
+            </select>
+            <button onClick={openLeaveModal} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs">
+              <Send className="w-3.5 h-3.5" /> ثبت مرخصی جدید
+            </button>
+          </div>
         </div>
-        {myReqs.length === 0 ? <p className="text-theme-muted text-sm">درخواستی ثبت نکرده‌اید</p> : (
+        {filteredReqs.length === 0 ? <p className="text-theme-muted text-sm">درخواستی یافت نشد</p> : (
           <div className="space-y-2">
-            {myReqs.map(q => (
+            {filteredReqs.map(q => (
               <div key={q.id} className="flex items-center justify-between text-sm border border-theme rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span dir="ltr" className="text-theme-primary">{faDate(q.gregDate)}</span>

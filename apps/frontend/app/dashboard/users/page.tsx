@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { List, LayoutGrid, Plus, Pencil, Users as UsersIcon, Upload, Phone, Ban, CheckCircle, KeyRound, Eye, EyeOff, UserX, CreditCard, Mail, ShieldCheck, Clock, Hash } from "lucide-react";
+import { List, LayoutGrid, Plus, Pencil, Users as UsersIcon, Upload, Phone, Ban, CheckCircle, KeyRound, Eye, EyeOff, UserX, CreditCard, Mail, ShieldCheck, Clock, Hash, FolderTree, ChevronDown, ChevronLeft } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader";
 import SearchBar from "../../components/ui/SearchBar";
 import SkeletonTable, { SkeletonCards } from "../../components/ui/SkeletonTable";
@@ -72,6 +72,7 @@ export default function UsersPage() {
   const [loading, setLoading]               = React.useState(true);
   const [open, setOpen]                     = React.useState(false);
   const [bulkOpen, setBulkOpen]             = React.useState(false);
+  const [deptTreeOpen, setDeptTreeOpen]     = React.useState(false);
   const [editing, setEditing]               = React.useState<any | null>(null);
   const [deptSearch, setDeptSearch]         = React.useState("");
   const [saving, setSaving]                 = React.useState(false);
@@ -219,6 +220,7 @@ export default function UsersPage() {
         iconColor="from-emerald-500 to-emerald-600"
         extra={ViewToggle}
         actions={[
+          { label: "دپارتمان‌ها", icon: FolderTree, onClick: () => setDeptTreeOpen(true), variant: "secondary" },
           { label: "وارد دسته‌ای", icon: Upload, onClick: () => setBulkOpen(true), variant: "secondary" },
           { label: "افزودن کاربر", icon: Plus, onClick: onAdd },
         ]}
@@ -650,7 +652,113 @@ export default function UsersPage() {
       {bulkOpen && (
         <BulkImportModal departments={departments} onClose={() => setBulkOpen(false)} onImported={async () => { setBulkOpen(false); await load(); }} />
       )}
+
+      {deptTreeOpen && (
+        <DepartmentsTreeModal allUsers={users} onClose={() => setDeptTreeOpen(false)} onChanged={load} />
+      )}
     </div>
+  );
+}
+
+function DepartmentsTreeModal({ onClose, onChanged, allUsers }: { onClose: () => void; onChanged: () => void; allUsers: User[] }) {
+  const toast = useToast();
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const h = () => ({ Authorization: `Bearer ${token}` });
+
+  type DeptWithMembers = { id: string; name: string; userDepartments: Array<{ userId: string; user: { id: string; firstName: string; lastName: string; role: string; disabled?: boolean } }> };
+  const [depts, setDepts]         = React.useState<DeptWithMembers[]>([]);
+  const [loading, setLoading]     = React.useState(true);
+  const [expanded, setExpanded]   = React.useState<Set<string>>(new Set());
+  const [addSearch, setAddSearch] = React.useState<Record<string, string>>({});
+  const [busy, setBusy]           = React.useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/departments`, { headers: h() });
+      const data = await r.json();
+      setDepts(Array.isArray(data) ? data : []);
+    } catch { setDepts([]); } finally { setLoading(false); }
+  }
+  React.useEffect(() => { load(); }, []);
+
+  function toggle(id: string) {
+    setExpanded(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
+  async function addMember(deptId: string, userId: string) {
+    setBusy(`${deptId}:${userId}`);
+    try {
+      const r = await fetch(`${API}/departments/${deptId}/members`, { method: "POST", headers: { "Content-Type": "application/json", ...h() }, body: JSON.stringify({ userId }) });
+      if (!r.ok) throw new Error();
+      await load(); await onChanged();
+    } catch { toast.error("خطا در افزودن عضو"); } finally { setBusy(null); }
+  }
+
+  async function removeMember(deptId: string, userId: string) {
+    setBusy(`${deptId}:${userId}`);
+    try {
+      const r = await fetch(`${API}/departments/${deptId}/members/${userId}`, { method: "DELETE", headers: h() });
+      if (!r.ok) throw new Error();
+      await load(); await onChanged();
+    } catch { toast.error("خطا در حذف عضو"); } finally { setBusy(null); }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="دپارتمان‌ها و اعضا" subtitle="برای مشاهده و مدیریت اعضا، روی هر دپارتمان کلیک کنید" size="xl">
+      <div className="space-y-2">
+        {loading ? (
+          <p className="py-8 text-theme-muted text-sm text-center">در حال بارگذاری...</p>
+        ) : depts.length === 0 ? (
+          <p className="py-8 text-theme-muted text-sm text-center">دپارتمانی یافت نشد</p>
+        ) : depts.map(d => {
+          const memberIds = new Set(d.userDepartments.map(x => x.userId));
+          const q = (addSearch[d.id] || "").toLowerCase();
+          const candidates = allUsers.filter(u => !memberIds.has(u.id) && `${u.firstName} ${u.lastName}`.toLowerCase().includes(q));
+          const isOpen = expanded.has(d.id);
+          return (
+            <div key={d.id} className="border border-theme rounded-xl overflow-hidden">
+              <button type="button" onClick={() => toggle(d.id)} className="flex justify-between items-center bg-theme-secondary hover:bg-theme-hover px-3 py-2.5 w-full text-right transition-colors">
+                <div className="flex items-center gap-2">
+                  {isOpen ? <ChevronDown className="w-4 h-4 text-theme-muted" /> : <ChevronLeft className="w-4 h-4 text-theme-muted" />}
+                  <span className="font-medium text-theme-primary text-sm">{d.name}</span>
+                </div>
+                <span className="badge badge-teal">{d.userDepartments.length.toLocaleString("fa-IR")} عضو</span>
+              </button>
+              {isOpen && (
+                <div className="space-y-2 bg-theme-card p-3">
+                  {d.userDepartments.length === 0 ? (
+                    <p className="text-theme-muted text-xs">این دپارتمان عضوی ندارد</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {d.userDepartments.map(m => (
+                        <div key={m.userId} className="flex justify-between items-center bg-theme-secondary px-2.5 py-1.5 rounded-lg text-sm">
+                          <span className="text-theme-primary">{m.user.firstName} {m.user.lastName}</span>
+                          <button type="button" disabled={busy === `${d.id}:${m.userId}`} onClick={() => removeMember(d.id, m.userId)} className="text-red-500 hover:text-red-600 text-xs disabled:opacity-40">حذف</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="pt-2 border-theme border-t">
+                    <input placeholder="جستجوی کاربر برای افزودن..." value={addSearch[d.id] || ""} onChange={e => setAddSearch(s => ({ ...s, [d.id]: e.target.value }))} className="mb-1.5 text-xs input-theme" />
+                    <div className="border border-theme rounded-lg max-h-32 overflow-auto">
+                      {candidates.length === 0 ? (
+                        <p className="px-3 py-2 text-theme-muted text-xs">کاربری یافت نشد</p>
+                      ) : candidates.slice(0, 30).map(u => (
+                        <button key={u.id} type="button" disabled={busy === `${d.id}:${u.id}`} onClick={() => addMember(d.id, u.id)} className="flex justify-between items-center hover:bg-theme-hover disabled:opacity-40 px-3 py-1.5 w-full text-xs transition-colors">
+                          <span className="text-theme-secondary">{u.firstName} {u.lastName}</span>
+                          <Plus className="w-3.5 h-3.5 text-blue-500" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Modal>
   );
 }
 

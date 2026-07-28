@@ -329,11 +329,11 @@ export default function MessagingPage() {
     } catch {}
   }, []);
 
-  const { conversations, activeConvId, messages, typing, presence, isConnected, users, loadingMore, hasMore, refreshConversations } = ctx;
+  const { conversations, activeConvId, messages, typing, presence, isConnected, users, loadingMore, hasMore, refreshConversations, refreshUsers } = ctx;
 
   async function handleRefresh() {
     setRefreshing(true);
-    try { await refreshConversations(); } finally {
+    try { await Promise.all([refreshConversations(), refreshUsers()]); } finally {
       setTimeout(() => setRefreshing(false), 600);
     }
   }
@@ -421,11 +421,14 @@ export default function MessagingPage() {
     return other ? fullName(other.user).includes(search) : false;
   });
 
-  const filteredUsers = users.filter((u) =>
-    !userSearch ||
-    fullName(u).includes(userSearch) ||
-    (u.department?.name ?? "").includes(userSearch),
-  );
+  const filteredUsers = users
+    .filter((u) =>
+      !userSearch ||
+      fullName(u).includes(userSearch) ||
+      (u.department?.name ?? "").includes(userSearch),
+    )
+    .slice()
+    .sort((a, b) => (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0));
 
   return (
     <>

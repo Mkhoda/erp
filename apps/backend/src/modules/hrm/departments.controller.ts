@@ -26,4 +26,16 @@ export class DepartmentsController {
   @Delete(':id')
   @Roles('ADMIN')
   remove(@Param('id') id: string) { return this.departmentsService.remove(id); }
+
+  @Post(':id/members')
+  @Roles('ADMIN')
+  addMember(@Param('id') id: string, @Body() body: { userId: string }) {
+    return this.departmentsService.addMember(id, body.userId);
+  }
+
+  @Delete(':id/members/:userId')
+  @Roles('ADMIN')
+  removeMember(@Param('id') id: string, @Param('userId') userId: string) {
+    return this.departmentsService.removeMember(id, userId);
+  }
 }

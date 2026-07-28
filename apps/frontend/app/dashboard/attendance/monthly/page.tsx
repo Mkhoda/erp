@@ -155,13 +155,19 @@ export default function AttendanceMonthlyReportPage() {
   React.useEffect(() => { load(); }, [load]);
 
   const yearOpts = [...new Set(periods.map(p => p.jYear))].sort((a, b) => b - a);
-  const personOptions: PersonOpt[] = users
+  const personOptions: PersonOpt[] = React.useMemo(() => users
     .filter((u: any) => !deptId || u.departmentId === deptId || (u.userDepartments || []).some((ud: any) => ud.departmentId === deptId))
     .map((u: any) => ({
       id: u.id,
       name: `${u.firstName} ${u.lastName}${u.attendanceCardNo ? ` (${u.attendanceCardNo})` : ""}`,
       search: `${u.firstName} ${u.lastName} ${u.phone || ""} ${u.attendanceCardNo || ""}`,
-    }));
+    })), [users, deptId]);
+
+  // Default selection to "all" whenever the available people set changes (initial load or department filter change)
+  React.useEffect(() => {
+    setUserIds(personOptions.map(o => o.id));
+    // eslint-disable-next-line
+  }, [personOptions]);
 
   const grouped = React.useMemo(() => {
     const m = new Map<string, any[]>();
@@ -221,7 +227,13 @@ export default function AttendanceMonthlyReportPage() {
             </select>
           </div>
           <div className="md:col-span-2 space-y-1.5">
-            <label className="text-xs text-theme-muted">افراد</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-theme-muted">افراد</label>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setUserIds(personOptions.map(o => o.id))} className="text-xs text-blue-600 hover:underline">انتخاب همه</button>
+                <button type="button" onClick={() => setUserIds([])} className="text-xs text-theme-muted hover:underline">حذف انتخاب</button>
+              </div>
+            </div>
             <MultiSelectField options={personOptions} value={userIds} onChange={setUserIds} placeholder="جستجو و انتخاب افراد..." />
           </div>
         </div>
