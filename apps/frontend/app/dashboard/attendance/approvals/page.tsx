@@ -18,6 +18,10 @@ export default function ApprovalsPage() {
 
   const [rows, setRows] = React.useState<any[]>([]);
   const [statusF, setStatusF] = React.useState("PENDING");
+  const [typeF, setTypeF] = React.useState("ALL");
+  const [search, setSearch] = React.useState("");
+  const [sortK, setSortK] = React.useState<null | "name" | "date" | "type" | "status">(null);
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [sel, setSel] = React.useState<any>(null); // { req, day }
@@ -32,6 +36,39 @@ export default function ApprovalsPage() {
     // eslint-disable-next-line
   }, [statusF]);
   React.useEffect(() => { load(); }, [load]);
+
+  function thSort(k: NonNullable<typeof sortK>) {
+    if (sortK === k) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortK(k); setSortDir("asc"); }
+  }
+  const arrow = (k: string) => sortK === k ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+
+  const reqTypeLabel = (q: any) => q.targetStatus ? STATUS_FA[q.targetStatus] : TYPE_FA[q.type] || q.type;
+
+  const filteredRows = React.useMemo(() => {
+    let arr = rows;
+    if (typeF !== "ALL") arr = arr.filter(q => q.type === typeF);
+    const s = search.trim().toLowerCase();
+    if (s) {
+      arr = arr.filter(q => {
+        const name = q.user ? `${q.user.firstName || ""} ${q.user.lastName || ""}` : "";
+        return name.toLowerCase().includes(s)
+          || (q.user?.phone || "").includes(s)
+          || (q.user?.attendanceCardNo || "").toLowerCase().includes(s);
+      });
+    }
+    if (sortK) {
+      const key = (q: any) => sortK === "name" ? (q.user ? `${q.user.firstName || ""} ${q.user.lastName || ""}` : "")
+        : sortK === "date" ? q.gregDate
+        : sortK === "type" ? reqTypeLabel(q)
+        : (q.status || "");
+      arr = [...arr].sort((a, b) => {
+        const va = key(a), vb = key(b);
+        return sortDir === "asc" ? (va > vb ? 1 : va < vb ? -1 : 0) : (va < vb ? 1 : va > vb ? -1 : 0);
+      });
+    }
+    return arr;
+  }, [rows, search, typeF, sortK, sortDir]);
 
   async function openRow(q: any) {
     setNote(""); setSel({ req: q, day: null });
@@ -51,17 +88,28 @@ export default function ApprovalsPage() {
 
   return (
     <div className="max-w-5xl mx-auto p-4 space-y-4" dir="rtl">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center"><ClipboardCheck className="w-5 h-5 text-white" /></div>
-          <div><h1 className="text-xl font-bold text-theme-primary">صف تایید حضور</h1><p className="text-sm text-theme-muted">{rows.length.toLocaleString("fa-IR")} درخواست</p></div>
+          <div><h1 className="text-xl font-bold text-theme-primary">صف تایید حضور</h1><p className="text-sm text-theme-muted">{filteredRows.length.toLocaleString("fa-IR")} از {rows.length.toLocaleString("fa-IR")} درخواست</p></div>
         </div>
-        <select className="input-theme text-sm w-auto" value={statusF} onChange={e => setStatusF(e.target.value)}>
-          <option value="PENDING">در انتظار</option>
-          <option value="ALL">همه</option>
-          <option value="APPROVED">تایید شده</option>
-          <option value="REJECTED">رد شده</option>
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="جستجوی کارمند..." className="input-theme text-sm w-auto" />
+          <select className="input-theme text-sm w-auto" value={typeF} onChange={e => setTypeF(e.target.value)}>
+            <option value="ALL">همه انواع</option>
+            <option value="CHECK_IN_FIX">اصلاح ورود</option>
+            <option value="CHECK_OUT_FIX">اصلاح خروج</option>
+            <option value="FULL_DAY_FIX">اصلاح ساعت</option>
+            <option value="EXPLANATION">توضیح</option>
+            <option value="LEAVE">مرخصی/ماموریت</option>
+          </select>
+          <select className="input-theme text-sm w-auto" value={statusF} onChange={e => setStatusF(e.target.value)}>
+            <option value="PENDING">در انتظار</option>
+            <option value="ALL">همه</option>
+            <option value="APPROVED">تایید شده</option>
+            <option value="REJECTED">رد شده</option>
+          </select>
+        </div>
       </div>
 
       <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
@@ -69,16 +117,19 @@ export default function ApprovalsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-center">
               <thead><tr className="text-theme-muted border-b border-theme bg-theme-secondary/30">
-                <th className="py-2 px-2 font-medium">کارمند</th><th className="px-2 font-medium">تاریخ</th><th className="px-2 font-medium">نوع</th>
+                <th className="py-2 px-2 font-medium cursor-pointer hover:text-theme-primary" onClick={() => thSort("name")}>کارمند{arrow("name")}</th>
+                <th className="px-2 font-medium cursor-pointer hover:text-theme-primary" onClick={() => thSort("date")}>تاریخ{arrow("date")}</th>
+                <th className="px-2 font-medium cursor-pointer hover:text-theme-primary" onClick={() => thSort("type")}>نوع{arrow("type")}</th>
                 <th className="px-2 font-medium">ورود</th><th className="px-2 font-medium">خروج</th><th className="px-2 font-medium">توضیح</th>
-                <th className="px-2 font-medium">وضعیت</th><th className="px-2 font-medium">اقدام</th>
+                <th className="px-2 font-medium cursor-pointer hover:text-theme-primary" onClick={() => thSort("status")}>وضعیت{arrow("status")}</th>
+                <th className="px-2 font-medium">اقدام</th>
               </tr></thead>
               <tbody>
-                {rows.length === 0 ? <tr><td colSpan={8} className="py-10 text-theme-muted">درخواستی نیست</td></tr> : rows.map(q => (
+                {filteredRows.length === 0 ? <tr><td colSpan={8} className="py-10 text-theme-muted">درخواستی نیست</td></tr> : filteredRows.map(q => (
                   <tr key={q.id} onClick={() => openRow(q)} className="border-b border-theme/40 hover:bg-theme-hover cursor-pointer">
                     <td className="py-1.5 px-2 text-theme-primary whitespace-nowrap">{q.user ? `${q.user.firstName} ${q.user.lastName}` : "—"}</td>
                     <td className="px-2 text-theme-muted" dir="ltr">{faDate(q.gregDate)}</td>
-                    <td className="px-2 text-theme-muted">{q.targetStatus ? STATUS_FA[q.targetStatus] : TYPE_FA[q.type] || q.type}</td>
+                    <td className="px-2 text-theme-muted">{reqTypeLabel(q)}</td>
                     <td className={`px-2 ${q.clearCheckIn ? "text-red-600 font-medium" : "text-theme-primary"}`} dir="ltr">{q.clearCheckIn ? "حذف" : faTime(q.requestedIn)}</td>
                     <td className={`px-2 ${q.clearCheckOut ? "text-red-600 font-medium" : "text-theme-primary"}`} dir="ltr">{q.clearCheckOut ? "حذف" : faTime(q.requestedOut)}</td>
                     <td className="px-2 text-theme-muted text-xs max-w-[180px] truncate" title={q.description}>{q.description || "—"}</td>

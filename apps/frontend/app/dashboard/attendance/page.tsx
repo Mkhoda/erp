@@ -284,8 +284,20 @@ export default function AttendanceDashboardPage() {
   const incompleteRecs = React.useMemo(() =>
     records.filter(r => r.status === "INCOMPLETE" && liveStatus(r, todayISO) !== "WORKING"), [records, todayISO]);
 
+  // Today's status counts adjusted for live status, so someone still at work
+  // (INCOMPLETE + checked in + no checkout yet) is bucketed as WORKING, not
+  // mixed into the "ناقص" (genuinely incomplete) count.
+  const todayLiveCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of todayRecs) {
+      const st = liveStatus(r, todayISO);
+      counts[st] = (counts[st] || 0) + 1;
+    }
+    return counts;
+  }, [todayRecs, todayISO]);
+
   const filteredToday = React.useMemo(() => {
-    let arr = todayTab === "ALL" ? todayRecs : todayRecs.filter(r => r.status === todayTab);
+    let arr = todayTab === "ALL" ? todayRecs : todayRecs.filter(r => liveStatus(r, todayISO) === todayTab);
     if (searchQ) {
       const q = searchQ.toLowerCase();
       arr = arr.filter(r => fullName(r.user).toLowerCase().includes(q) || (r.user?.department?.name||"").includes(searchQ));
@@ -295,7 +307,7 @@ export default function AttendanceDashboardPage() {
       const vb = sortK === "name" ? fullName(b.user) : (b as any)[sortK]||0;
       return sortDir === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
     });
-  }, [todayRecs, todayTab, searchQ, sortK, sortDir]);
+  }, [todayRecs, todayTab, todayISO, searchQ, sortK, sortDir]);
 
   const monthLabel = jMonth ? `${J_MONTHS[jMonth-1]} ${faY(jYear||0)}` : "—";
 
@@ -364,8 +376,8 @@ export default function AttendanceDashboardPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-          {Array.from({length:8}).map((_,i)=>(
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3">
+          {Array.from({length:9}).map((_,i)=>(
             <div key={i} className="rounded-2xl bg-theme-card border border-theme h-[88px] animate-pulse" />
           ))}
         </div>
@@ -378,11 +390,12 @@ export default function AttendanceDashboardPage() {
             <p className="text-xs text-theme-muted mb-2 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5" /> وضعیت امروز
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-3">
               <KpiCard icon={CheckCircle}    title="حاضر"          value={faNum(today.PRESENT||0)}        gradient="bg-gradient-to-br from-emerald-600 to-emerald-500" />
               <KpiCard icon={XCircle}        title="غایب"          value={faNum(today.ABSENT||0)}         gradient="bg-gradient-to-br from-red-600 to-red-500" />
               <KpiCard icon={Clock}          title="با تاخیر"      value={faNum(today.LATE||0)}           gradient="bg-gradient-to-br from-amber-600 to-amber-500" />
-              <KpiCard icon={AlertCircle}    title="ناقص"          value={faNum(today.INCOMPLETE||0)}     gradient="bg-gradient-to-br from-orange-600 to-orange-500" />
+              <KpiCard icon={AlertCircle}    title="ناقص"          value={faNum(todayLiveCounts.INCOMPLETE||0)} gradient="bg-gradient-to-br from-orange-600 to-orange-500" />
+              <KpiCard icon={Fingerprint}    title="در حال کار"    value={faNum(todayLiveCounts.WORKING||0)}    gradient="bg-gradient-to-br from-teal-600 to-teal-500" />
               <KpiCard icon={Timer}          title="تعجیل"         value={faNum(today.EARLY_LEAVE||0)}    gradient="bg-gradient-to-br from-yellow-600 to-yellow-500" />
               <KpiCard icon={CalendarCheck}  title="مرخصی"         value={faNum(today.LEAVE||0)}          gradient="bg-gradient-to-br from-blue-600 to-blue-500" />
               <KpiCard icon={Plane}          title="ماموریت / دور" value={faNum((today.MISSION||0)+(today.REMOTE_WORK||0))} gradient="bg-gradient-to-br from-violet-600 to-violet-500" />
@@ -554,7 +567,7 @@ export default function AttendanceDashboardPage() {
               <div className="flex flex-wrap items-center gap-2">
                 {/* Status tabs */}
                 <div className="flex gap-1 flex-wrap">
-                  {(["ALL","PRESENT","LATE","ABSENT","INCOMPLETE","LEAVE"] as const).map(s=>(
+                  {(["ALL","PRESENT","LATE","ABSENT","WORKING","INCOMPLETE","LEAVE"] as const).map(s=>(
                     <button key={s} onClick={()=>setTodayTab(s)}
                       className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-colors ${todayTab===s?"bg-blue-600 text-white":"bg-theme-hover text-theme-muted hover:text-theme-secondary"}`}>
                       {s==="ALL"?"همه":STATUS_FA[s]}
@@ -678,8 +691,8 @@ export default function AttendanceDashboardPage() {
                   if ((today.LATE||0) > 0)
                     items.push({icon:Clock, text:`${faNum(today.LATE)} نفر امروز با تاخیر وارد شده‌اند`, cls:"text-amber-600 dark:text-amber-400"});
 
-                  if ((today.INCOMPLETE||0) > 0)
-                    items.push({icon:AlertCircle, text:`${faNum(today.INCOMPLETE)} رکورد ناقص امروز نیاز به رسیدگی دارد`, cls:"text-orange-600 dark:text-orange-400"});
+                  if ((todayLiveCounts.INCOMPLETE||0) > 0)
+                    items.push({icon:AlertCircle, text:`${faNum(todayLiveCounts.INCOMPLETE)} رکورد ناقص امروز نیاز به رسیدگی دارد`, cls:"text-orange-600 dark:text-orange-400"});
 
                   if (incompleteRecs.length > 0)
                     items.push({icon:FileWarning, text:`${faNum(incompleteRecs.length)} رکورد ناقص در ماه ${monthLabel} وجود دارد`, cls:"text-orange-600 dark:text-orange-400"});

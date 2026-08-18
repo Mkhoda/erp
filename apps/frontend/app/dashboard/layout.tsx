@@ -44,7 +44,6 @@ const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard/rooms": { label: "اتاق‌ها", Icon: Home },
   "/dashboard/departments": { label: "دپارتمان‌ها", Icon: MapPin },
   "/dashboard/reports": { label: "گزارش‌ها", Icon: LayoutDashboard },
-  "/dashboard/change-password": { label: "تغییر رمز عبور", Icon: Shield },
   "/dashboard/system-logs": { label: "لاگ سیستم", Icon: Bell },
   "/dashboard/messaging": { label: "پیام‌رسانی", Icon: MessageSquare },
   "/dashboard/messaging/admin": { label: "تنظیمات پیام‌رسانی", Icon: Settings },
@@ -127,7 +126,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const BASE_ALWAYS_ALLOWED_EXACT = ["/dashboard"];
   const BASE_ALWAYS_ALLOWED_PREFIX = [
     "/dashboard/profile",
-    "/dashboard/change-password",
     "/dashboard/chat",
     "/dashboard/messaging",
     "/dashboard/attendance/my",
@@ -687,7 +685,7 @@ function HeaderUserMenu({ me, role, onLogout }: { me: any; role: Role | null; on
               <Link href="/dashboard/profile" onClick={() => setOpen(false)} className="flex items-center gap-2.5 hover:bg-theme-hover px-3 py-2 rounded-lg text-theme-secondary text-sm transition-colors">
                 <UserCog className="w-4 h-4 text-theme-muted" /> پروفایل
               </Link>
-              <Link href="/dashboard/change-password" onClick={() => setOpen(false)} className="flex items-center gap-2.5 hover:bg-theme-hover px-3 py-2 rounded-lg text-theme-secondary text-sm transition-colors">
+              <Link href="/dashboard/profile?tab=security" onClick={() => setOpen(false)} className="flex items-center gap-2.5 hover:bg-theme-hover px-3 py-2 rounded-lg text-theme-secondary text-sm transition-colors">
                 <Shield className="w-4 h-4 text-theme-muted" /> تغییر رمز عبور
               </Link>
             </div>

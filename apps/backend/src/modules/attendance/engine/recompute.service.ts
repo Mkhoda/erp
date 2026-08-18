@@ -47,7 +47,12 @@ export class RecomputeService {
     for (const [userId, dates] of byUser) {
       const from = dates[0];
       const to = dates[dates.length - 1];
-      const shiftId = await this.guardCalc.findActiveGuardShiftId(userId, from, to);
+      let shiftId: string | null = null;
+      try {
+        shiftId = await this.guardCalc.findActiveGuardShiftId(userId, from, to);
+      } catch (e: any) {
+        this.logger.error(`findActiveGuardShiftId failed for ${userId}: ${e.message}`);
+      }
       if (shiftId) {
         const existing = byShift.get(shiftId);
         byShift.set(shiftId, existing

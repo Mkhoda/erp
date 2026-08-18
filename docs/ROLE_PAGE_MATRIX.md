@@ -11,8 +11,7 @@ Legend
 
 Pages (file → recommended visible roles)
 - `/dashboard` (apps/frontend/app/dashboard/page.tsx): A, M, E, U
-- `/dashboard/profile` (profile/page.tsx): A, M, E, U
-- `/dashboard/change-password` (change-password/page.tsx): A, M, E, U
+- `/dashboard/profile` (profile/page.tsx, incl. password change): A, M, E, U
 - `/dashboard/users` (users/page.tsx, page-new.tsx): A, M
 - `/dashboard/roles` (roles/page.tsx): A
 - `/dashboard/settings` (settings/page.tsx): A, M

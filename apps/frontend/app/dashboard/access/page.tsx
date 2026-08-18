@@ -4,7 +4,7 @@ import { pageTitle } from "../../../lib/branding";
 import {
   Lock, ShieldCheck, Building2, Check, X, RefreshCw, ChevronDown,
   Boxes, Users, BarChart3, Fingerprint, MapPin, Navigation,
-  LayoutDashboard, MessageSquare, User, KeyRound,
+  LayoutDashboard, MessageSquare, User,
 } from "lucide-react";
 import { useToast } from "../../components/ui/Toast";
 
@@ -27,7 +27,6 @@ const UNIVERSAL_PAGES = [
   "/dashboard",
   "/dashboard/chat",
   "/dashboard/profile",
-  "/dashboard/change-password",
   "/dashboard/attendance/my",
 ];
 
@@ -121,7 +120,6 @@ const UNIVERSAL_DISPLAY = [
   { page: "/dashboard",                   label: "نمای کلی",          icon: LayoutDashboard },
   { page: "/dashboard/chat",              label: "گفتگو با AI",       icon: MessageSquare },
   { page: "/dashboard/profile",           label: "پروفایل",           icon: User },
-  { page: "/dashboard/change-password",   label: "تغییر رمز عبور",    icon: KeyRound },
   { page: "/dashboard/attendance/my",     label: "حضور من",           icon: Fingerprint },
 ];
 

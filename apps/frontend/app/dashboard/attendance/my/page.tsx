@@ -46,6 +46,16 @@ function jalaliToGregorian(jy0: number, jm: number, jd: number) {
 const jMonthLen=(jy:number,jm:number)=>(jm<=6?31:jm<=11?30:jy%4===3?30:29);
 const todayJ=()=>{const t=new Date();return toJalali(t.getFullYear(),t.getMonth()+1,t.getDate());};
 
+// Minutes between two "HH:MM" clock times on the same day; null if incomplete/invalid.
+function rangeMinutes(start?: string, end?: string): number | null {
+  if (!start || !end) return null;
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if ([sh, sm, eh, em].some(n => Number.isNaN(n))) return null;
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  return diff > 0 ? diff : null;
+}
+
 // Current Jalali year/month (Tehran) — used to default the filters on load.
 function currentJalali() {
   const p = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", timeZone: "Asia/Tehran" }).formatToParts(new Date());
@@ -73,7 +83,7 @@ export default function MyAttendancePage() {
   const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", fixIn: false, inTime: "", delIn: false, fixOut: false, outTime: "", delOut: false, description: "" });
   const [sending, setSending] = React.useState(false);
   const [leaveModal, setLeaveModal] = React.useState(false);
-  const [leaveForm, setLeaveForm] = React.useState({ jy: 0, jm: 0, jd: 0, type: "LEAVE", leaveHours: "", description: "" });
+  const [leaveForm, setLeaveForm] = React.useState({ jy: 0, jm: 0, jd: 0, type: "LEAVE", leaveStart: "", leaveEnd: "", description: "" });
   const [leaveSending, setLeaveSending] = React.useState(false);
   const [detail, setDetail] = React.useState<any>(null);
   const [reqStatusFilter, setReqStatusFilter] = React.useState("ALL");
@@ -123,12 +133,17 @@ export default function MyAttendancePage() {
 
   function openLeaveModal() {
     const { jy, jm, jd } = todayJ();
-    setLeaveForm({ jy, jm, jd, type: "LEAVE", leaveHours: "", description: "" });
+    setLeaveForm({ jy, jm, jd, type: "LEAVE", leaveStart: "", leaveEnd: "", description: "" });
     setLeaveModal(true);
   }
 
   async function submitLeaveRequest() {
     if (!leaveForm.jy || !leaveForm.jm || !leaveForm.jd) { alert("تاریخ را انتخاب کنید"); return; }
+    let hourlyMinutes: number | null = null;
+    if (leaveForm.type === "HOURLY_LEAVE") {
+      hourlyMinutes = rangeMinutes(leaveForm.leaveStart, leaveForm.leaveEnd);
+      if (hourlyMinutes == null) { alert("بازه زمانی مرخصی را کامل و درست انتخاب کنید"); return; }
+    }
     setLeaveSending(true);
     try {
       const g = jalaliToGregorian(leaveForm.jy, leaveForm.jm, leaveForm.jd);
@@ -136,7 +151,9 @@ export default function MyAttendancePage() {
       const body: any = { date, description: leaveForm.description };
       if (leaveForm.type === "HOURLY_LEAVE") {
         body.type = "LEAVE";
-        body.leaveMinutes = Math.round((Number(leaveForm.leaveHours) || 0) * 60);
+        body.leaveMinutes = hourlyMinutes;
+        body.inTime = leaveForm.leaveStart;
+        body.outTime = leaveForm.leaveEnd;
       } else {
         body.type = "LEAVE";
         body.targetStatus = leaveForm.type;
@@ -160,6 +177,11 @@ export default function MyAttendancePage() {
   }
 
   async function submitRequest() {
+    let hourlyMinutes: number | null = null;
+    if (reqForm.kind === "HOURLY_LEAVE") {
+      hourlyMinutes = rangeMinutes(reqForm.leaveStart, reqForm.leaveEnd);
+      if (hourlyMinutes == null) { alert("بازه زمانی مرخصی را کامل و درست انتخاب کنید"); return; }
+    }
     setSending(true);
     try {
       const k = reqForm.kind;
@@ -170,7 +192,7 @@ export default function MyAttendancePage() {
         if (doIn) { if (reqForm.delIn) body.clearCheckIn = true; else body.inTime = reqForm.inTime; }
         if (doOut) { if (reqForm.delOut) body.clearCheckOut = true; else body.outTime = reqForm.outTime; }
       } else if (k === "EXPLANATION") { body.type = "EXPLANATION"; }
-      else if (k === "HOURLY_LEAVE") { body.type = "LEAVE"; body.leaveMinutes = Math.round((Number(reqForm.leaveHours) || 0) * 60); }
+      else if (k === "HOURLY_LEAVE") { body.type = "LEAVE"; body.leaveMinutes = hourlyMinutes; body.inTime = reqForm.leaveStart; body.outTime = reqForm.leaveEnd; }
       else { body.type = "LEAVE"; body.targetStatus = k; } // LEAVE | MISSION | REMOTE_WORK
       const res = await fetch(`${API}/attendance/me/requests`, { method: "POST", headers: h, body: JSON.stringify(body) });
       if (res.ok) { setModal(null); await load(); }
@@ -424,11 +446,16 @@ export default function MyAttendancePage() {
           </div>
           {leaveForm.type === "HOURLY_LEAVE" && (
             <div>
-              <label className="block mb-1 text-theme-secondary text-xs">مدت مرخصی (ساعت)</label>
-              <input type="number" step="0.5" min="0.5" max="24" dir="ltr" value={leaveForm.leaveHours}
-                onChange={e => setLeaveForm(s => ({ ...s, leaveHours: e.target.value }))}
-                className="input-theme text-sm" placeholder="مثلاً 2" />
-              <p className="mt-1 text-[11px] text-theme-muted">بیشتر از ۳ ساعت = کل روز مرخصی</p>
+              <label className="block mb-1 text-theme-secondary text-xs">بازه مرخصی</label>
+              <div className="flex items-center gap-2">
+                <TimeSelect value={leaveForm.leaveStart} onChange={v => setLeaveForm(s => ({ ...s, leaveStart: v }))} />
+                <span className="text-theme-muted text-xs">تا</span>
+                <TimeSelect value={leaveForm.leaveEnd} onChange={v => setLeaveForm(s => ({ ...s, leaveEnd: v }))} />
+              </div>
+              <p className="mt-1 text-[11px] text-theme-muted">
+                {(() => { const m = rangeMinutes(leaveForm.leaveStart, leaveForm.leaveEnd); return m != null ? `مدت: ${fmtMin(m)}` : ""; })()}
+                {" "}بیشتر از ۳ ساعت = کل روز مرخصی
+              </p>
             </div>
           )}
           <div>
@@ -470,9 +497,16 @@ export default function MyAttendancePage() {
             </div>
             {reqForm.kind === "HOURLY_LEAVE" && (
               <div>
-                <label className="block mb-1 text-theme-secondary text-xs">مدت مرخصی (ساعت)</label>
-                <input type="number" step="0.5" min="0" dir="ltr" value={reqForm.leaveHours ?? ""} onChange={e => setReqForm((s: any) => ({ ...s, leaveHours: e.target.value }))} className="input-theme text-sm" placeholder="مثلاً 2" />
-                <p className="mt-1 text-[11px] text-theme-muted">بیشتر از ۳ ساعت = کل روز مرخصی و ساعات حضور اضافه‌کار محاسبه می‌شود.</p>
+                <label className="block mb-1 text-theme-secondary text-xs">بازه مرخصی</label>
+                <div className="flex items-center gap-2">
+                  <TimeSelect value={reqForm.leaveStart || ""} onChange={v => setReqForm((s: any) => ({ ...s, leaveStart: v }))} />
+                  <span className="text-theme-muted text-xs">تا</span>
+                  <TimeSelect value={reqForm.leaveEnd || ""} onChange={v => setReqForm((s: any) => ({ ...s, leaveEnd: v }))} />
+                </div>
+                <p className="mt-1 text-[11px] text-theme-muted">
+                  {(() => { const m = rangeMinutes(reqForm.leaveStart, reqForm.leaveEnd); return m != null ? `مدت: ${fmtMin(m)} — ` : ""; })()}
+                  بیشتر از ۳ ساعت = کل روز مرخصی و ساعات حضور اضافه‌کار محاسبه می‌شود.
+                </p>
               </div>
             )}
             {reqForm.kind === "FIX" && (

@@ -18,7 +18,6 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard',                    label: 'نمای کلی' },
   { page: '/dashboard/chat',               label: 'گفتگو با AI' },
   { page: '/dashboard/profile',            label: 'پروفایل' },
-  { page: '/dashboard/change-password',    label: 'تغییر رمز عبور' },
 
   // ── ERP pages (restricted by dept + role) ──
   { page: '/dashboard/assets',             label: 'دارایی‌ها' },

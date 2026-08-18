@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { useSearchParams } from 'next/navigation';
 import { User, Shield, Save, Key, Bell, Phone, Check, AlertCircle } from 'lucide-react';
 import { isValidPhone, normalizeTo98 } from '../../../lib/phone';
 import { pageTitle } from "../../../lib/branding";
@@ -15,14 +16,19 @@ const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
   USER: { label: 'کاربر', cls: 'bg-theme-secondary text-theme-secondary border-theme' },
 };
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   React.useEffect(() => { document.title = pageTitle("پروفایل"); }, []);
+
+  const searchParams = useSearchParams();
+  const initialTab = ['profile', 'security', 'notifications'].includes(searchParams.get('tab') || '')
+    ? (searchParams.get('tab') as string)
+    : 'profile';
 
   const [me, setMe] = React.useState<Me | null>(null);
   const [edit, setEdit] = React.useState<Partial<Me>>({});
   const [saving, setSaving] = React.useState(false);
   const [saveMsg, setSaveMsg] = React.useState<{ type: 'ok' | 'err'; text: string } | null>(null);
-  const [activeTab, setActiveTab] = React.useState('profile');
+  const [activeTab, setActiveTab] = React.useState(initialTab);
 
   // OTP / change password
   const [sendingOtp, setSendingOtp] = React.useState(false);
@@ -308,5 +314,13 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <React.Suspense fallback={<div className="flex items-center justify-center h-full text-theme-muted text-sm">در حال بارگذاری...</div>}>
+      <ProfilePageContent />
+    </React.Suspense>
   );
 }

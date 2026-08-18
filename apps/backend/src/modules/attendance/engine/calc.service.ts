@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import * as moment from 'moment-jalaali';
 import { AttendanceStatus, HolidayType } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
@@ -23,6 +24,12 @@ export interface EffectiveSchedule {
   // depart before checkOutStart.
   checkInEnd: number;
   checkOutStart: number;
+  // Flextime: when enabled, arrival before (flexInStart - graceMinutes) does not
+  // count toward worked minutes — it's the employee's own early-arrival time, not
+  // extra work. Lateness (checkInEnd) is unaffected — arriving very late is still late.
+  flexEnabled: boolean;
+  flexInStart: number;
+  graceMinutes: number;
   workDays: number[];
   otMinThreshold: number;
   otMaxDaily: number;
@@ -45,6 +52,9 @@ const DEFAULTS: EffectiveSchedule = {
   lunchMinutes: 0,
   checkInEnd: 9 * 60,           // 09:00
   checkOutStart: 14 * 60 + 50,  // 14:50
+  flexEnabled: false,
+  flexInStart: 7 * 60 + 30,     // 07:30
+  graceMinutes: 0,
   workDays: [6, 0, 1, 2, 3],    // Sat..Wed (Thu/Fri weekend)
   otMinThreshold: 30,
   otMaxDaily: 240,
@@ -82,6 +92,9 @@ export class CalcService {
       s.lunchMinutes = base.lunchMinutes;
       s.checkInEnd = parseHHmm((base as any).checkInEnd) ?? s.checkInEnd;
       s.checkOutStart = parseHHmm((base as any).checkOutStart) ?? s.checkOutStart;
+      s.flexEnabled = base.flexEnabled;
+      s.flexInStart = parseHHmm(base.flexInStart) ?? s.flexInStart;
+      s.graceMinutes = base.graceMinutes;
       s.workDays = base.workDays?.length ? base.workDays : s.workDays;
       s.otMinThreshold = base.otMinThreshold;
       s.otMaxDaily = base.otMaxDaily;
@@ -97,6 +110,8 @@ export class CalcService {
       if ((rule as any).checkInEnd) s.checkInEnd = parseHHmm((rule as any).checkInEnd) ?? s.checkInEnd;
       if ((rule as any).checkOutStart) s.checkOutStart = parseHHmm((rule as any).checkOutStart) ?? s.checkOutStart;
       if ((rule as any).checkOutEnd) s.endMin = parseHHmm((rule as any).checkOutEnd) ?? s.endMin;
+      if (rule.flexEnabled != null) s.flexEnabled = rule.flexEnabled;
+      if (rule.graceMinutes != null) s.graceMinutes = rule.graceMinutes;
       if (rule.otMaxDaily != null) s.otMaxDaily = rule.otMaxDaily;
       if (rule.otMaxMonthly != null) s.otMaxMonthly = rule.otMaxMonthly;
       s.otAllowed = rule.otAllowed;
@@ -130,11 +145,27 @@ export class CalcService {
       where: { startDate: { lte: gregDate }, endDate: { gte: gregDate }, recurring: false, OR: scope },
     });
     if (fixed) return fixed.type;
-    const { jMonth, jDay } = toJalaliParts(gregDate);
-    const rec = await this.prisma.holiday.findFirst({
-      where: { recurring: true, jMonth, jDay, OR: scope },
-    });
-    return rec ? rec.type : null;
+
+    // Recurring holidays only store the START day's (jMonth, jDay) — a multi-day
+    // recurring range (e.g. Nowruz 01/01–01/04) must be re-expanded from that
+    // anchor + the original span length every year, not matched as a single day.
+    const recurring = await this.prisma.holiday.findMany({ where: { recurring: true, OR: scope } });
+    if (!recurring.length) return null;
+    const { jYear } = toJalaliParts(gregDate);
+    for (const h of recurring) {
+      if (h.jMonth == null || h.jDay == null) continue;
+      const spanDays = Math.round((h.endDate.getTime() - h.startDate.getTime()) / 86400000);
+      // Try this Jalali year and its neighbors so a range crossing the Jalali
+      // new year (e.g. Esfand 29 → Farvardin 2) still matches correctly.
+      for (const yOffset of [0, -1, 1]) {
+        const anchor = moment(`${jYear + yOffset}/${h.jMonth}/${h.jDay}`, 'jYYYY/jM/jD');
+        if (!anchor.isValid()) continue;
+        const start = new Date(Date.UTC(anchor.year(), anchor.month(), anchor.date()));
+        const end = new Date(start.getTime() + spanDays * 86400000);
+        if (gregDate >= start && gregDate <= end) return h.type;
+      }
+    }
+    return null;
   }
 
   // Apply a matching ScheduleOverride to the effective schedule for this day.
@@ -219,13 +250,30 @@ export class CalcService {
 
     const hasPunch = firstIn != null;
     const bothPunches = firstIn != null && lastOut != null;
+    // More than 2 raw punches (e.g. leaving for a mission/hourly-leave and coming
+    // back) means first/last alone can't be trusted to represent the day — flag it
+    // for manual resolution instead of silently over/under-counting the gap. Once
+    // an admin/employee has pinned BOTH sides via an override, stop flagging: the
+    // raw punch count never changes, so without this the day would revert to
+    // INCOMPLETE on every recompute even after being resolved.
+    const pinnedByOverride = !!override
+      && (!!override.newCheckIn || override.clearCheckIn)
+      && (!!override.newCheckOut || override.clearCheckOut);
+    const ambiguousPunches = punches.length > 2 && !pinnedByOverride;
 
     if (bothPunches) {
       const inMin = minutesOfDay(firstIn!);
       let outMin = minutesOfDay(lastOut!);
       if (outMin < inMin) outMin += 24 * 60; // crossed midnight (night shift)
 
-      workedMinutes = Math.max(0, outMin - inMin - sched.lunchMinutes);
+      // Flextime: arrival before (flexInStart - grace) is the employee's own early
+      // time, not extra work — clamp it out of worked/night minutes. Lateness stays
+      // based on the raw arrival time (below), so arriving very late is still late.
+      const effectiveInMin = sched.flexEnabled
+        ? Math.max(inMin, sched.flexInStart - sched.graceMinutes)
+        : inMin;
+
+      workedMinutes = Math.max(0, outMin - effectiveInMin - sched.lunchMinutes);
 
       // Window-based: late if arriving after the check-in window ends; early
       // leave if departing before the check-out window starts.
@@ -252,8 +300,8 @@ export class CalcService {
 
       // Night minutes = overlap with 22:00–06:00 (next day window 22:00–30:00)
       nightMinutes =
-        this.overlapMinutes(inMin, outMin, 22 * 60, 30 * 60) +
-        this.overlapMinutes(inMin, outMin, 0, 6 * 60);
+        this.overlapMinutes(effectiveInMin, outMin, 22 * 60, 30 * 60) +
+        this.overlapMinutes(effectiveInMin, outMin, 0, 6 * 60);
     }
 
     // Hourly staff: only presence matters — drop lateness/early-leave.
@@ -309,7 +357,7 @@ export class CalcService {
       status = AttendanceStatus.WEEKEND;
     } else if (!hasPunch) {
       status = AttendanceStatus.ABSENT;
-    } else if (!bothPunches) {
+    } else if (!bothPunches || ambiguousPunches) {
       status = AttendanceStatus.INCOMPLETE;
     } else if (delayMinutes > 0) {
       status = AttendanceStatus.LATE;

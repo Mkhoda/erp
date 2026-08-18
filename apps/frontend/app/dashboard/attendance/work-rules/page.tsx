@@ -31,6 +31,7 @@ const TYPE_FA: Record<string, string> = { OFFICIAL: "رسمی", COMPANY: "شرک
 const NEW_DEFAULTS = {
   name: "", isDefault: false, dailyMinutes: 500, lunchMinutes: 0,
   checkInStart: "06:30", checkInEnd: "09:00", checkOutStart: "14:50", checkOutEnd: "17:20", workDays: [6, 0, 1, 2, 3],
+  flexEnabled: false, flexInStart: "07:30", flexInEnd: "09:00", graceMinutes: 0,
   otMinThreshold: 30, otRounding: 15, otMaxDaily: 240, otMaxMonthly: 3600, annualLeaveDays: 26,
   deficitToLeaveEnabled: true, absentToLeaveEnabled: true,
 };
@@ -255,6 +256,23 @@ export default function WorkRulesPage() {
               <Field label="پایان بازه خروج" hint="کار بعد از این = اضافه‌کار"><TimeSelect className={inputCls} value={form.checkOutEnd || ""} onChange={v => setF("checkOutEnd", v)} /></Field>
               <Field label="ساعت کار مورد نیاز (دقیقه)" hint={hrs(form.dailyMinutes)}><input type="number" className={inputCls} value={form.dailyMinutes ?? ""} onChange={e => setF("dailyMinutes", +e.target.value)} /></Field>
               <Field label="کسر ناهار/استراحت (دقیقه)"><input type="number" className={inputCls} value={form.lunchMinutes ?? ""} onChange={e => setF("lunchMinutes", +e.target.value)} /></Field>
+            </div>
+          </Section>
+          <Section title="شناوری" icon={Timer}>
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-sm text-theme-primary">
+                <input type="checkbox" checked={!!form.flexEnabled} onChange={e => setF("flexEnabled", e.target.checked)} />
+                ساعت ورود شناور است
+              </label>
+              {form.flexEnabled && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Field label="شروع بازه شناوری"><TimeSelect className={inputCls} value={form.flexInStart || ""} onChange={v => setF("flexInStart", v)} /></Field>
+                  <Field label="پایان بازه شناوری"><TimeSelect className={inputCls} value={form.flexInEnd || ""} onChange={v => setF("flexInEnd", v)} /></Field>
+                  <Field label="مهلت تکمیلی (دقیقه)" hint="ورود زودتر از این مقدار، جزو ساعت کاری محاسبه نمی‌شود">
+                    <input type="number" className={inputCls} value={form.graceMinutes ?? ""} onChange={e => setF("graceMinutes", +e.target.value)} />
+                  </Field>
+                </div>
+              )}
             </div>
           </Section>
           <Section title="روزهای کاری" icon={CalendarDays}>

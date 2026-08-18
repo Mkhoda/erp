@@ -68,7 +68,6 @@ export default function AttendanceRecordsPage() {
   // Pagination
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
-  React.useEffect(() => { setPage(1); }, [rows, pageSize]);
 
   // Default to the current Jalali month/year on load (0 = "all" once cleared).
   const [jYear, setJYear] = React.useState<number>(() => currentJalali().jYear);
@@ -77,6 +76,7 @@ export default function AttendanceRecordsPage() {
   const [deptId, setDeptId] = React.useState("");
   const [userId, setUserId] = React.useState("");
   const [status, setStatus] = React.useState("");
+  React.useEffect(() => { setPage(1); }, [rows, pageSize, status]);
 
   const qs = React.useCallback(() => {
     const p = new URLSearchParams();
@@ -85,7 +85,10 @@ export default function AttendanceRecordsPage() {
     if (jDay) p.set("jDay", String(jDay));
     if (deptId) p.set("departmentId", deptId);
     if (userId) p.set("userId", userId);
-    if (status) p.set("status", status);
+    // "WORKING" isn't a real backend status — it's a client-derived subset of
+    // INCOMPLETE (checked in, no checkout yet, today). Ask the backend for the
+    // full INCOMPLETE set and split it into WORKING vs. genuinely INCOMPLETE below.
+    if (status) p.set("status", status === "WORKING" ? "INCOMPLETE" : status);
     return p.toString();
   }, [jYear, jMonth, jDay, deptId, userId, status]);
 
@@ -176,6 +179,14 @@ export default function AttendanceRecordsPage() {
   // even before its data has loaded into `periods`.
   const yearOpts = [...new Set([...(jYear ? [jYear] : []), ...periods.map(p => p.jYear)])].sort((a, b) => b - a);
   const monthOpts = [...new Set([...(jMonth ? [jMonth] : []), ...periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth)])].sort((a, b) => a - b);
+  // Split the backend's raw INCOMPLETE set into "still working today" vs.
+  // genuinely incomplete, so the status filter doesn't lump the two together.
+  const displayRows = React.useMemo(() => {
+    if (status === "INCOMPLETE") return rows.filter(r => liveStatus(r) !== "WORKING");
+    if (status === "WORKING") return rows.filter(r => liveStatus(r) === "WORKING");
+    return rows;
+  }, [rows, status]);
+
   const personOptions = users.map((u: any) => ({
     id: u.id,
     name: `${u.firstName} ${u.lastName}${u.attendanceCardNo ? ` (${u.attendanceCardNo})` : ""}`,
@@ -190,7 +201,7 @@ export default function AttendanceRecordsPage() {
           <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center"><Fingerprint className="w-5 h-5 text-white" /></div>
           <div>
             <h1 className="text-xl font-bold text-theme-primary">کارکرد روزانه</h1>
-            <p className="text-sm text-theme-muted">{faNum(rows.length)} رکورد</p>
+            <p className="text-sm text-theme-muted">{faNum(displayRows.length)} رکورد</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -303,9 +314,9 @@ export default function AttendanceRecordsPage() {
                 <th className="font-medium px-2">وضعیت</th><th className="font-medium px-2">جزئیات</th>
               </tr></thead>
               <tbody>
-                {rows.length === 0 ? (
+                {displayRows.length === 0 ? (
                   <tr><td colSpan={16} className="py-10 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
-                ) : rows.slice((page-1)*pageSize, page*pageSize).map((r, i) => (
+                ) : displayRows.slice((page-1)*pageSize, page*pageSize).map((r, i) => (
                   <tr key={r.id} className="border-b border-theme/40 hover:bg-theme-hover">
                     <td className="py-1.5 px-2 text-theme-muted">{faNum((page-1)*pageSize + i + 1)}</td>
                     <td className="px-2 text-theme-primary whitespace-nowrap">{r.user ? `${r.user.firstName} ${r.user.lastName}` : "—"}</td>
@@ -338,19 +349,19 @@ export default function AttendanceRecordsPage() {
           </div>
         )}
         {/* Pagination */}
-        {!loading && rows.length > 0 && (
+        {!loading && displayRows.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 border-t border-theme text-sm">
             <div className="flex items-center gap-2 text-theme-muted">
               <span>نمایش</span>
               <select value={pageSize} onChange={e => setPageSize(+e.target.value)} className="input-theme text-sm w-auto py-1">
                 {[25, 50, 100, 200].map(n => <option key={n} value={n}>{faNum(n)}</option>)}
               </select>
-              <span>از {faNum(rows.length)} رکورد</span>
+              <span>از {faNum(displayRows.length)} رکورد</span>
             </div>
             <div className="flex items-center gap-2">
               <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 rounded-lg bg-theme-secondary border border-theme text-theme-primary disabled:opacity-40">قبلی</button>
-              <span className="text-theme-muted">صفحه {faNum(page)} از {faNum(Math.max(1, Math.ceil(rows.length / pageSize)))}</span>
-              <button disabled={page >= Math.ceil(rows.length / pageSize)} onClick={() => setPage(p => p + 1)} className="px-3 py-1 rounded-lg bg-theme-secondary border border-theme text-theme-primary disabled:opacity-40">بعدی</button>
+              <span className="text-theme-muted">صفحه {faNum(page)} از {faNum(Math.max(1, Math.ceil(displayRows.length / pageSize)))}</span>
+              <button disabled={page >= Math.ceil(displayRows.length / pageSize)} onClick={() => setPage(p => p + 1)} className="px-3 py-1 rounded-lg bg-theme-secondary border border-theme text-theme-primary disabled:opacity-40">بعدی</button>
             </div>
           </div>
         )}

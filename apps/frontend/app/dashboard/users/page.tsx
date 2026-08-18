@@ -621,6 +621,12 @@ export default function UsersPage() {
                   </label>
                 )}
               </div>
+              {editing?.rule?.flexEnabled && (
+                <div>
+                  <label className="block mb-1.5 text-theme-secondary text-xs">مهلت تکمیلی شناوری (دقیقه، اختیاری)</label>
+                  <input type="number" dir="ltr" value={editing?.rule?.graceMinutes ?? ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, graceMinutes: e.target.value } }))} className="text-sm input-theme" placeholder="پیش‌فرض گروه" />
+                </div>
+              )}
               <div>
                 <label className="block mb-1.5 text-theme-secondary text-xs">پایان بازه ورود (اختیاری)</label>
                 <input type="time" dir="ltr" value={editing?.rule?.checkInEnd || ""} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, checkInEnd: e.target.value } }))} className="text-sm input-theme" />

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as moment from 'moment-jalaali';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RecomputeService } from '../engine/recompute.service';
@@ -19,6 +19,8 @@ function parseFlexDate(s: string): Date {
 
 @Injectable()
 export class HolidaysService {
+  private readonly logger = new Logger(HolidaysService.name);
+
   constructor(
     private prisma: PrismaService,
     private recompute: RecomputeService,
@@ -53,7 +55,8 @@ export class HolidaysService {
         scheduleIds: Array.isArray(dto.scheduleIds) ? dto.scheduleIds.filter(Boolean) : [],
       },
     });
-    this.recompute.recomputeAllUsersForDays(this.daysOf(start, end)).catch(() => undefined);
+    this.recompute.recomputeAllUsersForDays(this.daysOf(start, end))
+      .catch((e: any) => this.logger.error(`recompute after holiday save failed: ${e.message}`));
     return holiday;
   }
 
@@ -78,7 +81,8 @@ export class HolidaysService {
         scheduleIds: Array.isArray(dto.scheduleIds) ? dto.scheduleIds.filter(Boolean) : existing.scheduleIds,
       },
     });
-    this.recompute.recomputeAllUsersForDays(this.daysOf(start, end)).catch(() => undefined);
+    this.recompute.recomputeAllUsersForDays(this.daysOf(start, end))
+      .catch((e: any) => this.logger.error(`recompute after holiday save failed: ${e.message}`));
     return holiday;
   }
 
@@ -86,7 +90,8 @@ export class HolidaysService {
     const existing = await this.prisma.holiday.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('تعطیلی یافت نشد');
     await this.prisma.holiday.delete({ where: { id } });
-    this.recompute.recomputeAllUsersForDays(this.daysOf(existing.startDate, existing.endDate)).catch(() => undefined);
+    this.recompute.recomputeAllUsersForDays(this.daysOf(existing.startDate, existing.endDate))
+      .catch((e: any) => this.logger.error(`recompute after holiday delete failed: ${e.message}`));
     return { ok: true };
   }
 }

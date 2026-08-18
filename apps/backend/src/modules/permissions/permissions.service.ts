@@ -6,7 +6,6 @@ import { KNOWN_PAGES } from './pages.constant';
 const BASE_PAGES = [
   '/dashboard',
   '/dashboard/profile',
-  '/dashboard/change-password',
   '/dashboard/chat',
   '/dashboard/messaging',
   '/dashboard/attendance/my',

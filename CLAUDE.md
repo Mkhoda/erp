@@ -48,8 +48,7 @@ docker-compose.prod.yml     ← production stack
 | Path | Description | Access |
 |---|---|---|
 | `/dashboard` | Overview / stats | All |
-| `/dashboard/profile` | User profile | All |
-| `/dashboard/change-password` | Password change | All |
+| `/dashboard/profile` | User profile (incl. password change, "security" tab) | All |
 | `/dashboard/chat` | AI chat | All |
 | `/dashboard/messaging` | Real-time internal messaging | All |
 | `/dashboard/assets` | Asset list | Restricted |
