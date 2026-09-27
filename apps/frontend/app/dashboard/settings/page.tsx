@@ -4,7 +4,7 @@ import {
   SlidersHorizontal, Globe, Smartphone, Database,
   Save, MessageSquare, Eye, EyeOff, AlertCircle,
   Loader2, Shield, Clock, RefreshCw, Info, Send,
-  CheckCircle, XCircle,
+  CheckCircle, XCircle, Tag, GitCommit,
 } from "lucide-react";
 import { useToast } from "../../components/ui/Toast";
 import { DEFAULT_SYSTEM_NAME, pageTitle, refreshSystemName } from "../../../lib/branding";
@@ -396,6 +396,78 @@ function GeneralTab() {
   );
 }
 
+// ── Version Tab ───────────────────────────────────────────────────────
+function VersionTab() {
+  const [info, setInfo] = React.useState<any>(null);
+  const [commits, setCommits] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function load() {
+    setLoading(true); setError(null);
+    try {
+      const [v, c] = await Promise.all([
+        fetch(`${API}/system-info/version`, { headers: ah() }).then(r => r.ok ? r.json() : Promise.reject()),
+        fetch(`${API}/system-info/commits?limit=30`, { headers: ah() }).then(r => r.ok ? r.json() : Promise.reject()),
+      ]);
+      setInfo(v); setCommits(Array.isArray(c) ? c : []);
+    } catch { setError("دریافت اطلاعات نسخه ناموفق بود"); }
+    finally { setLoading(false); }
+  }
+  React.useEffect(() => { load(); }, []);
+
+  const faDate = (iso: string) => iso ? new Date(iso).toLocaleDateString("fa-IR", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+
+  if (loading) return <div className="flex items-center justify-center py-12 text-theme-muted"><RefreshCw className="w-5 h-5 animate-spin" /></div>;
+  if (error) return <div className="flex items-center gap-2 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-600 text-sm"><AlertCircle className="w-4 h-4 shrink-0" />{error}</div>;
+
+  return (
+    <div className="space-y-5">
+      {info && (
+        <div className="rounded-xl border border-theme p-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div>
+            <p className="text-xs text-theme-muted mb-0.5">نسخه فعلی</p>
+            <p className="text-lg font-bold text-theme-primary font-mono" dir="ltr">{info.version}</p>
+          </div>
+          <div className="h-8 w-px bg-theme hidden sm:block" />
+          <div className="min-w-0">
+            <p className="text-xs text-theme-muted mb-0.5">آخرین کامیت</p>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-theme-secondary text-theme-primary shrink-0" dir="ltr">{info.commitShort}</span>
+              <span className="text-sm text-theme-primary truncate max-w-[280px]" title={info.commitMessage}>{info.commitMessage}</span>
+            </div>
+          </div>
+          <div className="h-8 w-px bg-theme hidden sm:block" />
+          <div>
+            <p className="text-xs text-theme-muted mb-0.5">شاخه</p>
+            <p className="text-sm text-theme-primary font-mono" dir="ltr">{info.branch}</p>
+          </div>
+          <button onClick={load} className="ms-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-theme-secondary hover:bg-theme-hover border border-theme">
+            <RefreshCw className="w-3.5 h-3.5" /> به‌روزرسانی
+          </button>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-theme overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-theme text-sm font-medium text-theme-primary flex items-center gap-2">
+          <GitCommit className="w-4 h-4 text-theme-muted" /> تاریخچه کامیت‌ها
+        </div>
+        <div className="divide-y divide-theme max-h-[480px] overflow-y-auto">
+          {commits.map(c => (
+            <div key={c.hash} className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-theme-hover">
+              <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-theme-secondary text-theme-muted shrink-0" dir="ltr">{c.shortHash}</span>
+              <span className="flex-1 min-w-0 truncate text-theme-primary" title={c.message}>{c.message}</span>
+              <span className="text-xs text-theme-muted shrink-0 hidden sm:inline">{c.author}</span>
+              <span className="text-xs text-theme-muted shrink-0 w-28 text-left" dir="ltr">{faDate(c.date)}</span>
+            </div>
+          ))}
+          {!commits.length && <div className="px-4 py-6 text-center text-sm text-theme-muted">کامیتی یافت نشد</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────
 export default function SettingsPage() {
   React.useEffect(() => { document.title = pageTitle("تنظیمات سامانه"); }, []);
@@ -407,6 +479,7 @@ export default function SettingsPage() {
     { id: "messaging", label: "پیام‌رسانی",     icon: MessageSquare },
     { id: "general",   label: "عمومی",          icon: Globe },
     { id: "database",  label: "پایگاه داده",    icon: Database },
+    { id: "version",   label: "نسخه",           icon: Tag },
   ];
 
   return (
@@ -439,6 +512,7 @@ export default function SettingsPage() {
           {tab === "messaging" && <MessagingTab />}
 
           {tab === "general" && <GeneralTab />}
+          {tab === "version" && <VersionTab />}
 
           {tab === "database" && (
             <div className="space-y-4">
