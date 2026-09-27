@@ -15,6 +15,17 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$REPO_ROOT"
 
+# Mutual exclusion — a manual run and a cron-triggered auto-update.sh run can
+# otherwise overlap (observed in practice: both hit `next build` at once and
+# one fails on the .next/lock file). Held for the lifetime of this process,
+# including across the re-exec below, since fd 200 isn't close-on-exec.
+LOCK_FILE="/tmp/arzesh-erp-update.lock"
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
+  echo "ERROR: another update.sh (or auto-update.sh) run is already in progress — exiting." >&2
+  exit 1
+fi
+
 # ── Colors ─────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; BLUE='\033[0;34m'
 YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
