@@ -239,6 +239,10 @@ export class CalcService {
 
     const { jYear, jMonth, jDay } = toJalaliParts(gregDate);
     const isWeekend = forcedOff || !sched.workDays.includes(dow);
+    // Company-wide remote-work day: no office schedule expectation, so
+    // punctuality windows don't apply even to someone who did punch in —
+    // showing up isn't required that day, so arrival time isn't "late".
+    const isRemoteWorkDay = holiday === HolidayType.REMOTE_WORK;
 
     // Resolve check-in / check-out, letting an override replace either side.
     let firstIn: Date | null = punches.length ? punches[0].punchAt : null;
@@ -322,6 +326,10 @@ export class CalcService {
       delayMinutes = 0;
       earlyLeaveMinutes = 0;
     }
+    if (isRemoteWorkDay) {
+      delayMinutes = 0;
+      earlyLeaveMinutes = 0;
+    }
 
     // ── Approved hourly leave ──────────────────────────────────────────
     // Above the group's maxDailyLeaveMinutes cap (default 3:30) ⇒ the whole
@@ -363,20 +371,20 @@ export class CalcService {
     // ── Status precedence ──────────────────────────────────────────────
     // A company remote-work day is deliberately NOT "holiday work": people
     // are expected to work (just without a punch we can see), so it must not
-    // zero delay/earlyLeave the way a real holiday does, must not dump
-    // worked time into holidayOvertimeMinutes at the 2x multiplier, and must
-    // not trigger deficit/absence — we simply have no visibility into hours
-    // worked remotely. Anyone who DOES punch in still earns regular overtime
-    // for hours past the requirement, same as a normal working day.
-    const isRemoteWorkDay = holiday === HolidayType.REMOTE_WORK;
+    // dump worked time into holidayOvertimeMinutes at the 2x multiplier, and
+    // must not trigger deficit/absence — we simply have no visibility into
+    // hours worked remotely. Anyone who DOES punch in still earns regular
+    // overtime for hours past the requirement, same as a normal working day,
+    // and gets their real status (PRESENT/LATE/...) rather than a blanket
+    // REMOTE_WORK label over genuine attendance.
     const holidayWork = (!!holiday && !isRemoteWorkDay) || isWeekend;
     if (override?.forceStatus) {
       status = override.forceStatus;
     } else if (forceLeaveFull) {
       status = AttendanceStatus.LEAVE;
-    } else if (isRemoteWorkDay) {
+    } else if (isRemoteWorkDay && !hasPunch) {
       status = AttendanceStatus.REMOTE_WORK;
-    } else if (holiday) {
+    } else if (holiday && !isRemoteWorkDay) {
       status = holiday === HolidayType.COMPANY ? AttendanceStatus.COMPANY_HOLIDAY : AttendanceStatus.HOLIDAY;
     } else if (isWeekend) {
       status = AttendanceStatus.WEEKEND;
@@ -390,14 +398,6 @@ export class CalcService {
       status = AttendanceStatus.EARLY_LEAVE;
     } else {
       status = AttendanceStatus.PRESENT;
-    }
-
-    // Remote-work day: no office schedule expectation, so punctuality doesn't
-    // apply either — but overtimeMinutes (computed above like a normal day)
-    // is intentionally left untouched, unlike the holiday branch below.
-    if (isRemoteWorkDay) {
-      delayMinutes = 0;
-      earlyLeaveMinutes = 0;
     }
 
     // On a holiday/weekend, punches count as holiday work.
@@ -418,15 +418,24 @@ export class CalcService {
     // days (the firstIn→lastOut span can't be trusted to represent the day — see
     // ambiguousPunches above; charging a deficit, and possibly auto-converting it to
     // leave, before a human has classified the day as leave/mission would silently
-    // spend real annual-leave balance on what might have been a work mission), and
-    // days still in progress (punched in but not yet out — workedMinutes is not final,
-    // so nothing must be finalized as deficit until check-out is recorded).
+    // spend real annual-leave balance on what might have been a work mission), days
+    // already resolved to a full-day LEAVE/MISSION/REMOTE_WORK status (whether by an
+    // admin/approved-request override, or forceLeaveFull above — the day is fully
+    // accounted for either way, so charging a leftover deficit on top is a
+    // double-count; forceLeaveFull already zeroes out via leaveMinutes=dailyMinutes,
+    // but a plain forceStatus override does NOT separately populate leaveMinutes, so
+    // this needs its own explicit check), and days still in progress (punched in but
+    // not yet out — workedMinutes is not final, so nothing must be finalized as
+    // deficit until check-out is recorded).
     // Formula: max(0, required - worked - approved_leave). Handles late, early, short, absent.
     // Minutes already paid out as overtime are excluded from "worked" here — otherwise
     // staying late would silently cancel out a late arrival (same minutes counted both
     // as paid overtime AND as covering the daily requirement), hiding real lateness.
+    const dayFullyAccountedFor = status === AttendanceStatus.LEAVE
+      || status === AttendanceStatus.MISSION
+      || status === AttendanceStatus.REMOTE_WORK;
     const workedTowardRequirement = Math.max(0, workedMinutes - overtimeMinutes);
-    let deficitMinutes = (!holidayWork && !isRemoteWorkDay && !ambiguousPunches && sched.employeeType === 'FULL_TIME' && (bothPunches || !hasPunch))
+    let deficitMinutes = (!holidayWork && !isRemoteWorkDay && !ambiguousPunches && !dayFullyAccountedFor && sched.employeeType === 'FULL_TIME' && (bothPunches || !hasPunch))
       ? Math.max(0, sched.dailyMinutes - workedTowardRequirement - leaveMinutes)
       : 0;
 
