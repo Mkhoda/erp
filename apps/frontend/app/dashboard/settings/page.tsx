@@ -4,9 +4,10 @@ import {
   SlidersHorizontal, Globe, Smartphone, Database,
   Save, MessageSquare, Eye, EyeOff, AlertCircle,
   Loader2, Shield, Clock, RefreshCw, Info, Send,
-  CheckCircle, XCircle, Tag, GitCommit,
+  CheckCircle, XCircle, Tag, GitCommit, Maximize2, CheckCircle2, History,
 } from "lucide-react";
 import { useToast } from "../../components/ui/Toast";
+import Modal from "../../components/ui/Modal";
 import { DEFAULT_SYSTEM_NAME, pageTitle, refreshSystemName } from "../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -396,12 +397,15 @@ function GeneralTab() {
   );
 }
 
+const faDate = (iso: string) => iso ? new Date(iso).toLocaleDateString("fa-IR", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+
 // ── Version Tab ───────────────────────────────────────────────────────
 function VersionTab() {
   const [info, setInfo] = React.useState<any>(null);
   const [commits, setCommits] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [selected, setSelected] = React.useState<any>(null);
 
   async function load() {
     setLoading(true); setError(null);
@@ -415,8 +419,6 @@ function VersionTab() {
     finally { setLoading(false); }
   }
   React.useEffect(() => { load(); }, []);
-
-  const faDate = (iso: string) => iso ? new Date(iso).toLocaleDateString("fa-IR", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
   if (loading) return <div className="flex items-center justify-center py-12 text-theme-muted"><RefreshCw className="w-5 h-5 animate-spin" /></div>;
   if (error) return <div className="flex items-center gap-2 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-600 text-sm"><AlertCircle className="w-4 h-4 shrink-0" />{error}</div>;
@@ -456,15 +458,64 @@ function VersionTab() {
           {commits.map(c => (
             <div key={c.hash} className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-theme-hover">
               <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-theme-secondary text-theme-muted shrink-0" dir="ltr">{c.shortHash}</span>
+              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 shrink-0 hidden md:inline" dir="ltr">v{c.version}</span>
               <span className="flex-1 min-w-0 truncate text-theme-primary" title={c.message}>{c.message}</span>
               <span className="text-xs text-theme-muted shrink-0 hidden sm:inline">{c.author}</span>
-              <span className="text-xs text-theme-muted shrink-0 w-28 text-left" dir="ltr">{faDate(c.date)}</span>
+              <span className="text-xs text-theme-muted shrink-0 w-24 text-left hidden sm:inline" dir="ltr">{faDate(c.date)}</span>
+              <button onClick={() => setSelected(c)} title="جزئیات بیشتر"
+                className="shrink-0 p-1.5 rounded-lg text-theme-muted hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors">
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
             </div>
           ))}
           {!commits.length && <div className="px-4 py-6 text-center text-sm text-theme-muted">کامیتی یافت نشد</div>}
         </div>
       </div>
+
+      <CommitDetailModal commit={selected} isDeployed={!!selected && !!info && selected.hash === info.commitHash} onClose={() => setSelected(null)} />
     </div>
+  );
+}
+
+// ── Commit detail modal ──────────────────────────────────────────────
+function CommitDetailModal({ commit, isDeployed, onClose }: { commit: any; isDeployed: boolean; onClose: () => void }) {
+  return (
+    <Modal open={!!commit} onClose={onClose} title="جزئیات کامیت" size="md">
+      {commit && (
+        <div className="space-y-4">
+          <div className={`flex items-center gap-2 p-3 rounded-xl text-sm border ${isDeployed
+            ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"
+            : "bg-theme-secondary border-theme text-theme-secondary"}`}>
+            {isDeployed ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <History className="w-4 h-4 shrink-0" />}
+            {isDeployed ? "نسخه در حال اجرا روی سرور — همین کامیت هم‌اکنون دیپلوی شده است" : "این کامیت قبلاً دیپلوی شده و با کامیت‌های بعدی جایگزین شده است"}
+          </div>
+
+          <div>
+            <p className="text-xs text-theme-muted mb-1">پیام کامیت</p>
+            <p className="text-sm text-theme-primary whitespace-pre-wrap leading-relaxed">{commit.message}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-theme-muted mb-1">نسخه</p>
+              <p className="text-sm font-mono text-theme-primary" dir="ltr">v{commit.version}</p>
+            </div>
+            <div>
+              <p className="text-xs text-theme-muted mb-1">هش کامل</p>
+              <p className="text-xs font-mono text-theme-primary break-all" dir="ltr">{commit.hash}</p>
+            </div>
+            <div>
+              <p className="text-xs text-theme-muted mb-1">نویسنده</p>
+              <p className="text-sm text-theme-primary">{commit.author}</p>
+            </div>
+            <div>
+              <p className="text-xs text-theme-muted mb-1">تاریخ</p>
+              <p className="text-sm text-theme-primary" dir="ltr">{faDate(commit.date)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 
