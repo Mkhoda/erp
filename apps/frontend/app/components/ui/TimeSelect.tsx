@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { createPortal } from "react-dom";
 
 interface Props {
   value: string;      // "HH:MM" or ""
@@ -234,7 +235,10 @@ export default function TimeSelect({ value, onChange, disabled, className = "inp
       </button>
 
       {/* ── Picker overlay ── */}
-      {open && (
+      {/* Rendered via portal so a backdrop-filter/transform ancestor (e.g. the
+          .bg-theme-card cards this is normally nested in) can't turn into the
+          containing block for this fixed-position overlay and confine it. */}
+      {open && createPortal(
         <div
           className="fixed inset-0 z-[10000] flex items-center justify-center"
           style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
@@ -361,7 +365,8 @@ export default function TimeSelect({ value, onChange, disabled, className = "inp
               <button onClick={confirm} className="px-4 py-2 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors">تأیید</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
