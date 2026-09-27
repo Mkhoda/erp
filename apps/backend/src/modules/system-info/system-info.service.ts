@@ -8,12 +8,19 @@ import { execFileSync } from 'child_process';
 // this works whether the process cwd is the repo root (prod, pm2) or
 // apps/backend (dev, ts-node-dev).
 //
-// "Version" is a synthetic build number, not semver: 1.0.0.<N> where N is
-// the commit's 0-based position in HEAD's history (git rev-list --count),
-// so it increments by exactly 1 per commit starting from 1.0.0.0 at the
-// repo's very first commit. This assumes a linear history (no merge
-// commits) — true for this repo's workflow so far; a merge would make the
-// per-row numbers in getCommits() approximate rather than exact.
+// "Version" is a synthetic build number, not semver: major.minor.patch.build,
+// derived from N = the commit's 0-based position in HEAD's history
+// (git rev-list --count). It's a mixed-radix odometer, each segment rolling
+// into the next once it fills up: build wraps every 16 (-> patch +1), patch
+// wraps every 32 of its own ticks (-> minor +1, i.e. every 16*32=512 raw
+// commits), minor wraps every 64 of its own ticks (-> major +1, i.e. every
+// 16*32*64=32768 raw commits). Major starts at 1. This assumes a linear
+// history (no merge commits) — true for this repo's workflow so far; a
+// merge would make the per-row numbers in getCommits() approximate.
+const BUILD_RADIX = 16;
+const PATCH_RADIX = 32;
+const MINOR_RADIX = 64;
+
 @Injectable()
 export class SystemInfoService {
   private git(args: string[]): string {
@@ -21,7 +28,14 @@ export class SystemInfoService {
   }
 
   private buildVersion(commitIndexFromHead: number, totalCount: number): string {
-    return `1.0.0.${Math.max(0, totalCount - 1 - commitIndexFromHead)}`;
+    const n = Math.max(0, totalCount - 1 - commitIndexFromHead);
+    const build = n % BUILD_RADIX;
+    const afterBuild = Math.floor(n / BUILD_RADIX);
+    const patch = afterBuild % PATCH_RADIX;
+    const afterPatch = Math.floor(afterBuild / PATCH_RADIX);
+    const minor = afterPatch % MINOR_RADIX;
+    const major = 1 + Math.floor(afterPatch / MINOR_RADIX);
+    return `${major}.${minor}.${patch}.${build}`;
   }
 
   getVersion() {
