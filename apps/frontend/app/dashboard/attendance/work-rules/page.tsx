@@ -34,7 +34,10 @@ const NEW_DEFAULTS = {
   flexEnabled: false, flexInStart: "07:30", flexInEnd: "09:00", graceMinutes: 0,
   otMinThreshold: 30, otRounding: 15, otMaxDaily: 240, otMaxMonthly: 3600, annualLeaveDays: 26,
   deficitToLeaveEnabled: true, absentToLeaveEnabled: true,
+  maxDailyLeaveEnabled: true, maxDailyLeaveMinutes: 210,
 };
+const minToHHMM = (m: number) => `${String(Math.floor((m || 0) / 60)).padStart(2, "0")}:${String((m || 0) % 60).padStart(2, "0")}`;
+const hhmmToMin = (v: string) => { const [hh, mm] = (v || "0:0").split(":").map(Number); return (hh || 0) * 60 + (mm || 0); };
 
 // ── Jalali ↔ Gregorian (jdf algorithm) ─────────────────────────────────────
 function toJalali(gy0: number, gm: number, gd: number) {
@@ -301,6 +304,21 @@ export default function WorkRulesPage() {
                 <input type="checkbox" checked={!!form.absentToLeaveEnabled} onChange={e => setF("absentToLeaveEnabled", e.target.checked)} />
                 روزهای غیبت به‌صورت خودکار به مرخصی روزانه تبدیل شوند (در صورت کافی بودن مانده مرخصی)
               </label>
+            </div>
+          </Section>
+          <Section title="سقف مرخصی ساعتی روزانه" icon={Timer}>
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-sm text-theme-primary">
+                <input type="checkbox" checked={!!form.maxDailyLeaveEnabled} onChange={e => setF("maxDailyLeaveEnabled", e.target.checked)} />
+                برای مرخصی ساعتی روزانه سقف در نظر گرفته شود
+              </label>
+              {form.maxDailyLeaveEnabled && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="حداکثر مرخصی ساعتی در روز" hint="بیشتر از این = مرخصی کامل روزانه + ساعات حضور به‌صورت اضافه‌کار">
+                    <TimeSelect className={inputCls} value={minToHHMM(form.maxDailyLeaveMinutes)} onChange={v => setF("maxDailyLeaveMinutes", hhmmToMin(v))} />
+                  </Field>
+                </div>
+              )}
             </div>
           </Section>
           <div className="flex items-center justify-between gap-3">

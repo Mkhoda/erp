@@ -729,6 +729,8 @@ model WorkSchedule {
   annualLeaveDays Int     @default(26)                 // yearly paid-leave entitlement (days)
   deficitToLeaveEnabled Boolean @default(true)          // auto-cover daily shortfall from the hourly-leave balance
   absentToLeaveEnabled  Boolean @default(true)          // auto-convert an ABSENT day to LEAVE when annual balance allows
+  maxDailyLeaveEnabled  Boolean @default(true)          // cap hourly leave granted in a single day
+  maxDailyLeaveMinutes  Int     @default(210) @map("hourlyLeaveCapMinutes") // above this (3:30) the day becomes full LEAVE + worked time → overtime; reuses a pre-existing unused DB column
   userRules      UserAttendanceRule[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

@@ -39,6 +39,12 @@ export interface EffectiveSchedule {
   annualLeaveDays: number;
   deficitToLeaveEnabled: boolean;
   absentToLeaveEnabled: boolean;
+  // Hourly leave granted for a single day beyond this cap forces the whole day
+  // to LEAVE and converts any actually-worked time to overtime (see the
+  // "Approved hourly leave" block in computeDay()). When disabled, granted
+  // leave of any size is always treated as partial (no cap).
+  maxDailyLeaveEnabled: boolean;
+  maxDailyLeaveMinutes: number;
 }
 
 // Hardcoded fallback matching the WorkSchedule schema defaults — used when no
@@ -64,6 +70,8 @@ const DEFAULTS: EffectiveSchedule = {
   annualLeaveDays: 26,
   deficitToLeaveEnabled: true,
   absentToLeaveEnabled: true,
+  maxDailyLeaveEnabled: true,
+  maxDailyLeaveMinutes: 210,   // 3:30
 };
 
 @Injectable()
@@ -103,6 +111,8 @@ export class CalcService {
       s.annualLeaveDays = base.annualLeaveDays;
       s.deficitToLeaveEnabled = base.deficitToLeaveEnabled;
       s.absentToLeaveEnabled = base.absentToLeaveEnabled;
+      s.maxDailyLeaveEnabled = base.maxDailyLeaveEnabled;
+      s.maxDailyLeaveMinutes = base.maxDailyLeaveMinutes;
     }
     if (rule) {
       s.employeeType = rule.employeeType as 'FULL_TIME' | 'HOURLY';
@@ -311,12 +321,14 @@ export class CalcService {
     }
 
     // ── Approved hourly leave ──────────────────────────────────────────
-    // > 3h of leave in a day ⇒ the whole day is leave and any present time
-    // becomes overtime. ≤ 3h ⇒ partial leave that counts toward the required
-    // hours (so it can produce overtime and excuses the shortfall).
+    // Above the group's maxDailyLeaveMinutes cap (default 3:30) ⇒ the whole
+    // day is leave and any present time becomes overtime. At/below the cap
+    // ⇒ partial leave that counts toward the required hours (so it can
+    // produce overtime and excuses the shortfall). When the cap is disabled
+    // for the group, granted leave is always treated as partial.
     const grantedLeave = override?.leaveMinutes ?? 0;
     if (grantedLeave > 0) {
-      if (grantedLeave > 180) {
+      if (sched.maxDailyLeaveEnabled && grantedLeave > sched.maxDailyLeaveMinutes) {
         forceLeaveFull = true;
         leaveMinutes = sched.dailyMinutes;
         delayMinutes = 0;

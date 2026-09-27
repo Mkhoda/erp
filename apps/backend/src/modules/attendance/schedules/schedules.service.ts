@@ -27,6 +27,7 @@ export class SchedulesService {
   private readonly INT = [
     'dailyMinutes', 'weeklyMinutes', 'lunchMinutes', 'graceMinutes',
     'otMinThreshold', 'otMaxDaily', 'otMaxMonthly', 'otRounding', 'annualLeaveDays',
+    'maxDailyLeaveMinutes',
   ];
 
   private mapFields(dto: any) {
@@ -36,6 +37,7 @@ export class SchedulesService {
     if ('flexEnabled' in dto) data.flexEnabled = !!dto.flexEnabled;
     if ('deficitToLeaveEnabled' in dto) data.deficitToLeaveEnabled = !!dto.deficitToLeaveEnabled;
     if ('absentToLeaveEnabled' in dto) data.absentToLeaveEnabled = !!dto.absentToLeaveEnabled;
+    if ('maxDailyLeaveEnabled' in dto) data.maxDailyLeaveEnabled = !!dto.maxDailyLeaveEnabled;
     if (Array.isArray(dto.workDays)) data.workDays = dto.workDays.map((d: any) => +d).filter((d: number) => d >= 0 && d <= 6);
     return data;
   }
