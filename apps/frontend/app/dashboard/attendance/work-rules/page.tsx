@@ -26,8 +26,9 @@ const HOLIDAY_TYPES: Array<{ k: string; fa: string; color: string }> = [
   { k: "OFFICIAL", fa: "رسمی", color: "#ef4444" },
   { k: "COMPANY", fa: "شرکتی", color: "#a855f7" },
   { k: "CALENDAR", fa: "تقویمی", color: "#f97316" },
+  { k: "REMOTE_WORK", fa: "دورکاری شرکتی", color: "#0ea5e9" },
 ];
-const TYPE_FA: Record<string, string> = { OFFICIAL: "رسمی", COMPANY: "شرکتی", CALENDAR: "تقویمی", HALF_DAY: "نیم‌روز" };
+const TYPE_FA: Record<string, string> = { OFFICIAL: "رسمی", COMPANY: "شرکتی", CALENDAR: "تقویمی", HALF_DAY: "نیم‌روز", REMOTE_WORK: "دورکاری شرکتی" };
 const NEW_DEFAULTS = {
   name: "", isDefault: false, dailyMinutes: 500, lunchMinutes: 0,
   checkInStart: "06:30", checkInEnd: "09:00", checkOutStart: "14:50", checkOutEnd: "17:20", workDays: [6, 0, 1, 2, 3],

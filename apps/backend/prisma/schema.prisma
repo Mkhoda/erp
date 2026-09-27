@@ -508,6 +508,7 @@ enum HolidayType {
   COMPANY
   HALF_DAY
   CALENDAR
+  REMOTE_WORK // company-wide remote-work day: no deficit/absence tracking (no visibility into hours worked remotely), but anyone who does punch in still earns regular overtime for hours worked past the requirement
 }
 
 enum ShiftType {

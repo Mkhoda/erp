@@ -4,7 +4,7 @@ import { Loader2, CalendarOff, Plus, Trash2 } from "lucide-react";
 import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
-const TYPE_FA: Record<string, string> = { OFFICIAL: "تعطیل رسمی", COMPANY: "تعطیل شرکت", HALF_DAY: "نیم‌روز" };
+const TYPE_FA: Record<string, string> = { OFFICIAL: "تعطیل رسمی", COMPANY: "تعطیل شرکت", HALF_DAY: "نیم‌روز", REMOTE_WORK: "دورکاری شرکتی" };
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone: "UTC" });
 
 export default function HolidaysPage() {
