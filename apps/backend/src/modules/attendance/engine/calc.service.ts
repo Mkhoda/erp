@@ -414,15 +414,19 @@ export class CalcService {
     }
 
     // Net deficit: hours short of required. Zero for HOURLY staff, holidays, weekends,
-    // remote-work days (no visibility into hours worked off-site), and days still in
-    // progress (punched in but not yet out — workedMinutes is not final, so nothing
-    // must be finalized as deficit until check-out is recorded).
+    // remote-work days (no visibility into hours worked off-site), ambiguous multi-punch
+    // days (the firstIn→lastOut span can't be trusted to represent the day — see
+    // ambiguousPunches above; charging a deficit, and possibly auto-converting it to
+    // leave, before a human has classified the day as leave/mission would silently
+    // spend real annual-leave balance on what might have been a work mission), and
+    // days still in progress (punched in but not yet out — workedMinutes is not final,
+    // so nothing must be finalized as deficit until check-out is recorded).
     // Formula: max(0, required - worked - approved_leave). Handles late, early, short, absent.
     // Minutes already paid out as overtime are excluded from "worked" here — otherwise
     // staying late would silently cancel out a late arrival (same minutes counted both
     // as paid overtime AND as covering the daily requirement), hiding real lateness.
     const workedTowardRequirement = Math.max(0, workedMinutes - overtimeMinutes);
-    let deficitMinutes = (!holidayWork && !isRemoteWorkDay && sched.employeeType === 'FULL_TIME' && (bothPunches || !hasPunch))
+    let deficitMinutes = (!holidayWork && !isRemoteWorkDay && !ambiguousPunches && sched.employeeType === 'FULL_TIME' && (bothPunches || !hasPunch))
       ? Math.max(0, sched.dailyMinutes - workedTowardRequirement - leaveMinutes)
       : 0;
 

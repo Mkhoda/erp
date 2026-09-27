@@ -558,7 +558,17 @@ export default function MyAttendancePage() {
         )}
       </Modal>
 
-      <DayDetailModal open={!!detail} onClose={() => setDetail(null)} detail={detail} />
+      <DayDetailModal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        detail={detail}
+        onRequestKind={(kind) => {
+          const row = detail.row;
+          setDetail(null);
+          setReqForm((s: any) => ({ ...s, kind }));
+          setModal({ row });
+        }}
+      />
     </div>
   );
 }
