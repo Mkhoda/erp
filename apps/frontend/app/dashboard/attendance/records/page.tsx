@@ -3,6 +3,7 @@ import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
   FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, ScrollText, Filter,
+  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon, Maximize2,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
@@ -311,19 +312,19 @@ export default function AttendanceRecordsPage() {
         />
       </div>
 
-      {/* Summary — click a card to see which days/hours make up that total */}
+      {/* Summary — click a card (or its icon) to see which days/hours make up that total */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-          <SumCard label="روزهای دارای داده" value={faNum(summary.distinctDays ?? summary.days)} onClick={() => setBreakdown("distinctDays")} />
-          <SumCard label="کارکرد" value={fmtMin(summary.workedMinutes)} onClick={() => setBreakdown("workedMinutes")} />
-          <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" onClick={() => setBreakdown("delayMinutes")} />
-          <SumCard label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" onClick={() => setBreakdown("earlyLeaveMinutes")} />
-          <SumCard label="کسری" value={fmtMin(summary.deficitMinutes || 0)} cls="text-orange-600" onClick={() => setBreakdown("deficitMinutes")} />
-          <SumCard label="مرخصی ساعتی" value={fmtMin(summary.hourlyLeaveMinutes || 0)} cls="text-blue-600" onClick={() => setBreakdown("hourlyLeaveMinutes")} />
-          <SumCard label="مرخصی روزانه" value={`${faNum(summary.leaveDays || 0)} روز`} cls="text-blue-600" onClick={() => setBreakdown("leaveDays")} />
-          <SumCard label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" onClick={() => setBreakdown("overtimeMinutes")} />
-          <SumCard label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" onClick={() => setBreakdown("holidayOvertimeMinutes")} />
-          <SumCard label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" onClick={() => setBreakdown("nightMinutes")} />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
+          <SumCard label="روزهای دارای داده" value={faNum(summary.distinctDays ?? summary.days)} icon={CalendarDays} iconCls="bg-sky-500/10 text-sky-600" onClick={() => setBreakdown("distinctDays")} />
+          <SumCard label="کارکرد" value={fmtMin(summary.workedMinutes)} icon={Fingerprint} iconCls="bg-emerald-500/10 text-emerald-600" onClick={() => setBreakdown("workedMinutes")} />
+          <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" icon={AlarmClock} iconCls="bg-amber-500/10 text-amber-600" onClick={() => setBreakdown("delayMinutes")} />
+          <SumCard label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" icon={LogOut} iconCls="bg-yellow-500/10 text-yellow-600" onClick={() => setBreakdown("earlyLeaveMinutes")} />
+          <SumCard label="کسری" value={fmtMin(summary.deficitMinutes || 0)} cls="text-orange-600" icon={TrendingDown} iconCls="bg-orange-500/10 text-orange-600" onClick={() => setBreakdown("deficitMinutes")} />
+          <SumCard label="مرخصی ساعتی" value={fmtMin(summary.hourlyLeaveMinutes || 0)} cls="text-blue-600" icon={Hourglass} iconCls="bg-blue-500/10 text-blue-600" onClick={() => setBreakdown("hourlyLeaveMinutes")} />
+          <SumCard label="مرخصی روزانه" value={`${faNum(summary.leaveDays || 0)} روز`} cls="text-blue-600" icon={CalendarCheck} iconCls="bg-blue-500/10 text-blue-600" onClick={() => setBreakdown("leaveDays")} />
+          <SumCard label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" icon={TrendingUp} iconCls="bg-violet-500/10 text-violet-600" onClick={() => setBreakdown("overtimeMinutes")} />
+          <SumCard label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" icon={CalendarOff} iconCls="bg-rose-500/10 text-rose-600" onClick={() => setBreakdown("holidayOvertimeMinutes")} />
+          <SumCard label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" icon={Moon} iconCls="bg-slate-500/10 text-slate-600" onClick={() => setBreakdown("nightMinutes")} />
         </div>
       )}
 
@@ -543,13 +544,25 @@ function RulesPanel({ rules: r }: { rules: any }) {
   );
 }
 
-function SumCard({ label, value, cls, onClick }: { label: string; value: string; cls?: string; onClick?: () => void }) {
+function SumCard({ label, value, cls, icon: Icon, iconCls, onClick }: { label: string; value: string; cls?: string; icon: any; iconCls: string; onClick?: () => void }) {
   return (
-    <button type="button" onClick={onClick}
-      className="bg-theme-card border border-theme rounded-xl p-3 text-center hover:border-blue-400 hover:bg-theme-hover transition-colors text-right w-full">
-      <div className={`text-lg font-bold ${cls || "text-theme-primary"}`} dir="ltr">{value}</div>
-      <div className="text-[11px] text-theme-muted">{label}</div>
-    </button>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick?.(); } }}
+      className="group relative bg-theme-card border border-theme rounded-2xl p-3.5 text-right cursor-pointer hover:border-blue-400/50 hover:shadow-theme-lg transition-all"
+    >
+      <div className="flex items-start justify-between mb-2.5">
+        <button type="button" onClick={e => { e.stopPropagation(); onClick?.(); }} title={`مشاهده جزئیات ${label}`}
+          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${iconCls}`}>
+          <Icon className="w-5 h-5" />
+        </button>
+        <Maximize2 className="w-3.5 h-3.5 text-theme-muted/40 group-hover:text-blue-500 transition-colors mt-1.5" />
+      </div>
+      <div className={`text-2xl font-extrabold leading-none tracking-tight ${cls || "text-theme-primary"}`} dir="ltr">{value}</div>
+      <div className="text-[11px] text-theme-muted mt-1.5">{label}</div>
+    </div>
   );
 }
 
