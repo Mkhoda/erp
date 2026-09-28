@@ -2,7 +2,7 @@
 import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
-  FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, ScrollText,
+  FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, ScrollText, Filter,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
@@ -28,6 +28,26 @@ function liveStatus(r: any): string {
   if (r.status === "INCOMPLETE" && r.firstCheckIn && !r.lastCheckOut && r.gregDate?.slice(0, 10) === TODAY_ISO) return "WORKING";
   return r.status;
 }
+
+// Drill-down spec for each summary card: which rows contributed to that sum,
+// and what to show as the "value" column in the breakdown modal. Mirrors the
+// exact same filters the backend's summary() aggregate uses (e.g. hourly
+// leave = leaveMinutes on non-full-leave days) so the modal total matches
+// the card.
+type MetricKey = "distinctDays" | "workedMinutes" | "delayMinutes" | "earlyLeaveMinutes" | "deficitMinutes"
+  | "hourlyLeaveMinutes" | "leaveDays" | "overtimeMinutes" | "holidayOvertimeMinutes" | "nightMinutes";
+const METRICS: Record<MetricKey, { label: string; valueLabel: string; matches: (r: any) => boolean; value: (r: any) => number; unit: "min" | "day" }> = {
+  distinctDays: { label: "روزهای دارای داده", valueLabel: "کارکرد", matches: () => true, value: (r) => r.workedMinutes || 0, unit: "min" },
+  workedMinutes: { label: "کارکرد", valueLabel: "کارکرد", matches: (r) => (r.workedMinutes || 0) > 0, value: (r) => r.workedMinutes || 0, unit: "min" },
+  delayMinutes: { label: "تاخیر", valueLabel: "تاخیر", matches: (r) => (r.delayMinutes || 0) > 0, value: (r) => r.delayMinutes || 0, unit: "min" },
+  earlyLeaveMinutes: { label: "تعجیل", valueLabel: "تعجیل", matches: (r) => (r.earlyLeaveMinutes || 0) > 0, value: (r) => r.earlyLeaveMinutes || 0, unit: "min" },
+  deficitMinutes: { label: "کسری", valueLabel: "کسری", matches: (r) => (r.deficitMinutes || 0) > 0, value: (r) => r.deficitMinutes || 0, unit: "min" },
+  hourlyLeaveMinutes: { label: "مرخصی ساعتی", valueLabel: "مرخصی", matches: (r) => (r.leaveMinutes || 0) > 0 && r.status !== "LEAVE", value: (r) => r.leaveMinutes || 0, unit: "min" },
+  leaveDays: { label: "مرخصی روزانه", valueLabel: "مرخصی", matches: (r) => r.status === "LEAVE", value: (r) => r.leaveMinutes || 0, unit: "day" },
+  overtimeMinutes: { label: "اضافه‌کار عادی", valueLabel: "اضافه‌کار", matches: (r) => (r.overtimeMinutes || 0) > 0, value: (r) => r.overtimeMinutes || 0, unit: "min" },
+  holidayOvertimeMinutes: { label: "تعطیل‌کاری", valueLabel: "تعطیل‌کاری", matches: (r) => (r.holidayOvertimeMinutes || 0) > 0, value: (r) => r.holidayOvertimeMinutes || 0, unit: "min" },
+  nightMinutes: { label: "شب‌کاری", valueLabel: "شب‌کاری", matches: (r) => (r.nightMinutes || 0) > 0, value: (r) => r.nightMinutes || 0, unit: "min" },
+};
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 const fmtDH = (days: number) => { const d = Math.floor(days); const h = Math.round((days - d) * 8); return h > 0 ? `${faNum(d)} روز و ${faNum(h)} ساعت` : `${faNum(d)} روز`; };
 const faY = (n: number) => (n ?? 0).toLocaleString("fa-IR", { useGrouping: false }); // years: no thousands separator
@@ -66,6 +86,7 @@ export default function AttendanceRecordsPage() {
   const [rules, setRules] = React.useState<any>(null);
   const [rulesOpen, setRulesOpen] = React.useState(false);
   const [rulesLoading, setRulesLoading] = React.useState(false);
+  const [breakdown, setBreakdown] = React.useState<MetricKey | null>(null);
   // Pagination
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
@@ -189,6 +210,43 @@ export default function AttendanceRecordsPage() {
     return rows;
   }, [rows, status]);
 
+  // ── Column sort (client-side, applied after the status split above) ──
+  const [sortK, setSortK] = React.useState<string | null>(null);
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
+  function thSort(k: string) {
+    if (sortK === k) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortK(k); setSortDir("asc"); }
+  }
+  const arrow = (k: string) => sortK === k ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+  const sortValue = React.useCallback((r: any, k: string): string | number => {
+    switch (k) {
+      case "name": return r.user ? `${r.user.firstName || ""} ${r.user.lastName || ""}` : "";
+      case "card": return r.user?.attendanceCardNo || "";
+      case "dept": return r.user?.department?.name || "";
+      case "date": return r.gregDate || "";
+      case "in": return r.firstCheckIn || "";
+      case "out": return r.lastCheckOut || "";
+      case "worked": return r.workedMinutes || 0;
+      case "delay": return r.delayMinutes || 0;
+      case "early": return r.earlyLeaveMinutes || 0;
+      case "deficit": return r.deficitMinutes || 0;
+      case "leave": return r.leaveMinutes || 0;
+      case "ot": return r.overtimeMinutes || 0;
+      case "holidayOt": return r.holidayOvertimeMinutes || 0;
+      case "status": return STATUS_FA[liveStatus(r)] || r.status || "";
+      default: return 0;
+    }
+  }, []);
+  const sortedRows = React.useMemo(() => {
+    if (!sortK) return displayRows;
+    const sorted = [...displayRows].sort((a, b) => {
+      const va = sortValue(a, sortK), vb = sortValue(b, sortK);
+      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "fa");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [displayRows, sortK, sortDir, sortValue]);
+
   const personOptions = users.map((u: any) => ({
     id: u.id,
     name: `${u.firstName} ${u.lastName}${u.attendanceCardNo ? ` (${u.attendanceCardNo})` : ""}`,
@@ -253,19 +311,19 @@ export default function AttendanceRecordsPage() {
         />
       </div>
 
-      {/* Summary */}
+      {/* Summary — click a card to see which days/hours make up that total */}
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-          <SumCard label="روزهای دارای داده" value={faNum(summary.distinctDays ?? summary.days)} />
-          <SumCard label="کارکرد" value={fmtMin(summary.workedMinutes)} />
-          <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
-          <SumCard label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" />
-          <SumCard label="کسری" value={fmtMin(summary.deficitMinutes || 0)} cls="text-orange-600" />
-          <SumCard label="مرخصی ساعتی" value={fmtMin(summary.hourlyLeaveMinutes || 0)} cls="text-blue-600" />
-          <SumCard label="مرخصی روزانه" value={`${faNum(summary.leaveDays || 0)} روز`} cls="text-blue-600" />
-          <SumCard label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
-          <SumCard label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" />
-          <SumCard label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" />
+          <SumCard label="روزهای دارای داده" value={faNum(summary.distinctDays ?? summary.days)} onClick={() => setBreakdown("distinctDays")} />
+          <SumCard label="کارکرد" value={fmtMin(summary.workedMinutes)} onClick={() => setBreakdown("workedMinutes")} />
+          <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" onClick={() => setBreakdown("delayMinutes")} />
+          <SumCard label="تعجیل" value={fmtMin(summary.earlyLeaveMinutes)} cls="text-yellow-600" onClick={() => setBreakdown("earlyLeaveMinutes")} />
+          <SumCard label="کسری" value={fmtMin(summary.deficitMinutes || 0)} cls="text-orange-600" onClick={() => setBreakdown("deficitMinutes")} />
+          <SumCard label="مرخصی ساعتی" value={fmtMin(summary.hourlyLeaveMinutes || 0)} cls="text-blue-600" onClick={() => setBreakdown("hourlyLeaveMinutes")} />
+          <SumCard label="مرخصی روزانه" value={`${faNum(summary.leaveDays || 0)} روز`} cls="text-blue-600" onClick={() => setBreakdown("leaveDays")} />
+          <SumCard label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" onClick={() => setBreakdown("overtimeMinutes")} />
+          <SumCard label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" onClick={() => setBreakdown("holidayOvertimeMinutes")} />
+          <SumCard label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" onClick={() => setBreakdown("nightMinutes")} />
         </div>
       )}
 
@@ -308,17 +366,27 @@ export default function AttendanceRecordsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-center">
               <thead><tr className="text-theme-muted text-center border-b border-theme bg-theme-secondary/30">
-                <th className="py-2 px-2 font-medium">#</th><th className="font-medium px-2">نام</th>
-                <th className="font-medium px-2">کد کارت</th><th className="font-medium px-2">دپارتمان</th>
-                <th className="font-medium px-2">تاریخ</th><th className="font-medium px-2">ورود</th><th className="font-medium px-2">خروج</th>
-                <th className="font-medium px-2">کارکرد</th><th className="font-medium px-2">تاخیر</th><th className="font-medium px-2">تعجیل</th>
-                <th className="font-medium px-2">کسری</th><th className="font-medium px-2">مرخصی</th><th className="font-medium px-2">اضافه‌کار</th><th className="font-medium px-2">تعطیل‌کاری</th>
-                <th className="font-medium px-2">وضعیت</th><th className="font-medium px-2">جزئیات</th>
+                <th className="py-2 px-2 font-medium">#</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("name")}>نام{arrow("name")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("card")}>کد کارت{arrow("card")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("dept")}>دپارتمان{arrow("dept")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("date")}>تاریخ{arrow("date")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("in")}>ورود{arrow("in")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("out")}>خروج{arrow("out")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("worked")}>کارکرد{arrow("worked")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("delay")}>تاخیر{arrow("delay")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("early")}>تعجیل{arrow("early")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("deficit")}>کسری{arrow("deficit")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("leave")}>مرخصی{arrow("leave")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("ot")}>اضافه‌کار{arrow("ot")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("holidayOt")}>تعطیل‌کاری{arrow("holidayOt")}</th>
+                <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("status")}>وضعیت{arrow("status")}</th>
+                <th className="font-medium px-2">عملیات</th>
               </tr></thead>
               <tbody>
-                {displayRows.length === 0 ? (
+                {sortedRows.length === 0 ? (
                   <tr><td colSpan={16} className="py-10 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
-                ) : displayRows.slice((page-1)*pageSize, page*pageSize).map((r, i) => (
+                ) : sortedRows.slice((page-1)*pageSize, page*pageSize).map((r, i) => (
                   <tr key={r.id} className="border-b border-theme/40 hover:bg-theme-hover">
                     <td className="py-1.5 px-2 text-theme-muted">{faNum((page-1)*pageSize + i + 1)}</td>
                     <td className="px-2 text-theme-primary whitespace-nowrap">{r.user ? `${r.user.firstName} ${r.user.lastName}` : "—"}</td>
@@ -339,10 +407,16 @@ export default function AttendanceRecordsPage() {
                     <td className="px-2 text-rose-600" dir="ltr">{r.holidayOvertimeMinutes ? fmtMin(r.holidayOvertimeMinutes) : "—"}</td>
                     <td className="px-2"><span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[liveStatus(r)] || "bg-theme-secondary"}`}>{STATUS_FA[liveStatus(r)] || r.status}</span></td>
                     <td className="px-2">
-                      <button onClick={() => openDetail(r)} title="مشاهده جزئیات و پانچ‌ها"
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors">
-                        <Eye className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => openDetail(r)} title="مشاهده جزئیات و پانچ‌ها"
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setUserId(r.userId)} title={`فیلتر بر اساس ${r.user ? `${r.user.firstName} ${r.user.lastName}` : "این کاربر"}`}
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-theme-muted hover:bg-blue-500/10 hover:text-blue-500 transition-colors">
+                          <Filter className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -379,6 +453,8 @@ export default function AttendanceRecordsPage() {
         onSaveOverride={saveOverride}
         ovSaving={ovSaving}
       />
+
+      <BreakdownModal metricKey={breakdown} rows={rows} onClose={() => setBreakdown(null)} />
 
       {/* Work-rules info panel — generated live from the effective schedule, never hardcoded */}
       <Modal
@@ -467,11 +543,90 @@ function RulesPanel({ rules: r }: { rules: any }) {
   );
 }
 
-function SumCard({ label, value, cls }: { label: string; value: string; cls?: string }) {
+function SumCard({ label, value, cls, onClick }: { label: string; value: string; cls?: string; onClick?: () => void }) {
   return (
-    <div className="bg-theme-card border border-theme rounded-xl p-3 text-center">
+    <button type="button" onClick={onClick}
+      className="bg-theme-card border border-theme rounded-xl p-3 text-center hover:border-blue-400 hover:bg-theme-hover transition-colors text-right w-full">
       <div className={`text-lg font-bold ${cls || "text-theme-primary"}`} dir="ltr">{value}</div>
       <div className="text-[11px] text-theme-muted">{label}</div>
-    </div>
+    </button>
+  );
+}
+
+// Drill-down modal for a summary card — every row that contributed to that
+// total, sortable on any column (mirrors the main table's sort pattern).
+function BreakdownModal({ metricKey, rows, onClose }: { metricKey: MetricKey | null; rows: any[]; onClose: () => void }) {
+  const [sk, setSk] = React.useState<string | null>(null);
+  const [sd, setSd] = React.useState<"asc" | "desc">("asc");
+  function thSort(k: string) {
+    if (sk === k) setSd(d => d === "asc" ? "desc" : "asc");
+    else { setSk(k); setSd("asc"); }
+  }
+  const arrow = (k: string) => sk === k ? (sd === "asc" ? " ↑" : " ↓") : "";
+  React.useEffect(() => { setSk(null); setSd("asc"); }, [metricKey]);
+
+  const spec = metricKey ? METRICS[metricKey] : null;
+  const matched = React.useMemo(() => spec ? rows.filter(spec.matches) : [], [spec, rows]);
+  const sorted = React.useMemo(() => {
+    if (!spec) return [];
+    const val = (r: any, k: string): string | number => {
+      switch (k) {
+        case "name": return r.user ? `${r.user.firstName || ""} ${r.user.lastName || ""}` : "";
+        case "dept": return r.user?.department?.name || "";
+        case "date": return r.gregDate || "";
+        case "in": return r.firstCheckIn || "";
+        case "out": return r.lastCheckOut || "";
+        case "value": return spec.value(r);
+        case "status": return STATUS_FA[liveStatus(r)] || r.status || "";
+        default: return 0;
+      }
+    };
+    if (!sk) return matched;
+    return [...matched].sort((a, b) => {
+      const va = val(a, sk), vb = val(b, sk);
+      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "fa");
+      return sd === "asc" ? cmp : -cmp;
+    });
+  }, [matched, sk, sd, spec]);
+
+  const totalMinutes = matched.reduce((s, r) => s + (spec ? spec.value(r) : 0), 0);
+
+  return (
+    <Modal open={!!metricKey} onClose={onClose} title={spec ? spec.label : ""}
+      subtitle={spec ? `${faNum(matched.length)} رکورد${spec.unit === "min" ? ` — مجموع ${fmtMin(totalMinutes)}` : ""}` : undefined}
+      size="lg" footer={<button onClick={onClose} className="btn-theme-secondary text-sm">بستن</button>}>
+      {spec && (
+        <div className="overflow-x-auto -mx-1">
+          <table className="w-full text-sm text-center">
+            <thead><tr className="text-theme-muted text-center border-b border-theme">
+              <th className="py-2 px-2 font-medium">#</th>
+              <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("name")}>نام{arrow("name")}</th>
+              <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("dept")}>دپارتمان{arrow("dept")}</th>
+              <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("date")}>تاریخ{arrow("date")}</th>
+              <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("in")}>ورود{arrow("in")}</th>
+              <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("out")}>خروج{arrow("out")}</th>
+              <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("value")}>{spec.valueLabel}{arrow("value")}</th>
+              <th className="font-medium px-2 cursor-pointer hover:text-theme-primary" onClick={() => thSort("status")}>وضعیت{arrow("status")}</th>
+            </tr></thead>
+            <tbody>
+              {sorted.length === 0 ? (
+                <tr><td colSpan={8} className="py-8 text-center text-theme-muted">رکوردی یافت نشد</td></tr>
+              ) : sorted.map((r, i) => (
+                <tr key={r.id} className="border-b border-theme/40 hover:bg-theme-hover">
+                  <td className="py-1.5 px-2 text-theme-muted">{faNum(i + 1)}</td>
+                  <td className="px-2 text-theme-primary whitespace-nowrap">{r.user ? `${r.user.firstName} ${r.user.lastName}` : "—"}</td>
+                  <td className="px-2 text-theme-muted whitespace-nowrap">{r.user?.department?.name || "—"}</td>
+                  <td className="px-2 text-theme-muted" dir="ltr">{faDate(r.gregDate)}</td>
+                  <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.firstCheckIn)}</td>
+                  <td className="px-2 text-theme-primary" dir="ltr">{faTime(r.lastCheckOut)}</td>
+                  <td className="px-2 font-medium text-theme-primary" dir="ltr">{spec.unit === "day" ? "روز کامل" : fmtMin(spec.value(r))}</td>
+                  <td className="px-2"><span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[liveStatus(r)] || "bg-theme-secondary"}`}>{STATUS_FA[liveStatus(r)] || r.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
   );
 }
