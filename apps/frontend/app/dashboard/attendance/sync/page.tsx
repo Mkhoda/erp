@@ -109,6 +109,22 @@ export default function SyncMonitorPage() {
     } catch { setMaintMsg("خطا در عملیات"); } finally { setMaintBusy(false); setTimeout(() => setMaintMsg(null), 10000); }
   }
 
+  // "اتصال و بازمحاسبه" above only rebuilds up to today (relinkUser bounds the
+  // range to [first punch, today]) — it never touches future-dated days, so a
+  // leave/mission approved for an upcoming date needs this instead: rebuild one
+  // whole Jalali month (any month, past or future) for all users or just one.
+  const [rmYear, setRmYear] = React.useState("");
+  const [rmMonth, setRmMonth] = React.useState("");
+  async function recomputeMonth() {
+    const jYear = +rmYear, jMonth = +rmMonth;
+    if (!jYear || !jMonth || jMonth < 1 || jMonth > 12) { setMaintMsg("سال و ماه شمسی معتبر وارد کنید (مثلاً 1405 و 7)"); setTimeout(() => setMaintMsg(null), 6000); return; }
+    setMaintBusy(true); setMaintMsg(null);
+    try {
+      const r = await fetch(`${API}/attendance/maintenance/recompute-month`, { method: "POST", headers: h, body: JSON.stringify({ jYear, jMonth }) }).then(x => x.json());
+      setMaintMsg(`${faNum(r)} روز بازمحاسبه شد`);
+    } catch { setMaintMsg("خطا در عملیات"); } finally { setMaintBusy(false); setTimeout(() => setMaintMsg(null), 8000); }
+  }
+
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
 
   return (
@@ -138,6 +154,18 @@ export default function SyncMonitorPage() {
           </div>
         </div>
         {maintMsg && <div className="text-sm text-green-600 bg-green-500/10 rounded-lg px-3 py-2">{maintMsg}</div>}
+
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-theme">
+          <span className="text-xs text-theme-muted flex items-center gap-1 shrink-0"><TimerReset className="w-3.5 h-3.5 text-blue-500" /> بازمحاسبه یک ماه خاص (شامل روزهای آینده — برای مرخصی/ماموریت از‌پیش‌ثبت‌شده)</span>
+          <input value={rmYear} onChange={e => setRmYear(e.target.value.replace(/\D/g, ""))} placeholder="سال (1405)" dir="ltr"
+            className="input-theme text-sm w-24 py-1.5" />
+          <input value={rmMonth} onChange={e => setRmMonth(e.target.value.replace(/\D/g, ""))} placeholder="ماه (1-12)" dir="ltr"
+            className="input-theme text-sm w-24 py-1.5" />
+          <button onClick={recomputeMonth} disabled={maintBusy} className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
+            {maintBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} بازمحاسبه ماه
+          </button>
+        </div>
+
         {diag && (
           <div className="border border-theme rounded-lg">
             <button onClick={() => setDiagOpen(o => !o)} className="w-full flex items-center justify-between px-3 py-2">
