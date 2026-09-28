@@ -56,6 +56,10 @@ function rangeMinutes(start?: string, end?: string): number | null {
   return diff > 0 ? diff : null;
 }
 
+// A root-relative /uploads/... path from the backend needs the site origin
+// prefixed, NOT the API base (which is .../api and has no static mount there).
+const attachmentUrl = (raw: string) => raw.startsWith("http") ? raw : `${typeof window !== "undefined" ? window.location.origin : ""}${raw}`;
+
 // Current Jalali year/month (Tehran) — used to default the filters on load.
 function currentJalali() {
   const p = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", timeZone: "Asia/Tehran" }).formatToParts(new Date());
@@ -80,11 +84,29 @@ export default function MyAttendancePage() {
   const [pageSize, setPageSize] = React.useState(50);
   React.useEffect(() => { setPage(1); }, [jYear, jMonth, jDay, pageSize, rows.length]);
   const [modal, setModal] = React.useState<any>(null); // { row }
-  const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", fixIn: false, inTime: "", delIn: false, fixOut: false, outTime: "", delOut: false, description: "" });
+  const [reqForm, setReqForm] = React.useState<any>({ kind: "FIX", fixIn: false, inTime: "", delIn: false, fixOut: false, outTime: "", delOut: false, description: "", attachment: "" });
   const [sending, setSending] = React.useState(false);
+  const [reqUploading, setReqUploading] = React.useState(false);
   const [leaveModal, setLeaveModal] = React.useState(false);
-  const [leaveForm, setLeaveForm] = React.useState({ jy: 0, jm: 0, jd: 0, type: "LEAVE", leaveStart: "", leaveEnd: "", description: "" });
+  const [leaveForm, setLeaveForm] = React.useState({ jy: 0, jm: 0, jd: 0, type: "LEAVE", leaveStart: "", leaveEnd: "", description: "", attachment: "" });
   const [leaveSending, setLeaveSending] = React.useState(false);
+  const [leaveUploading, setLeaveUploading] = React.useState(false);
+
+  // Uploads a sick-leave doctor's-note image, returns its /uploads/... url.
+  async function uploadAttachment(file: File): Promise<string | null> {
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch(`${API}/attendance/me/requests/attachment`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.message || "خطا در آپلود عکس"); return null; }
+      const d = await res.json();
+      return d.url as string;
+    } catch { alert("خطا در آپلود عکس"); return null; }
+  }
   const [detail, setDetail] = React.useState<any>(null);
   const [reqStatusFilter, setReqStatusFilter] = React.useState("ALL");
 
@@ -133,12 +155,24 @@ export default function MyAttendancePage() {
 
   function openLeaveModal() {
     const { jy, jm, jd } = todayJ();
-    setLeaveForm({ jy, jm, jd, type: "LEAVE", leaveStart: "", leaveEnd: "", description: "" });
+    setLeaveForm({ jy, jm, jd, type: "LEAVE", leaveStart: "", leaveEnd: "", description: "", attachment: "" });
     setLeaveModal(true);
+  }
+
+  async function onPickLeaveAttachment(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setLeaveUploading(true);
+    const url = await uploadAttachment(f);
+    setLeaveUploading(false);
+    if (url) setLeaveForm(s => ({ ...s, attachment: url }));
   }
 
   async function submitLeaveRequest() {
     if (!leaveForm.jy || !leaveForm.jm || !leaveForm.jd) { alert("تاریخ را انتخاب کنید"); return; }
+    const isSick = leaveForm.type === "SICK_LEAVE" || leaveForm.type === "SICK_HOURLY";
+    if (isSick && !leaveForm.attachment) { alert("برای مرخصی استعلاجی، بارگذاری تصویر مدرک پزشکی الزامی است"); return; }
     let hourlyMinutes: number | null = null;
     if (leaveForm.type === "HOURLY_LEAVE" || leaveForm.type === "SICK_HOURLY") {
       hourlyMinutes = rangeMinutes(leaveForm.leaveStart, leaveForm.leaveEnd);
@@ -160,10 +194,12 @@ export default function MyAttendancePage() {
         body.inTime = leaveForm.leaveStart;
         body.outTime = leaveForm.leaveEnd;
         body.isSickLeave = true;
+        body.attachment = leaveForm.attachment;
       } else if (leaveForm.type === "SICK_LEAVE") {
         body.type = "LEAVE";
         body.targetStatus = "SICK_LEAVE";
         body.isSickLeave = true;
+        body.attachment = leaveForm.attachment;
       } else {
         body.type = "LEAVE";
         body.targetStatus = leaveForm.type;
@@ -181,12 +217,24 @@ export default function MyAttendancePage() {
       // Pre-fill existing times; default to correcting the MISSING side.
       fixIn: !hasIn, inTime: toHHmm(row.firstCheckIn), delIn: false,
       fixOut: !hasOut, outTime: toHHmm(row.lastCheckOut), delOut: false,
-      description: "",
+      description: "", attachment: "",
     });
     setModal({ row });
   }
 
+  async function onPickReqAttachment(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setReqUploading(true);
+    const url = await uploadAttachment(f);
+    setReqUploading(false);
+    if (url) setReqForm((s: any) => ({ ...s, attachment: url }));
+  }
+
   async function submitRequest() {
+    const isSick = reqForm.kind === "SICK_LEAVE" || reqForm.kind === "SICK_HOURLY";
+    if (isSick && !reqForm.attachment) { alert("برای مرخصی استعلاجی، بارگذاری تصویر مدرک پزشکی الزامی است"); return; }
     let hourlyMinutes: number | null = null;
     if (reqForm.kind === "HOURLY_LEAVE" || reqForm.kind === "SICK_HOURLY") {
       hourlyMinutes = rangeMinutes(reqForm.leaveStart, reqForm.leaveEnd);
@@ -203,8 +251,8 @@ export default function MyAttendancePage() {
         if (doOut) { if (reqForm.delOut) body.clearCheckOut = true; else body.outTime = reqForm.outTime; }
       } else if (k === "EXPLANATION") { body.type = "EXPLANATION"; }
       else if (k === "HOURLY_LEAVE") { body.type = "LEAVE"; body.leaveMinutes = hourlyMinutes; body.inTime = reqForm.leaveStart; body.outTime = reqForm.leaveEnd; }
-      else if (k === "SICK_HOURLY") { body.type = "LEAVE"; body.leaveMinutes = hourlyMinutes; body.inTime = reqForm.leaveStart; body.outTime = reqForm.leaveEnd; body.isSickLeave = true; }
-      else if (k === "SICK_LEAVE") { body.type = "LEAVE"; body.targetStatus = "SICK_LEAVE"; body.isSickLeave = true; }
+      else if (k === "SICK_HOURLY") { body.type = "LEAVE"; body.leaveMinutes = hourlyMinutes; body.inTime = reqForm.leaveStart; body.outTime = reqForm.leaveEnd; body.isSickLeave = true; body.attachment = reqForm.attachment; }
+      else if (k === "SICK_LEAVE") { body.type = "LEAVE"; body.targetStatus = "SICK_LEAVE"; body.isSickLeave = true; body.attachment = reqForm.attachment; }
       else { body.type = "LEAVE"; body.targetStatus = k; } // LEAVE | MISSION | REMOTE_WORK
       const res = await fetch(`${API}/attendance/me/requests`, { method: "POST", headers: h, body: JSON.stringify(body) });
       if (res.ok) { setModal(null); await load(); }

@@ -2,6 +2,7 @@
 import React from "react";
 import { Loader2, CheckCircle2, XCircle, ClipboardCheck, ArrowLeftRight } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import JalaliDatePicker from "../../../components/ui/JalaliDatePicker";
 import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -10,6 +11,8 @@ const TYPE_FA: Record<string,string> = { CHECK_IN_FIX:"اصلاح ورود", CHE
 const REQ_STATUS_FA: Record<string,string> = { PENDING:"در انتظار", APPROVED:"تایید شده", REJECTED:"رد شده" };
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
+// A root-relative /uploads/... path needs the site origin prefixed, not the API base (.../api has no static mount there).
+const attachmentUrl = (raw: string) => raw.startsWith("http") ? raw : `${typeof window !== "undefined" ? window.location.origin : ""}${raw}`;
 
 export default function ApprovalsPage() {
   React.useEffect(() => { document.title = pageTitle("صف تایید حضور"); }, []);
@@ -20,6 +23,9 @@ export default function ApprovalsPage() {
   const [statusF, setStatusF] = React.useState("PENDING");
   const [typeF, setTypeF] = React.useState("ALL");
   const [search, setSearch] = React.useState("");
+  const [dateFrom, setDateFrom] = React.useState("");
+  const [dateTo, setDateTo] = React.useState("");
+  const [sickOnly, setSickOnly] = React.useState(false);
   const [sortK, setSortK] = React.useState<null | "name" | "date" | "type" | "status">(null);
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
   const [loading, setLoading] = React.useState(true);
@@ -52,6 +58,9 @@ export default function ApprovalsPage() {
   const filteredRows = React.useMemo(() => {
     let arr = rows;
     if (typeF !== "ALL") arr = arr.filter(q => q.type === typeF);
+    if (sickOnly) arr = arr.filter(q => q.isSickLeave);
+    if (dateFrom) arr = arr.filter(q => q.gregDate.slice(0, 10) >= dateFrom);
+    if (dateTo) arr = arr.filter(q => q.gregDate.slice(0, 10) <= dateTo);
     const s = search.trim().toLowerCase();
     if (s) {
       arr = arr.filter(q => {
@@ -72,7 +81,7 @@ export default function ApprovalsPage() {
       });
     }
     return arr;
-  }, [rows, search, typeF, sortK, sortDir]);
+  }, [rows, search, typeF, sortK, sortDir, dateFrom, dateTo, sickOnly]);
 
   async function openRow(q: any) {
     setNote(""); setSel({ req: q, day: null });
@@ -113,6 +122,18 @@ export default function ApprovalsPage() {
             <option value="APPROVED">تایید شده</option>
             <option value="REJECTED">رد شده</option>
           </select>
+          <div className="flex items-center gap-1 text-sm text-theme-muted">
+            <span>از</span>
+            <JalaliDatePicker value={dateFrom} onChange={setDateFrom} className="input-theme text-sm w-36" />
+          </div>
+          <div className="flex items-center gap-1 text-sm text-theme-muted">
+            <span>تا</span>
+            <JalaliDatePicker value={dateTo} onChange={setDateTo} className="input-theme text-sm w-36" />
+          </div>
+          <label className="flex items-center gap-1.5 text-sm text-theme-primary cursor-pointer px-2">
+            <input type="checkbox" checked={sickOnly} onChange={e => setSickOnly(e.target.checked)} />
+            فقط استعلاجی
+          </label>
         </div>
       </div>
 
@@ -185,6 +206,14 @@ export default function ApprovalsPage() {
               </div>
             </div>
             {sel.req.description && <div className="text-sm"><span className="text-theme-muted">توضیح کارمند: </span><span className="text-theme-primary">{sel.req.description}</span></div>}
+            {sel.req.attachment && (
+              <div>
+                <div className="text-xs text-theme-muted mb-1">مدرک پیوست‌شده</div>
+                <a href={attachmentUrl(sel.req.attachment)} target="_blank" rel="noopener noreferrer">
+                  <img src={attachmentUrl(sel.req.attachment)} alt="مدرک پیوست‌شده" className="max-h-48 rounded-lg border border-theme hover:opacity-90 transition-opacity" />
+                </a>
+              </div>
+            )}
             {sel.req.status === "PENDING" ? (
               <div>
                 <label className="block mb-1 text-theme-secondary text-xs">یادداشت تصمیم (اختیاری)</label>

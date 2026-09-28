@@ -30,6 +30,8 @@ const toFa = (s: string) => s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d
 const fmtMin = (m: number) => toFa(`${Math.floor(Math.abs(m || 0) / 60)}:${String(Math.abs(m || 0) % 60).padStart(2, "0")}`);
 const faTime = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran", hour12: false }) : "—");
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone: "UTC" });
+// A root-relative /uploads/... path needs the site origin prefixed, not the API base (.../api has no static mount there).
+const attachmentUrl = (raw: string) => raw.startsWith("http") ? raw : `${typeof window !== "undefined" ? window.location.origin : ""}${raw}`;
 
 // Explains WHY a day ended up as leave / hourly-leave when it was auto-converted
 // from a deficit or an absence (see calc.service.ts's conversion rules), instead
@@ -181,6 +183,14 @@ export default function DayDetailModal({ open, onClose, detail, allowOverride, o
               {detail.override && (
                 <div className="mt-3 text-xs text-amber-600 bg-amber-500/10 rounded-lg p-2">
                   اصلاح دستی توسط {detail.override.createdBy?.firstName} {detail.override.createdBy?.lastName}: {detail.override.reason}
+                </div>
+              )}
+              {detail.override?.attachment && (
+                <div className="mt-3">
+                  <div className="text-xs text-theme-muted mb-1">مدرک پیوست‌شده</div>
+                  <a href={attachmentUrl(detail.override.attachment)} target="_blank" rel="noopener noreferrer">
+                    <img src={attachmentUrl(detail.override.attachment)} alt="مدرک پیوست‌شده" className="max-h-48 rounded-lg border border-theme hover:opacity-90 transition-opacity" />
+                  </a>
                 </div>
               )}
             </div>
