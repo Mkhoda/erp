@@ -6,6 +6,7 @@ import {
   RefreshCw, Play, CheckCircle2, XCircle, Loader2, AlertTriangle,
   Activity, Database, Clock, ChevronDown, Stethoscope, Users, TimerReset,
 } from "lucide-react";
+import SearchSelect from "../../../components/ui/SearchSelect";
 
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 
@@ -115,12 +116,31 @@ export default function SyncMonitorPage() {
   // whole Jalali month (any month, past or future) for all users or just one.
   const [rmYear, setRmYear] = React.useState("");
   const [rmMonth, setRmMonth] = React.useState("");
+  const [rmUserId, setRmUserId] = React.useState("");
+  const [users, setUsers] = React.useState<any[]>([]);
+  React.useEffect(() => {
+    fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
+    // eslint-disable-next-line
+  }, []);
+  const userOptions = users.map((u: any) => ({
+    id: u.id,
+    name: `${u.firstName} ${u.lastName}${u.attendanceCardNo ? ` (${u.attendanceCardNo})` : ""}`,
+    search: `${u.firstName} ${u.lastName} ${u.phone || ""} ${u.attendanceCardNo || ""}`,
+  }));
+  const rmUserName = rmUserId ? (userOptions.find(u => u.id === rmUserId)?.name || "این کاربر") : null;
+
   async function recomputeMonth() {
     const jYear = +rmYear, jMonth = +rmMonth;
     if (!jYear || !jMonth || jMonth < 1 || jMonth > 12) { setMaintMsg("سال و ماه شمسی معتبر وارد کنید (مثلاً 1405 و 7)"); setTimeout(() => setMaintMsg(null), 6000); return; }
+    const warn = rmUserName
+      ? `کل روزهای ماه ${faNum(jMonth)}/${faNum(jYear)} فقط برای «${rmUserName}» از نو محاسبه و مقادیر فعلی (کارکرد، مرخصی، کسری و ...) بازنویسی می‌شود. ادامه می‌دهید؟`
+      : `⚠️ کل روزهای ماه ${faNum(jMonth)}/${faNum(jYear)} برای همه‌ی کاربران دارای کارت از نو محاسبه و مقادیر فعلی بازنویسی می‌شود. اگر فقط یک نفر مدنظرتان است، از فیلد «کاربر» بالا او را انتخاب کنید. ادامه می‌دهید؟`;
+    if (!confirm(warn)) return;
     setMaintBusy(true); setMaintMsg(null);
     try {
-      const r = await fetch(`${API}/attendance/maintenance/recompute-month`, { method: "POST", headers: h, body: JSON.stringify({ jYear, jMonth }) }).then(x => x.json());
+      const body: any = { jYear, jMonth };
+      if (rmUserId) body.userId = rmUserId;
+      const r = await fetch(`${API}/attendance/maintenance/recompute-month`, { method: "POST", headers: h, body: JSON.stringify(body) }).then(x => x.json());
       setMaintMsg(`${faNum(r)} روز بازمحاسبه شد`);
     } catch { setMaintMsg("خطا در عملیات"); } finally { setMaintBusy(false); setTimeout(() => setMaintMsg(null), 8000); }
   }
@@ -155,15 +175,27 @@ export default function SyncMonitorPage() {
         </div>
         {maintMsg && <div className="text-sm text-green-600 bg-green-500/10 rounded-lg px-3 py-2">{maintMsg}</div>}
 
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-theme">
-          <span className="text-xs text-theme-muted flex items-center gap-1 shrink-0"><TimerReset className="w-3.5 h-3.5 text-blue-500" /> بازمحاسبه یک ماه خاص (شامل روزهای آینده — برای مرخصی/ماموریت از‌پیش‌ثبت‌شده)</span>
-          <input value={rmYear} onChange={e => setRmYear(e.target.value.replace(/\D/g, ""))} placeholder="سال (1405)" dir="ltr"
-            className="input-theme text-sm w-24 py-1.5" />
-          <input value={rmMonth} onChange={e => setRmMonth(e.target.value.replace(/\D/g, ""))} placeholder="ماه (1-12)" dir="ltr"
-            className="input-theme text-sm w-24 py-1.5" />
-          <button onClick={recomputeMonth} disabled={maintBusy} className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
-            {maintBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} بازمحاسبه ماه
-          </button>
+        <div className="pt-2 border-t border-theme space-y-2">
+          <span className="text-xs text-theme-muted flex items-center gap-1"><TimerReset className="w-3.5 h-3.5 text-blue-500" /> بازمحاسبه یک ماه خاص (شامل روزهای آینده — برای مرخصی/ماموریت از‌پیش‌ثبت‌شده)</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <input value={rmYear} onChange={e => setRmYear(e.target.value.replace(/\D/g, ""))} placeholder="سال (1405)" dir="ltr"
+              className="input-theme text-sm w-24 py-1.5" />
+            <input value={rmMonth} onChange={e => setRmMonth(e.target.value.replace(/\D/g, ""))} placeholder="ماه (1-12)" dir="ltr"
+              className="input-theme text-sm w-24 py-1.5" />
+            <SearchSelect
+              className="w-56"
+              options={userOptions}
+              value={rmUserId}
+              onChange={setRmUserId}
+              searchKey="search"
+              emptyLabel="همه کاربران (⚠️ همه)"
+              placeholder="فقط یک کاربر (پیشنهادی)"
+            />
+            <button onClick={recomputeMonth} disabled={maintBusy} className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
+              {maintBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} بازمحاسبه ماه
+            </button>
+          </div>
+          {!rmUserId && <p className="text-[11px] text-amber-600">کاربری انتخاب نشده — این عملیات کل کاربران دارای کارت را برای این ماه بازمحاسبه می‌کند.</p>}
         </div>
 
         {diag && (
