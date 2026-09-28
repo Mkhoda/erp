@@ -219,6 +219,33 @@ export class CalcService {
    * derives the row fresh and upserts it. Never reads/writes RawAttendanceRecord.
    */
   async computeDay(userId: string, gregDate: Date): Promise<void> {
+    const v = await this.computeDayValues(userId, gregDate);
+    await this.prisma.attendanceDay.upsert({
+      where: { userId_gregDate: { userId, gregDate } },
+      create: { userId, gregDate, ...v },
+      update: { ...v, computedAt: new Date() },
+    });
+  }
+
+  // Read-only preview: computes what computeDay() WOULD write for this day,
+  // without touching the database, alongside whatever is currently stored
+  // there (if anything) — so a caller can diff before/after and decide
+  // whether to actually apply it. Used by the maintenance "preview month"
+  // tool so an admin can review a bulk recompute's effect before committing
+  // to it (see RecomputeService.previewUserMonth).
+  async previewDay(userId: string, gregDate: Date) {
+    const [current, computed] = await Promise.all([
+      this.prisma.attendanceDay.findUnique({ where: { userId_gregDate: { userId, gregDate } } }),
+      this.computeDayValues(userId, gregDate),
+    ]);
+    return { current, computed };
+  }
+
+  // The actual calculation, pulled out of computeDay() so it can be reused
+  // by previewDay() without writing anything. Returns exactly the fields
+  // computeDay()'s upsert needs (everything except userId/gregDate, which
+  // the caller already has).
+  private async computeDayValues(userId: string, gregDate: Date) {
     // gregDate is a work-date LABEL (Date.UTC of the Tehran calendar day), not the
     // real instant of Tehran midnight — convert before bounding the punch query.
     const dayStart = tehranMidnightInstant(gregDate);
@@ -484,23 +511,13 @@ export class CalcService {
       }
     }
 
-    await this.prisma.attendanceDay.upsert({
-      where: { userId_gregDate: { userId, gregDate } },
-      create: {
-        userId, gregDate, jYear, jMonth, jDay,
-        firstCheckIn: firstIn, lastCheckOut: lastOut,
-        workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
-        delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes, sickLeaveMinutes,
-        autoConvertedLeave, status, isHolidayWork, hasOverride: !!override,
-      },
-      update: {
-        jYear, jMonth, jDay,
-        firstCheckIn: firstIn, lastCheckOut: lastOut,
-        workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
-        delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes, sickLeaveMinutes,
-        autoConvertedLeave, status, isHolidayWork, hasOverride: !!override, computedAt: new Date(),
-      },
-    });
+    return {
+      jYear, jMonth, jDay,
+      firstCheckIn: firstIn, lastCheckOut: lastOut,
+      workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
+      delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes, sickLeaveMinutes,
+      autoConvertedLeave, status, isHolidayWork, hasOverride: !!override,
+    };
   }
 
   // Remaining annual leave balance in minutes, counting only days strictly

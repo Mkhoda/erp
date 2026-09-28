@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
@@ -80,5 +80,16 @@ export class MaintenanceController {
   recomputeMonth(@Body() body: { jYear: number; jMonth: number; userId?: string }) {
     if (body.userId) return this.recompute.recomputeUserMonth(body.userId, +body.jYear, +body.jMonth);
     return this.recompute.recomputeAllForMonth(+body.jYear, +body.jMonth);
+  }
+
+  // Read-only: what recompute-month WOULD change for one user's month,
+  // without writing anything. Always scoped to a single user — a
+  // company-wide preview would be an unreviewably huge report, and the
+  // point of this endpoint is to let an admin actually read it before
+  // deciding to apply anything.
+  @Post('recompute-month/preview')
+  previewMonth(@Body() body: { jYear: number; jMonth: number; userId: string }) {
+    if (!body.userId) throw new BadRequestException('برای پیش‌نمایش، انتخاب یک کاربر الزامی است');
+    return this.recompute.previewUserMonth(body.userId, +body.jYear, +body.jMonth);
   }
 }

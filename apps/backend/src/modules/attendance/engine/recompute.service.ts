@@ -102,6 +102,53 @@ export class RecomputeService {
     return this.recomputeDays(pairs);
   }
 
+  // The fields worth showing an admin in a before/after diff — every column
+  // that actually appears on the records grid or the leave/deficit balances.
+  private static readonly DIFF_FIELDS = [
+    'status', 'workedMinutes', 'overtimeMinutes', 'holidayOvertimeMinutes',
+    'delayMinutes', 'earlyLeaveMinutes', 'deficitMinutes', 'nightMinutes',
+    'leaveMinutes', 'sickLeaveMinutes', 'autoConvertedLeave',
+  ] as const;
+
+  /**
+   * Read-only dry run: for every day in a Jalali month, compute what
+   * computeDay() WOULD write and diff it against whatever is currently
+   * stored — without writing anything. Lets an admin review a bulk
+   * recompute's actual effect before committing to it (see
+   * MaintenanceController's recompute-month/preview route). Only returns
+   * days that would actually change (or would be newly created); days
+   * already matching the fresh computation are omitted to keep the report
+   * focused. Guard-duty users are skipped — GuardCalcService's handoff-chain
+   * algorithm computes a whole shift range across multiple guards at once,
+   * not one day in isolation, so it isn't meaningfully previewable this way.
+   */
+  async previewUserMonth(userId: string, jYear: number, jMonth: number) {
+    const { start, endExcl } = jalaliMonthRange(jYear, jMonth);
+    const days: Date[] = [];
+    for (let d = new Date(start); d < endExcl; d = new Date(d.getTime() + 86400000)) days.push(new Date(d));
+    if (!days.length) return { isGuard: false, days: [] as any[] };
+
+    const shiftId = await this.guardCalc
+      .findActiveGuardShiftId(userId, days[0], days[days.length - 1])
+      .catch(() => null);
+    if (shiftId) return { isGuard: true, days: [] as any[] };
+
+    const results: Array<{
+      gregDate: Date; isNew: boolean; changedFields: string[];
+      current: Record<string, any> | null; computed: Record<string, any>;
+    }> = [];
+    for (const gregDate of days) {
+      const { current, computed } = await this.calc.previewDay(userId, gregDate);
+      const changedFields = RecomputeService.DIFF_FIELDS.filter(
+        (f) => !current || (current as any)[f] !== (computed as any)[f],
+      );
+      if (!current || changedFields.length) {
+        results.push({ gregDate, isNew: !current, changedFields, current, computed });
+      }
+    }
+    return { isGuard: false, days: results };
+  }
+
   /**
    * Release a card number from any other user that currently holds it, so it
    * can be assigned to a new owner without violating the unique constraint.

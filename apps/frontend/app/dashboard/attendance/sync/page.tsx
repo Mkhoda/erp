@@ -7,8 +7,14 @@ import {
   Activity, Database, Clock, ChevronDown, Stethoscope, Users, TimerReset,
 } from "lucide-react";
 import SearchSelect from "../../../components/ui/SearchSelect";
+import Modal from "../../../components/ui/Modal";
 
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
+const toFa = (s: string) => s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]);
+const fmtMin = (m: number) => toFa(`${Math.floor(Math.abs(m || 0) / 60)}:${String(Math.abs(m || 0) % 60).padStart(2, "0")}`);
+const faDateOnly = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" });
+const STATUS_FA: Record<string, string> = { PRESENT: "حاضر", LATE: "تاخیر", EARLY_LEAVE: "تعجیل", ABSENT: "غیبت", INCOMPLETE: "ناقص", LEAVE: "مرخصی", SICK_LEAVE: "استعلاجی", MISSION: "ماموریت", REMOTE_WORK: "دورکاری", HOLIDAY: "تعطیل", COMPANY_HOLIDAY: "تعطیل شرکت", WEEKEND: "آخر هفته", OFF_DUTY: "استراحت (شیفت)" };
+const DIFF_FIELD_FA: Record<string, string> = { status: "وضعیت", workedMinutes: "کارکرد", overtimeMinutes: "اضافه‌کار", holidayOvertimeMinutes: "تعطیل‌کاری", delayMinutes: "تاخیر", earlyLeaveMinutes: "تعجیل", deficitMinutes: "کسری", nightMinutes: "شب‌کاری", leaveMinutes: "مرخصی", sickLeaveMinutes: "استعلاجی", autoConvertedLeave: "تبدیل خودکار" };
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -129,20 +135,28 @@ export default function SyncMonitorPage() {
   }));
   const rmUserName = rmUserId ? (userOptions.find(u => u.id === rmUserId)?.name || "این کاربر") : null;
 
-  async function recomputeMonth() {
+  // Preview-only: shows exactly what a recompute WOULD change, day by day,
+  // without writing anything. The actual apply endpoint (recompute-month)
+  // still exists on the backend but is deliberately not wired to any button
+  // here — after a broad recompute once left a lot of unrelated data looking
+  // different than expected, changes to real attendance/leave data should go
+  // through a reviewed report first, not a single unreviewed click.
+  const [preview, setPreview] = React.useState<any>(null); // { isGuard, days }
+  const [previewLoading, setPreviewLoading] = React.useState(false);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+
+  async function previewMonth() {
     const jYear = +rmYear, jMonth = +rmMonth;
     if (!jYear || !jMonth || jMonth < 1 || jMonth > 12) { setMaintMsg("سال و ماه شمسی معتبر وارد کنید (مثلاً 1405 و 7)"); setTimeout(() => setMaintMsg(null), 6000); return; }
-    const warn = rmUserName
-      ? `کل روزهای ماه ${faNum(jMonth)}/${faNum(jYear)} فقط برای «${rmUserName}» از نو محاسبه و مقادیر فعلی (کارکرد، مرخصی، کسری و ...) بازنویسی می‌شود. ادامه می‌دهید؟`
-      : `⚠️ کل روزهای ماه ${faNum(jMonth)}/${faNum(jYear)} برای همه‌ی کاربران دارای کارت از نو محاسبه و مقادیر فعلی بازنویسی می‌شود. اگر فقط یک نفر مدنظرتان است، از فیلد «کاربر» بالا او را انتخاب کنید. ادامه می‌دهید؟`;
-    if (!confirm(warn)) return;
-    setMaintBusy(true); setMaintMsg(null);
+    if (!rmUserId) { setMaintMsg("برای پیش‌نمایش، یک کاربر را انتخاب کنید"); setTimeout(() => setMaintMsg(null), 6000); return; }
+    setPreviewLoading(true);
     try {
-      const body: any = { jYear, jMonth };
-      if (rmUserId) body.userId = rmUserId;
-      const r = await fetch(`${API}/attendance/maintenance/recompute-month`, { method: "POST", headers: h, body: JSON.stringify(body) }).then(x => x.json());
-      setMaintMsg(`${faNum(r)} روز بازمحاسبه شد`);
-    } catch { setMaintMsg("خطا در عملیات"); } finally { setMaintBusy(false); setTimeout(() => setMaintMsg(null), 8000); }
+      const r = await fetch(`${API}/attendance/maintenance/recompute-month/preview`, { method: "POST", headers: h, body: JSON.stringify({ jYear, jMonth, userId: rmUserId }) });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); setMaintMsg(e.message || "خطا در پیش‌نمایش"); setTimeout(() => setMaintMsg(null), 6000); return; }
+      setPreview(await r.json());
+      setPreviewOpen(true);
+    } catch { setMaintMsg("خطا در پیش‌نمایش"); setTimeout(() => setMaintMsg(null), 6000); }
+    finally { setPreviewLoading(false); }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
@@ -176,7 +190,7 @@ export default function SyncMonitorPage() {
         {maintMsg && <div className="text-sm text-green-600 bg-green-500/10 rounded-lg px-3 py-2">{maintMsg}</div>}
 
         <div className="pt-2 border-t border-theme space-y-2">
-          <span className="text-xs text-theme-muted flex items-center gap-1"><TimerReset className="w-3.5 h-3.5 text-blue-500" /> بازمحاسبه یک ماه خاص (شامل روزهای آینده — برای مرخصی/ماموریت از‌پیش‌ثبت‌شده)</span>
+          <span className="text-xs text-theme-muted flex items-center gap-1"><TimerReset className="w-3.5 h-3.5 text-blue-500" /> پیش‌نمایش بازمحاسبه یک ماه برای یک کاربر (شامل روزهای آینده — برای مرخصی/ماموریت از‌پیش‌ثبت‌شده) — فقط گزارش، چیزی تغییر نمی‌کند</span>
           <div className="flex flex-wrap items-center gap-2">
             <input value={rmYear} onChange={e => setRmYear(e.target.value.replace(/\D/g, ""))} placeholder="سال (1405)" dir="ltr"
               className="input-theme text-sm w-24 py-1.5" />
@@ -188,14 +202,13 @@ export default function SyncMonitorPage() {
               value={rmUserId}
               onChange={setRmUserId}
               searchKey="search"
-              emptyLabel="همه کاربران (⚠️ همه)"
-              placeholder="فقط یک کاربر (پیشنهادی)"
+              emptyLabel="— یک کاربر انتخاب کنید —"
+              placeholder="کاربر"
             />
-            <button onClick={recomputeMonth} disabled={maintBusy} className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
-              {maintBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} بازمحاسبه ماه
+            <button onClick={previewMonth} disabled={previewLoading || !rmUserId} className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
+              {previewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} پیش‌نمایش تغییرات
             </button>
           </div>
-          {!rmUserId && <p className="text-[11px] text-amber-600">کاربری انتخاب نشده — این عملیات کل کاربران دارای کارت را برای این ماه بازمحاسبه می‌کند.</p>}
         </div>
 
         {diag && (
@@ -303,7 +316,94 @@ export default function SyncMonitorPage() {
           </table>
         </div>
       </div>
+
+      <Modal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title="پیش‌نمایش بازمحاسبه"
+        subtitle={rmUserName ? `${rmUserName} — ${faNum(+rmMonth)}/${faNum(+rmYear)}` : undefined}
+        size="xl"
+        footer={<button onClick={() => setPreviewOpen(false)} className="btn-theme-secondary text-sm">بستن</button>}
+      >
+        {preview?.isGuard ? (
+          <div className="text-sm text-theme-muted text-center py-8">
+            این کاربر در چرخه‌ی شیفت نگهبانی است — پیش‌نمایش برای این نوع کاربر پشتیبانی نمی‌شود (منطق محاسبه‌ی نگهبانی چند نفر را با هم در نظر می‌گیرد).
+          </div>
+        ) : !preview?.days?.length ? (
+          <div className="text-sm text-theme-muted text-center py-8">
+            هیچ تغییری پیدا نشد — همه‌ی روزهای این ماه با محاسبه‌ی فعلی یکسان هستند.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-theme-muted">
+              {faNum(preview.days.length)} روز با محاسبه‌ی فعلی فرق دارد. این فقط گزارش است — چیزی در دیتابیس تغییر نکرده.
+            </p>
+            <div className="overflow-x-auto -mx-1">
+              <table className="w-full text-xs text-center">
+                <thead className="sticky top-0 bg-theme-card">
+                  <tr className="text-theme-muted border-b border-theme">
+                    <th className="py-2 px-2 font-medium">تاریخ</th>
+                    <th className="px-2 font-medium">وضعیت</th>
+                    <th className="px-2 font-medium">کارکرد</th>
+                    <th className="px-2 font-medium">کسری</th>
+                    <th className="px-2 font-medium">مرخصی</th>
+                    <th className="px-2 font-medium">سایر تغییرات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.days.map((d: any) => {
+                    const shown = new Set(['status', 'workedMinutes', 'deficitMinutes', 'leaveMinutes']);
+                    const otherFields = d.changedFields.filter((f: string) => !shown.has(f));
+                    return (
+                      <tr key={d.gregDate} className="border-b border-theme/40 hover:bg-theme-hover">
+                        <td className="py-1.5 px-2 text-theme-primary whitespace-nowrap" dir="ltr">{faDateOnly(d.gregDate)}</td>
+                        <td className="px-2">
+                          {d.isNew ? (
+                            <span className="text-cyan-600">جدید: {STATUS_FA[d.computed.status] || d.computed.status}</span>
+                          ) : d.current.status === d.computed.status ? (
+                            <span className="text-theme-muted">{STATUS_FA[d.computed.status] || d.computed.status}</span>
+                          ) : (
+                            <FieldDiff oldV={STATUS_FA[d.current.status] || d.current.status} newV={STATUS_FA[d.computed.status] || d.computed.status} />
+                          )}
+                        </td>
+                        <td className="px-2" dir="ltr">
+                          {!d.isNew && d.current.workedMinutes !== d.computed.workedMinutes
+                            ? <FieldDiff oldV={fmtMin(d.current.workedMinutes)} newV={fmtMin(d.computed.workedMinutes)} />
+                            : <span className="text-theme-muted">{fmtMin(d.computed.workedMinutes)}</span>}
+                        </td>
+                        <td className="px-2" dir="ltr">
+                          {!d.isNew && d.current.deficitMinutes !== d.computed.deficitMinutes
+                            ? <FieldDiff oldV={fmtMin(d.current.deficitMinutes)} newV={fmtMin(d.computed.deficitMinutes)} cls="text-orange-600" />
+                            : <span className="text-theme-muted">{fmtMin(d.computed.deficitMinutes)}</span>}
+                        </td>
+                        <td className="px-2" dir="ltr">
+                          {!d.isNew && d.current.leaveMinutes !== d.computed.leaveMinutes
+                            ? <FieldDiff oldV={fmtMin(d.current.leaveMinutes)} newV={fmtMin(d.computed.leaveMinutes)} cls="text-blue-600" />
+                            : <span className="text-theme-muted">{fmtMin(d.computed.leaveMinutes)}</span>}
+                        </td>
+                        <td className="px-2 text-theme-muted">
+                          {otherFields.length ? otherFields.map((f: string) => DIFF_FIELD_FA[f] || f).join("، ") : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
+  );
+}
+
+function FieldDiff({ oldV, newV, cls }: { oldV: string; newV: string; cls?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <span className="text-theme-muted line-through decoration-red-400">{oldV}</span>
+      <span className="text-theme-muted">←</span>
+      <span className={`font-semibold ${cls || "text-theme-primary"}`}>{newV}</span>
+    </span>
   );
 }
 
