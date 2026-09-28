@@ -12,11 +12,12 @@ import Link from "next/link";
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
-const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار" };
+const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", SICK_LEAVE:"استعلاجی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار" };
 const STATUS_CLS: Record<string,string> = {
   PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600",
   EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600",
   INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600",
+  SICK_LEAVE:"bg-rose-500/15 text-rose-600",
   MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600",
   HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500",
   OFF_DUTY:"bg-slate-300/20 text-slate-500",
@@ -59,7 +60,7 @@ export default function AttendanceRecordsPage() {
   const [detail, setDetail] = React.useState<any>(null);
   const [exporting, setExporting] = React.useState<string | null>(null);
   // Admin edit (override) form in the detail modal.
-  const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean }>({ inTime: "", outTime: "", status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false });
+  const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean; isSickLeave: boolean }>({ inTime: "", outTime: "", status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false, isSickLeave: false });
   const [ovSaving, setOvSaving] = React.useState(false);
   const [leave, setLeave] = React.useState<any>(null);
   const [rules, setRules] = React.useState<any>(null);
@@ -135,7 +136,7 @@ export default function AttendanceRecordsPage() {
   async function openDetail(row: any) {
     const date = row.gregDate.slice(0, 10);
     const d = await fetch(`${API}/attendance/records/day?userId=${row.userId}&date=${date}`, { headers: h }).then(r => r.ok ? r.json() : null);
-    setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false });
+    setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false, isSickLeave: false });
     setDetail({ row, ...d });
   }
 
@@ -152,6 +153,7 @@ export default function AttendanceRecordsPage() {
         clearCheckOut: ov.clearCheckOut || undefined,
         forceStatus: ov.status || undefined,
         leaveMinutes: ov.leaveHours ? Math.round(Number(ov.leaveHours) * 60) : undefined,
+        isSickLeave: ov.isSickLeave || undefined,
         reason: ov.reason || "اصلاح توسط مدیر",
       };
       const res = await fetch(`${API}/attendance/overrides`, { method: "POST", headers: h, body: JSON.stringify(body) });

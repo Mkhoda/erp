@@ -33,7 +33,7 @@ const NEW_DEFAULTS = {
   name: "", isDefault: false, dailyMinutes: 500, lunchMinutes: 0,
   checkInStart: "06:30", checkInEnd: "09:00", checkOutStart: "14:50", checkOutEnd: "17:20", workDays: [6, 0, 1, 2, 3],
   flexEnabled: false, flexInStart: "07:30", flexInEnd: "09:00", graceMinutes: 0,
-  otMinThreshold: 30, otRounding: 15, otMaxDaily: 240, otMaxMonthly: 3600, annualLeaveDays: 26,
+  otMinThreshold: 30, otRounding: 15, otMaxDaily: 240, otMaxMonthly: 3600, annualLeaveDays: 26, sickLeaveDays: 5,
   deficitToLeaveEnabled: true, absentToLeaveEnabled: true,
   maxDailyLeaveEnabled: true, maxDailyLeaveMinutes: 210,
 };
@@ -289,6 +289,7 @@ export default function WorkRulesPage() {
           <Section title="مرخصی و اضافه‌کار" icon={SlidersHorizontal}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="مرخصی استحقاقی سالانه (روز)"><input type="number" className={inputCls} value={form.annualLeaveDays ?? ""} onChange={e => setF("annualLeaveDays", +e.target.value)} /></Field>
+              <Field label="مرخصی استعلاجی سالانه (روز)" hint="موجودی جداگانه از مرخصی استحقاقی"><input type="number" className={inputCls} value={form.sickLeaveDays ?? ""} onChange={e => setF("sickLeaveDays", +e.target.value)} /></Field>
               <Field label="حداقل آستانه اضافه‌کار (دقیقه)"><input type="number" className={inputCls} value={form.otMinThreshold ?? ""} onChange={e => setF("otMinThreshold", +e.target.value)} /></Field>
               <Field label="گرد کردن اضافه‌کار (دقیقه)"><input type="number" className={inputCls} value={form.otRounding ?? ""} onChange={e => setF("otRounding", +e.target.value)} /></Field>
               <Field label="حداکثر اضافه‌کار روزانه (۰=نامحدود)" hint={hrs(form.otMaxDaily)}><input type="number" className={inputCls} value={form.otMaxDaily ?? ""} onChange={e => setF("otMaxDaily", +e.target.value)} /></Field>

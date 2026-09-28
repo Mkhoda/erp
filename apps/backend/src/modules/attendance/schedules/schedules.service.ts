@@ -26,7 +26,7 @@ export class SchedulesService {
   private readonly STR = ['startTime', 'endTime', 'flexInStart', 'flexInEnd', 'checkInStart', 'checkInEnd', 'checkOutStart', 'checkOutEnd'];
   private readonly INT = [
     'dailyMinutes', 'weeklyMinutes', 'lunchMinutes', 'graceMinutes',
-    'otMinThreshold', 'otMaxDaily', 'otMaxMonthly', 'otRounding', 'annualLeaveDays',
+    'otMinThreshold', 'otMaxDaily', 'otMaxMonthly', 'otRounding', 'annualLeaveDays', 'sickLeaveDays',
     'maxDailyLeaveMinutes',
   ];
 

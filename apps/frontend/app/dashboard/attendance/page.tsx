@@ -19,14 +19,14 @@ const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","م�
 
 const STATUS_FA: Record<string,string> = {
   PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت",
-  INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت",
+  INCOMPLETE:"ناقص", LEAVE:"مرخصی", SICK_LEAVE:"استعلاجی", MISSION:"ماموریت",
   REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته",
   OFF_DUTY:"استراحت (شیفت)",
   WORKING:"در حال کار",
 };
 const STATUS_CLR: Record<string,string> = {
   PRESENT:"#10b981", LATE:"#f59e0b", EARLY_LEAVE:"#eab308", ABSENT:"#ef4444",
-  INCOMPLETE:"#f97316", LEAVE:"#3b82f6", MISSION:"#8b5cf6",
+  INCOMPLETE:"#f97316", LEAVE:"#3b82f6", SICK_LEAVE:"#f43f5e", MISSION:"#8b5cf6",
   REMOTE_WORK:"#06b6d4", HOLIDAY:"#94a3b8", COMPANY_HOLIDAY:"#64748b", WEEKEND:"#cbd5e1",
   OFF_DUTY:"#cbd5e1",
   WORKING:"#10b981",
@@ -38,6 +38,7 @@ const STATUS_BADGE: Record<string,string> = {
   ABSENT:"bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
   INCOMPLETE:"bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400",
   LEAVE:"bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
+  SICK_LEAVE:"bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400",
   MISSION:"bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400",
   REMOTE_WORK:"bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400",
   HOLIDAY:"bg-slate-100 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400",

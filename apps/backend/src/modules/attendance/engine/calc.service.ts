@@ -37,6 +37,7 @@ export interface EffectiveSchedule {
   otRounding: number;
   otAllowed: boolean;
   annualLeaveDays: number;
+  sickLeaveDays: number;
   deficitToLeaveEnabled: boolean;
   absentToLeaveEnabled: boolean;
   // Hourly leave granted for a single day beyond this cap forces the whole day
@@ -68,6 +69,7 @@ const DEFAULTS: EffectiveSchedule = {
   otRounding: 15,
   otAllowed: true,
   annualLeaveDays: 26,
+  sickLeaveDays: 5,
   deficitToLeaveEnabled: true,
   absentToLeaveEnabled: true,
   maxDailyLeaveEnabled: true,
@@ -109,6 +111,7 @@ export class CalcService {
       s.otMaxMonthly = base.otMaxMonthly;
       s.otRounding = base.otRounding;
       s.annualLeaveDays = base.annualLeaveDays;
+      s.sickLeaveDays = base.sickLeaveDays;
       s.deficitToLeaveEnabled = base.deficitToLeaveEnabled;
       s.absentToLeaveEnabled = base.absentToLeaveEnabled;
       s.maxDailyLeaveEnabled = base.maxDailyLeaveEnabled;
@@ -259,7 +262,9 @@ export class CalcService {
     let earlyLeaveMinutes = 0;
     let nightMinutes = 0;
     let leaveMinutes = 0;
+    let sickLeaveMinutes = 0;
     let forceLeaveFull = false;
+    let forceLeaveFullSick = false; // which pool forceLeaveFull draws from — annual (LEAVE) or sick (SICK_LEAVE)
     let status: AttendanceStatus;
 
     const hasPunch = firstIn != null;
@@ -337,17 +342,24 @@ export class CalcService {
     // ⇒ partial leave that counts toward the required hours (so it can
     // produce overtime and excuses the shortfall). When the cap is disabled
     // for the group, granted leave is always treated as partial.
+    // isSickLeave routes the minutes to sickLeaveMinutes (a separate balance
+    // pool, see WorkSchedule.sickLeaveDays) instead of the annual leaveMinutes
+    // — the requirement-offsetting math is identical either way.
     const grantedLeave = override?.leaveMinutes ?? 0;
+    const grantedLeaveIsSick = !!override?.isSickLeave;
     if (grantedLeave > 0) {
       if (sched.maxDailyLeaveEnabled && grantedLeave > sched.maxDailyLeaveMinutes) {
         forceLeaveFull = true;
-        leaveMinutes = sched.dailyMinutes;
+        forceLeaveFullSick = grantedLeaveIsSick;
+        if (grantedLeaveIsSick) sickLeaveMinutes = sched.dailyMinutes;
+        else leaveMinutes = sched.dailyMinutes;
         delayMinutes = 0;
         earlyLeaveMinutes = 0;
         overtimeMinutes = workedMinutes; // present hours → overtime
       } else {
-        leaveMinutes = grantedLeave;
-        const extra = workedMinutes + delayMinutes + leaveMinutes - sched.dailyMinutes;
+        if (grantedLeaveIsSick) sickLeaveMinutes = grantedLeave;
+        else leaveMinutes = grantedLeave;
+        const extra = workedMinutes + delayMinutes + grantedLeave - sched.dailyMinutes;
         if (sched.otAllowed && extra >= sched.otMinThreshold) {
           const rounded = sched.otRounding > 0 ? Math.floor(extra / sched.otRounding) * sched.otRounding : extra;
           overtimeMinutes = Math.max(overtimeMinutes, sched.otMaxDaily > 0 ? Math.min(rounded, sched.otMaxDaily) : rounded);
@@ -381,7 +393,7 @@ export class CalcService {
     if (override?.forceStatus) {
       status = override.forceStatus;
     } else if (forceLeaveFull) {
-      status = AttendanceStatus.LEAVE;
+      status = forceLeaveFullSick ? AttendanceStatus.SICK_LEAVE : AttendanceStatus.LEAVE;
     } else if (isRemoteWorkDay && !hasPunch) {
       status = AttendanceStatus.REMOTE_WORK;
     } else if (holiday && !isRemoteWorkDay) {
@@ -432,11 +444,12 @@ export class CalcService {
     // staying late would silently cancel out a late arrival (same minutes counted both
     // as paid overtime AND as covering the daily requirement), hiding real lateness.
     const dayFullyAccountedFor = status === AttendanceStatus.LEAVE
+      || status === AttendanceStatus.SICK_LEAVE
       || status === AttendanceStatus.MISSION
       || status === AttendanceStatus.REMOTE_WORK;
     const workedTowardRequirement = Math.max(0, workedMinutes - overtimeMinutes);
     let deficitMinutes = (!holidayWork && !isRemoteWorkDay && !ambiguousPunches && !dayFullyAccountedFor && sched.employeeType === 'FULL_TIME' && (bothPunches || !hasPunch))
-      ? Math.max(0, sched.dailyMinutes - workedTowardRequirement - leaveMinutes)
+      ? Math.max(0, sched.dailyMinutes - workedTowardRequirement - leaveMinutes - sickLeaveMinutes)
       : 0;
 
     // ── Automatic leave conversion ───────────────────────────────────────
@@ -477,14 +490,14 @@ export class CalcService {
         userId, gregDate, jYear, jMonth, jDay,
         firstCheckIn: firstIn, lastCheckOut: lastOut,
         workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
-        delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes,
+        delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes, sickLeaveMinutes,
         autoConvertedLeave, status, isHolidayWork, hasOverride: !!override,
       },
       update: {
         jYear, jMonth, jDay,
         firstCheckIn: firstIn, lastCheckOut: lastOut,
         workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
-        delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes,
+        delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes, sickLeaveMinutes,
         autoConvertedLeave, status, isHolidayWork, hasOverride: !!override, computedAt: new Date(),
       },
     });

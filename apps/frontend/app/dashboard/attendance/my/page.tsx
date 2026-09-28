@@ -8,8 +8,8 @@ import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
-const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار" };
-const STATUS_CLS: Record<string,string> = { PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600", EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600", INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600", MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600", HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500", OFF_DUTY:"bg-slate-300/20 text-slate-500", WORKING:"bg-teal-500/15 text-teal-600" };
+const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", SICK_LEAVE:"استعلاجی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار" };
+const STATUS_CLS: Record<string,string> = { PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600", EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600", INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600", SICK_LEAVE:"bg-rose-500/15 text-rose-600", MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600", HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500", OFF_DUTY:"bg-slate-300/20 text-slate-500", WORKING:"bg-teal-500/15 text-teal-600" };
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 function liveStatus(r: any): string {
   if (r.status === "INCOMPLETE" && r.firstCheckIn && !r.lastCheckOut && r.gregDate?.slice(0, 10) === TODAY_ISO) return "WORKING";
@@ -140,7 +140,7 @@ export default function MyAttendancePage() {
   async function submitLeaveRequest() {
     if (!leaveForm.jy || !leaveForm.jm || !leaveForm.jd) { alert("تاریخ را انتخاب کنید"); return; }
     let hourlyMinutes: number | null = null;
-    if (leaveForm.type === "HOURLY_LEAVE") {
+    if (leaveForm.type === "HOURLY_LEAVE" || leaveForm.type === "SICK_HOURLY") {
       hourlyMinutes = rangeMinutes(leaveForm.leaveStart, leaveForm.leaveEnd);
       if (hourlyMinutes == null) { alert("بازه زمانی مرخصی را کامل و درست انتخاب کنید"); return; }
     }
@@ -154,6 +154,16 @@ export default function MyAttendancePage() {
         body.leaveMinutes = hourlyMinutes;
         body.inTime = leaveForm.leaveStart;
         body.outTime = leaveForm.leaveEnd;
+      } else if (leaveForm.type === "SICK_HOURLY") {
+        body.type = "LEAVE";
+        body.leaveMinutes = hourlyMinutes;
+        body.inTime = leaveForm.leaveStart;
+        body.outTime = leaveForm.leaveEnd;
+        body.isSickLeave = true;
+      } else if (leaveForm.type === "SICK_LEAVE") {
+        body.type = "LEAVE";
+        body.targetStatus = "SICK_LEAVE";
+        body.isSickLeave = true;
       } else {
         body.type = "LEAVE";
         body.targetStatus = leaveForm.type;
@@ -178,7 +188,7 @@ export default function MyAttendancePage() {
 
   async function submitRequest() {
     let hourlyMinutes: number | null = null;
-    if (reqForm.kind === "HOURLY_LEAVE") {
+    if (reqForm.kind === "HOURLY_LEAVE" || reqForm.kind === "SICK_HOURLY") {
       hourlyMinutes = rangeMinutes(reqForm.leaveStart, reqForm.leaveEnd);
       if (hourlyMinutes == null) { alert("بازه زمانی مرخصی را کامل و درست انتخاب کنید"); return; }
     }
@@ -193,6 +203,8 @@ export default function MyAttendancePage() {
         if (doOut) { if (reqForm.delOut) body.clearCheckOut = true; else body.outTime = reqForm.outTime; }
       } else if (k === "EXPLANATION") { body.type = "EXPLANATION"; }
       else if (k === "HOURLY_LEAVE") { body.type = "LEAVE"; body.leaveMinutes = hourlyMinutes; body.inTime = reqForm.leaveStart; body.outTime = reqForm.leaveEnd; }
+      else if (k === "SICK_HOURLY") { body.type = "LEAVE"; body.leaveMinutes = hourlyMinutes; body.inTime = reqForm.leaveStart; body.outTime = reqForm.leaveEnd; body.isSickLeave = true; }
+      else if (k === "SICK_LEAVE") { body.type = "LEAVE"; body.targetStatus = "SICK_LEAVE"; body.isSickLeave = true; }
       else { body.type = "LEAVE"; body.targetStatus = k; } // LEAVE | MISSION | REMOTE_WORK
       const res = await fetch(`${API}/attendance/me/requests`, { method: "POST", headers: h, body: JSON.stringify(body) });
       if (res.ok) { setModal(null); await load(); }
@@ -244,6 +256,33 @@ export default function MyAttendancePage() {
             ] as { lbl: string; val: string; cls: string }[]).map((item, i) => (
               <React.Fragment key={item.lbl}>
                 {i > 0 && <div className="w-px bg-blue-500/20 self-stretch" />}
+                <div className="flex flex-col items-center justify-center px-3 py-2 text-center">
+                  <span className="text-theme-muted whitespace-nowrap">{item.lbl}</span>
+                  <span className={`font-semibold whitespace-nowrap mt-0.5 ${item.cls}`}>{item.val}</span>
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {leave && (
+        <div className="border border-rose-500/30 rounded-xl overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5 bg-rose-500/10 border-b border-rose-500/20">
+            <span className="text-theme-primary font-semibold text-sm">مرخصی استعلاجی سال {toFa(String(leave.jYear))}</span>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-rose-600 font-bold">{fmtDH(leave.sickRemainingDays)} مانده</span>
+              <span className="text-theme-muted text-xs">از {faNum(leave.sickEntitlement)} روز</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-stretch bg-rose-500/5 text-xs">
+            {([
+              { lbl: "استعلاجی روزانه", val: `${faNum(leave.sickFullDays)} روز`, cls: "text-rose-600" },
+              { lbl: "استعلاجی ساعتی", val: fmtMin(leave.sickHourlyMinutes), cls: "text-rose-600" },
+              { lbl: "مصرف کل", val: `${faNum(leave.sickUsedDays)} روز`, cls: "text-orange-600" },
+            ] as { lbl: string; val: string; cls: string }[]).map((item, i) => (
+              <React.Fragment key={item.lbl}>
+                {i > 0 && <div className="w-px bg-rose-500/20 self-stretch" />}
                 <div className="flex flex-col items-center justify-center px-3 py-2 text-center">
                   <span className="text-theme-muted whitespace-nowrap">{item.lbl}</span>
                   <span className={`font-semibold whitespace-nowrap mt-0.5 ${item.cls}`}>{item.val}</span>
@@ -440,11 +479,13 @@ export default function MyAttendancePage() {
             <select value={leaveForm.type} onChange={e => setLeaveForm(s => ({ ...s, type: e.target.value }))} className="input-theme text-sm">
               <option value="LEAVE">مرخصی (کل روز)</option>
               <option value="HOURLY_LEAVE">مرخصی ساعتی</option>
+              <option value="SICK_LEAVE">استعلاجی (کل روز)</option>
+              <option value="SICK_HOURLY">استعلاجی ساعتی</option>
               <option value="MISSION">ماموریت (کل روز)</option>
               <option value="REMOTE_WORK">دورکاری (کل روز)</option>
             </select>
           </div>
-          {leaveForm.type === "HOURLY_LEAVE" && (
+          {(leaveForm.type === "HOURLY_LEAVE" || leaveForm.type === "SICK_HOURLY") && (
             <div>
               <label className="block mb-1 text-theme-secondary text-xs">بازه مرخصی</label>
               <div className="flex items-center gap-2">
@@ -454,7 +495,7 @@ export default function MyAttendancePage() {
               </div>
               <p className="mt-1 text-[11px] text-theme-muted">
                 {(() => { const m = rangeMinutes(leaveForm.leaveStart, leaveForm.leaveEnd); return m != null ? `مدت: ${fmtMin(m)}` : ""; })()}
-                {" "}بیشتر از ۳ ساعت = کل روز مرخصی
+                {" "}بیشتر از سقف روزانه گروه = کل روز {leaveForm.type === "SICK_HOURLY" ? "استعلاجی" : "مرخصی"}
               </p>
             </div>
           )}
@@ -490,12 +531,14 @@ export default function MyAttendancePage() {
                 <option value="FIX">اصلاح ساعت ورود/خروج</option>
                 <option value="HOURLY_LEAVE">مرخصی ساعتی</option>
                 <option value="LEAVE">مرخصی (کل روز)</option>
+                <option value="SICK_HOURLY">استعلاجی ساعتی</option>
+                <option value="SICK_LEAVE">استعلاجی (کل روز)</option>
                 <option value="MISSION">ماموریت (کل روز)</option>
                 <option value="REMOTE_WORK">دورکاری (کل روز)</option>
                 <option value="EXPLANATION">توضیح</option>
               </select>
             </div>
-            {reqForm.kind === "HOURLY_LEAVE" && (
+            {(reqForm.kind === "HOURLY_LEAVE" || reqForm.kind === "SICK_HOURLY") && (
               <div>
                 <label className="block mb-1 text-theme-secondary text-xs">بازه مرخصی</label>
                 <div className="flex items-center gap-2">
@@ -505,7 +548,7 @@ export default function MyAttendancePage() {
                 </div>
                 <p className="mt-1 text-[11px] text-theme-muted">
                   {(() => { const m = rangeMinutes(reqForm.leaveStart, reqForm.leaveEnd); return m != null ? `مدت: ${fmtMin(m)} — ` : ""; })()}
-                  بیشتر از ۳ ساعت = کل روز مرخصی و ساعات حضور اضافه‌کار محاسبه می‌شود.
+                  بیشتر از سقف روزانه گروه = کل روز {reqForm.kind === "SICK_HOURLY" ? "استعلاجی" : "مرخصی"} و ساعات حضور اضافه‌کار محاسبه می‌شود.
                 </p>
               </div>
             )}

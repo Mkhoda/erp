@@ -229,8 +229,9 @@ export class RecordsService {
       });
     }
     const entitlement = sched?.annualLeaveDays ?? 26;
+    const sickEntitlement = sched?.sickLeaveDays ?? 5;
     const dailyReq = sched?.dailyMinutes ?? 500;
-    const [fullDays, absentDays, mission, remote, tardyAgg, hourlyAgg] = await Promise.all([
+    const [fullDays, absentDays, mission, remote, tardyAgg, hourlyAgg, sickFullDays, sickHourlyAgg] = await Promise.all([
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'LEAVE' } }),
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'ABSENT' } }),
       this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'MISSION' } }),
@@ -248,14 +249,26 @@ export class RecordsService {
         where: { userId, jYear, status: { not: 'LEAVE' } },
         _sum: { leaveMinutes: true },
       }),
+      // Sick leave is a separate pool — same full-day/hourly split, but never
+      // auto-converted (no tardy/absence deduction against it), so it's just
+      // these two counts.
+      this.prisma.attendanceDay.count({ where: { userId, jYear, status: 'SICK_LEAVE' } }),
+      this.prisma.attendanceDay.aggregate({
+        where: { userId, jYear, status: { not: 'SICK_LEAVE' } },
+        _sum: { sickLeaveMinutes: true },
+      }),
     ]);
     const tardyMinutes = (tardyAgg._sum.delayMinutes ?? 0) + (tardyAgg._sum.earlyLeaveMinutes ?? 0);
     const hourlyLeaveMinutes = hourlyAgg._sum.leaveMinutes ?? 0;
+    const sickHourlyMinutes = sickHourlyAgg._sum.sickLeaveMinutes ?? 0;
 
     const r2 = (n: number) => Math.round(n * 100) / 100;
     const entitlementMin = entitlement * dailyReq;
     const usedMin = fullDays * dailyReq + absentDays * dailyReq + hourlyLeaveMinutes + tardyMinutes;
     const remainingMin = Math.max(0, entitlementMin - usedMin);
+    const sickEntitlementMin = sickEntitlement * dailyReq;
+    const sickUsedMin = sickFullDays * dailyReq + sickHourlyMinutes;
+    const sickRemainingMin = Math.max(0, sickEntitlementMin - sickUsedMin);
     return {
       jYear, entitlement, dailyReq, mission, remote,
       fullDays,                                   // whole-day leaves
@@ -266,6 +279,14 @@ export class RecordsService {
       usedDays: r2(usedMin / dailyReq),
       remainingMinutes: remainingMin,
       remainingDays: r2(remainingMin / dailyReq),
+      // Sick-leave balance — separate pool, see WorkSchedule.sickLeaveDays.
+      sickEntitlement,
+      sickFullDays,
+      sickHourlyMinutes,
+      sickUsedMinutes: sickUsedMin,
+      sickUsedDays: r2(sickUsedMin / dailyReq),
+      sickRemainingMinutes: sickRemainingMin,
+      sickRemainingDays: r2(sickRemainingMin / dailyReq),
     };
   }
 

@@ -5,7 +5,7 @@ import Modal from "../../../components/ui/Modal";
 import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
-const STATUS_FA: Record<string,string> = { LEAVE:"مرخصی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری" };
+const STATUS_FA: Record<string,string> = { LEAVE:"مرخصی", SICK_LEAVE:"استعلاجی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری" };
 const TYPE_FA: Record<string,string> = { CHECK_IN_FIX:"اصلاح ورود", CHECK_OUT_FIX:"اصلاح خروج", FULL_DAY_FIX:"اصلاح ساعت", EXPLANATION:"توضیح", LEAVE:"مرخصی/ماموریت" };
 const REQ_STATUS_FA: Record<string,string> = { PENDING:"در انتظار", APPROVED:"تایید شده", REJECTED:"رد شده" };
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
@@ -43,7 +43,11 @@ export default function ApprovalsPage() {
   }
   const arrow = (k: string) => sortK === k ? (sortDir === "asc" ? " ↑" : " ↓") : "";
 
-  const reqTypeLabel = (q: any) => q.targetStatus ? STATUS_FA[q.targetStatus] : TYPE_FA[q.type] || q.type;
+  const reqTypeLabel = (q: any) => {
+    if (q.targetStatus) return STATUS_FA[q.targetStatus] || q.targetStatus;
+    if (q.type === "LEAVE" && q.leaveMinutes) return q.isSickLeave ? "استعلاجی (ساعتی)" : "مرخصی ساعتی";
+    return TYPE_FA[q.type] || q.type;
+  };
 
   const filteredRows = React.useMemo(() => {
     let arr = rows;

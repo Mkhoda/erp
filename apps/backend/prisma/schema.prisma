@@ -495,6 +495,7 @@ enum AttendanceStatus {
   ABSENT
   INCOMPLETE
   LEAVE
+  SICK_LEAVE // مرخصی استعلاجی — separate balance pool from LEAVE (see WorkSchedule.sickLeaveDays)
   MISSION
   REMOTE_WORK
   HOLIDAY
@@ -668,7 +669,8 @@ model AttendanceDay {
   earlyLeaveMinutes      Int              @default(0)
   deficitMinutes         Int              @default(0)   // shortfall vs required hours (delay+earlyLeave+unworked)
   nightMinutes           Int              @default(0)
-  leaveMinutes      Int              @default(0)        // approved leave for the day (hourly or full)
+  leaveMinutes      Int              @default(0)        // approved annual leave for the day (hourly or full)
+  sickLeaveMinutes  Int              @default(0)        // approved sick leave for the day (hourly or full) — separate balance pool from leaveMinutes
   autoConvertedLeave Boolean         @default(false)    // leaveMinutes/status here came from automatic deficit→hourly or absence→daily conversion, not an approved request
   status            AttendanceStatus
   isHolidayWork     Boolean          @default(false)
@@ -693,6 +695,7 @@ model AttendanceOverride {
   clearCheckOut Boolean         @default(false)          // explicitly wipe the check-out punch for the day
   forceStatus AttendanceStatus?
   leaveMinutes Int?                                     // hourly-leave minutes granted for the day
+  isSickLeave Boolean           @default(false)          // this leave (full-day forceStatus=SICK_LEAVE, or hourly leaveMinutes) draws from the sick-leave balance instead of annual
   reason      String
   createdById String
   createdBy   User              @relation("AttnOverrideBy", fields: [createdById], references: [id])
@@ -728,6 +731,7 @@ model WorkSchedule {
   otMaxMonthly   Int      @default(3600)
   otRounding     Int      @default(15)                 // round OT to nearest N minutes
   annualLeaveDays Int     @default(26)                 // yearly paid-leave entitlement (days)
+  sickLeaveDays   Int     @default(5)                  // yearly sick-leave entitlement (days) — separate balance pool
   deficitToLeaveEnabled Boolean @default(true)          // auto-cover daily shortfall from the hourly-leave balance
   absentToLeaveEnabled  Boolean @default(true)          // auto-convert an ABSENT day to LEAVE when annual balance allows
   maxDailyLeaveEnabled  Boolean @default(true)          // cap hourly leave granted in a single day
@@ -889,6 +893,7 @@ model AttendanceRequest {
   // For leave/mission/remote-work declarations — the status to force on approval.
   targetStatus AttendanceStatus?
   leaveMinutes Int?                                     // hourly-leave duration (minutes)
+  isSickLeave  Boolean           @default(false)         // requesting sick leave (SICK_LEAVE status or hourly) — draws from the separate sick-leave balance
   description  String
   attachment   String?
   status       AttnRequestStatus @default(PENDING)

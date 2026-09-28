@@ -16,11 +16,12 @@ const FIELD_HELP: Record<string, string> = {
   deficit: "کمبود کارکرد نسبت به ساعت کاری مورد نیاز پس از کسر مرخصی. اگر تنظیمات گروه فعال باشد، به‌صورت خودکار از مانده مرخصی سالانه کسر می‌شود.",
   night: "دقایق کارکرد هم‌پوشان با بازه‌ی ۲۲:۰۰ تا ۰۶:۰۰.",
   leave: "دقایق مرخصی این روز — یا دستی ثبت شده، یا به‌صورت خودکار از کسری/غیبت تبدیل شده.",
+  sickLeave: "دقایق مرخصی استعلاجی این روز — از موجودی جداگانه‌ی مرخصی استعلاجی کسر می‌شود، نه مرخصی استحقاقی.",
 };
 
 const STATUS_FA: Record<string, string> = {
   PRESENT: "حاضر", LATE: "تاخیر", EARLY_LEAVE: "تعجیل", ABSENT: "غیبت", INCOMPLETE: "ناقص",
-  LEAVE: "مرخصی", MISSION: "ماموریت", REMOTE_WORK: "دورکاری", HOLIDAY: "تعطیل",
+  LEAVE: "مرخصی", SICK_LEAVE: "استعلاجی", MISSION: "ماموریت", REMOTE_WORK: "دورکاری", HOLIDAY: "تعطیل",
   COMPANY_HOLIDAY: "تعطیل شرکت", WEEKEND: "آخر هفته", OFF_DUTY: "استراحت (شیفت)",
 };
 
@@ -52,8 +53,8 @@ type Props = {
   detail: DayDetail | null;
   // Admin-only "اصلاح ساعت ورود/خروج" tab — omit for self-service (read-only) use.
   allowOverride?: boolean;
-  ov?: { inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean };
-  setOv?: React.Dispatch<React.SetStateAction<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean }>>;
+  ov?: { inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean; isSickLeave: boolean };
+  setOv?: React.Dispatch<React.SetStateAction<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean; isSickLeave: boolean }>>;
   onSaveOverride?: () => void;
   ovSaving?: boolean;
   // Self-service (employee) path: open the parent's request modal pre-set to
@@ -149,6 +150,9 @@ export default function DayDetailModal({ open, onClose, detail, allowOverride, o
                 {row.leaveMinutes > 0 && (
                   <Info label="مرخصی" value={`${fmtMin(row.leaveMinutes)}${row.autoConvertedLeave ? " (خودکار)" : ""}`} cls="text-blue-600" help={FIELD_HELP.leave} />
                 )}
+                {row.sickLeaveMinutes > 0 && (
+                  <Info label="استعلاجی" value={fmtMin(row.sickLeaveMinutes)} cls="text-rose-600" help={FIELD_HELP.sickLeave} />
+                )}
               </div>
             </div>
           )}
@@ -213,12 +217,16 @@ export default function DayDetailModal({ open, onClose, detail, allowOverride, o
                   <label className="block mb-1 text-theme-secondary text-xs">وضعیت (اختیاری)</label>
                   <select value={ov.status} onChange={e => setOv(s => ({ ...s, status: e.target.value }))} className="input-theme text-sm">
                     <option value="">— خودکار —</option>
-                    {["PRESENT", "LEAVE", "MISSION", "REMOTE_WORK", "ABSENT"].map(s => <option key={s} value={s}>{STATUS_FA[s]}</option>)}
+                    {["PRESENT", "LEAVE", "SICK_LEAVE", "MISSION", "REMOTE_WORK", "ABSENT"].map(s => <option key={s} value={s}>{STATUS_FA[s]}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block mb-1 text-theme-secondary text-xs">مرخصی ساعتی (ساعت)</label>
                   <input type="number" step="0.5" min="0" dir="ltr" value={ov.leaveHours} onChange={e => setOv(s => ({ ...s, leaveHours: e.target.value }))} className="input-theme text-sm" placeholder="مثلاً 2" />
+                  <label className="mt-1 flex items-center gap-1.5 text-[11px] text-rose-600 cursor-pointer">
+                    <input type="checkbox" checked={ov.isSickLeave} onChange={e => setOv(s => ({ ...s, isSickLeave: e.target.checked }))} />
+                    استعلاجی (از موجودی جدا کسر شود)
+                  </label>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block mb-1 text-theme-secondary text-xs">دلیل</label>
