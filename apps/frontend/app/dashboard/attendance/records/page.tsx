@@ -3,7 +3,7 @@ import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
   FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, ScrollText, Filter,
-  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon, Maximize2,
+  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
@@ -546,23 +546,18 @@ function RulesPanel({ rules: r }: { rules: any }) {
 
 function SumCard({ label, value, cls, icon: Icon, iconCls, onClick }: { label: string; value: string; cls?: string; icon: any; iconCls: string; onClick?: () => void }) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       onClick={onClick}
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick?.(); } }}
-      className="group relative bg-theme-card border border-theme rounded-2xl p-3.5 text-right cursor-pointer hover:border-blue-400/50 hover:shadow-theme-lg transition-all"
+      title={`مشاهده جزئیات ${label}`}
+      className="flex items-center gap-2 bg-theme-card border border-theme rounded-2xl px-3 py-2.5 w-full hover:border-blue-400/50 hover:shadow-theme-lg transition-all"
     >
-      <div className="flex items-start justify-between mb-2.5">
-        <button type="button" onClick={e => { e.stopPropagation(); onClick?.(); }} title={`مشاهده جزئیات ${label}`}
-          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${iconCls}`}>
-          <Icon className="w-5 h-5" />
-        </button>
-        <Maximize2 className="w-3.5 h-3.5 text-theme-muted/40 group-hover:text-blue-500 transition-colors mt-1.5" />
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconCls}`}>
+        <Icon className="w-4 h-4" />
       </div>
-      <div className={`text-2xl font-extrabold leading-none tracking-tight ${cls || "text-theme-primary"}`} dir="ltr">{value}</div>
-      <div className="text-[11px] text-theme-muted mt-1.5">{label}</div>
-    </div>
+      <span className="text-xs text-theme-muted truncate flex-1 text-right">{label}</span>
+      <span className={`text-lg font-extrabold shrink-0 ${cls || "text-theme-primary"}`} dir="ltr">{value}</span>
+    </button>
   );
 }
 
