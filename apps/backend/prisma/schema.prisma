@@ -696,6 +696,7 @@ model AttendanceOverride {
   forceStatus AttendanceStatus?
   leaveMinutes Int?                                     // hourly-leave minutes granted for the day
   isSickLeave Boolean           @default(false)          // this leave (full-day forceStatus=SICK_LEAVE, or hourly leaveMinutes) draws from the sick-leave balance instead of annual
+  attachment  String?                                    // copied from the approved AttendanceRequest (e.g. doctor's note for sick leave) so records/day-detail can show it without joining back to the request
   reason      String
   createdById String
   createdBy   User              @relation("AttnOverrideBy", fields: [createdById], references: [id])
