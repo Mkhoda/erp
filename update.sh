@@ -155,6 +155,16 @@ fi
 if [ "$DO_BUILD" -eq 1 ]; then
   header "Build"
 
+  # Regenerate the Prisma client first so the build and runtime match schema.prisma
+  # (new columns otherwise fail at runtime with "Unknown argument").
+  step_start "Prisma generate"
+  if (cd apps/backend && npx prisma generate >/dev/null 2>&1); then
+    step_done
+  else
+    step_fail
+    warn "prisma generate failed"
+  fi
+
   step_start "Backend build"
   npm --prefix apps/backend run build 2>&1 | grep -E '(error TS|Error:|warning TS)' | head -20 || true
   step_done
@@ -176,6 +186,7 @@ if [ "$DO_BUILD" -eq 1 ]; then
     exit 1
   fi
 else
+  _STEP_NAME="Prisma generate"; step_skip
   _STEP_NAME="Backend build";   step_skip
   _STEP_NAME="Prisma migrate";  step_skip
   _STEP_NAME="Frontend build";  step_skip

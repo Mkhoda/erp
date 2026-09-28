@@ -3,14 +3,21 @@ import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
   Megaphone, Plus, Pencil, Trash2, Send, BarChart3, X,
-  ChevronRight, ChevronLeft, Search, Clock, CheckCircle2,
+  ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Paperclip, Upload, Loader2,
 } from "lucide-react";
 import { useToast } from "../../../components/ui/Toast";
 import SearchSelect from "../../../components/ui/SearchSelect";
+import { AnnAttachment, fmtSize } from "../../../components/announcements/shared";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const TYPE_FA: Record<string, string> = { BANNER: "بنر", POPUP: "پاپ‌آپ", NOTIFICATION: "اعلان" };
+// How each type is surfaced to users in the dashboard
+const TYPE_HINT: Record<string, string> = {
+  BANNER: "به صورت بنر در بالای صفحات داشبورد نمایش داده می‌شود.",
+  POPUP: "هنگام ورود کاربر به داشبورد در یک پنجره نمایش داده می‌شود.",
+  NOTIFICATION: "به صورت کارت اعلان در گوشه داشبورد و در زنگوله اعلان‌ها نمایش داده می‌شود.",
+};
 const TARGET_FA: Record<string, string> = { ALL: "همه کاربران", DEPARTMENT: "دپارتمان", ROLE: "نقش", USER: "کاربر خاص" };
 const PRIORITY_FA: Record<string, string> = { CRITICAL: "بحرانی", HIGH: "بالا", NORMAL: "عادی", LOW: "کم", INFO: "اطلاعات" };
 const PRIORITY_COLORS: Record<string, string> = {
@@ -153,6 +160,7 @@ type Ann = {
   targetType: string; targetDeptIds: string[]; targetRoles: string[]; targetUserIds: string[];
   isSticky: boolean; isPublished: boolean; showOnce: boolean; showUntilAck: boolean;
   publishAt: string | null; expireAt: string | null;
+  attachments?: AnnAttachment[] | null;
   author: { firstName: string; lastName: string };
   _count: { acks: number };
   createdAt: string;
@@ -163,6 +171,7 @@ const emptyForm = () => ({
   targetDeptIds: [] as string[], targetRoles: [] as string[], targetUserIds: [] as string[],
   isSticky: false, showOnce: false, showUntilAck: false,
   publishAt: "", expireAt: "",
+  attachments: [] as AnnAttachment[],
 });
 
 export default function AnnouncementsPage() {
@@ -185,6 +194,7 @@ export default function AnnouncementsPage() {
   const [editing, setEditing] = React.useState<Ann | null>(null);
   const [form, setForm] = React.useState(emptyForm());
   const [saving, setSaving] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
   const [ackStats, setAckStats] = React.useState<any>(null);
   const [departments, setDepartments] = React.useState<any[]>([]);
   const [users, setUsers] = React.useState<any[]>([]);
@@ -234,6 +244,7 @@ export default function AnnouncementsPage() {
       showUntilAck: ann.showUntilAck,
       publishAt: ann.publishAt ? ann.publishAt.slice(0, 16) : "",
       expireAt: ann.expireAt ? ann.expireAt.slice(0, 16) : "",
+      attachments: Array.isArray(ann.attachments) ? ann.attachments : [],
     });
     setModal("edit");
   };
@@ -266,6 +277,27 @@ export default function AnnouncementsPage() {
       setPage(1);
       await load(1);
     } finally { setSaving(false); }
+  };
+
+  const uploadFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const added: AnnAttachment[] = [];
+      for (const file of Array.from(files)) {
+        if (file.size > 20 * 1024 * 1024) { toast.error(`«${file.name}» بزرگ‌تر از ۲۰ مگابایت است`); continue; }
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await fetch(`${API}/notifications/announcements/upload`, { method: "POST", headers: h as any, body: fd });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          toast.error(`آپلود «${file.name}» ناموفق بود${err?.message ? `: ${err.message}` : ""}`);
+          continue;
+        }
+        added.push(await r.json());
+      }
+      if (added.length) setForm(f => ({ ...f, attachments: [...f.attachments, ...added].slice(0, 10) }));
+    } finally { setUploading(false); }
   };
 
   const publish = async (id: string) => {
@@ -364,7 +396,14 @@ export default function AnnouncementsPage() {
                 {rows.map((ann) => (
                   <tr key={ann.id} className="hover:bg-theme-hover transition-colors">
                     <td className="px-3 py-2.5">
-                      <div className="font-medium text-theme-primary max-w-48 truncate">{ann.title}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-theme-primary max-w-48 truncate">{ann.title}</span>
+                        {!!ann.attachments?.length && (
+                          <span className="flex items-center gap-0.5 text-[11px] text-theme-muted shrink-0" title="پیوست">
+                            <Paperclip className="w-3 h-3" />{ann.attachments.length}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-theme-muted mt-0.5">
                         {ann.author.firstName} {ann.author.lastName} · {fmtDate(ann.createdAt)}
                       </div>
@@ -472,6 +511,30 @@ export default function AnnouncementsPage() {
                   value={form.body} onChange={e => pf("body", e.target.value)} />
               </div>
 
+              {/* Attachments */}
+              <div>
+                <label className="block text-sm font-medium text-theme-secondary mb-1.5">پیوست‌ها</label>
+                <label className={`flex items-center justify-center gap-2 border-2 border-dashed border-theme rounded-xl px-4 py-3 text-sm text-theme-muted transition-colors ${uploading ? "opacity-60" : "cursor-pointer hover:bg-theme-hover"}`}>
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {uploading ? "در حال آپلود..." : "افزودن فایل (تصویر، PDF، اسناد آفیس، ZIP — تا ۲۰ مگابایت)"}
+                  <input type="file" multiple className="hidden" disabled={uploading}
+                    onChange={e => { uploadFiles(e.target.files); e.target.value = ""; }} />
+                </label>
+                {form.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {form.attachments.map(a => (
+                      <span key={a.url} className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs bg-theme-secondary border border-theme text-theme-secondary">
+                        <Paperclip className="w-3 h-3 shrink-0" />
+                        <a href={a.url} target="_blank" rel="noopener noreferrer" className="truncate max-w-[200px] hover:underline">{a.name}</a>
+                        {a.size ? <span className="text-theme-muted" dir="ltr">{fmtSize(a.size)}</span> : null}
+                        <button type="button" onClick={() => pf("attachments", form.attachments.filter(x => x.url !== a.url))}
+                          className="text-theme-muted hover:text-red-500" title="حذف پیوست"><X className="w-3 h-3" /></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Type + Priority */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -479,6 +542,7 @@ export default function AnnouncementsPage() {
                   <select className="input-theme w-full text-sm" value={form.type} onChange={e => pf("type", e.target.value)}>
                     {Object.entries(TYPE_FA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
+                  <p className="text-[11px] text-theme-muted mt-1 leading-relaxed">{TYPE_HINT[form.type]}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-theme-secondary mb-1.5">اولویت</label>
@@ -577,7 +641,7 @@ export default function AnnouncementsPage() {
               <button onClick={() => setModal(null)} className="px-4 py-2 rounded-xl border border-theme text-theme-secondary text-sm hover:bg-theme-hover">
                 انصراف
               </button>
-              <button onClick={save} disabled={saving}
+              <button onClick={save} disabled={saving || uploading}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
                 {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                 {modal === "edit" ? "ذخیره" : "ایجاد"}

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseGuards, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseFilters, UseGuards, Req } from '@nestjs/common';
 import { AssetsService } from './assets.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -6,8 +6,10 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Response } from 'express';
 import { generateQrPng, generateCode128Png } from './barcode.util';
 import { ConfigService } from '@nestjs/config';
+import { AssetsPrismaErrorFilter } from './prisma-error.filter';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@UseFilters(AssetsPrismaErrorFilter)
 @Controller('assets')
 export class AssetsController {
   constructor(private readonly service: AssetsService, private config: ConfigService) {}
@@ -17,12 +19,12 @@ export class AssetsController {
   list(@Query() query: any) { return this.service.list(query); }
 
   @Get(':id')
-  @Roles('ADMIN', 'MANAGER', 'USER')
+  @Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
   get(@Param('id') id: string) { return this.service.get(id); }
 
   @Post()
   @Roles('ADMIN', 'MANAGER')
-  create(@Body() data: any, @Req() req: any) { return this.service.create({ ...data, createdById: req?.user?.userId }); }
+  create(@Body() data: any, @Req() req: any) { return this.service.create({ ...data, createdById: req?.user?.id }); }
 
   @Patch(':id')
   @Roles('ADMIN', 'MANAGER', 'EXPERT')
@@ -32,11 +34,22 @@ export class AssetsController {
   @Roles('ADMIN')
   remove(@Param('id') id: string) { return this.service.remove(id); }
 
+  /** Attach an already-uploaded image (see POST /uploads/asset-image) to the asset. */
+  @Post(':id/images')
+  @Roles('ADMIN', 'MANAGER', 'EXPERT')
+  addImage(@Param('id') id: string, @Body() body: { url?: string; caption?: string }) {
+    if (!body?.url || !body.url.startsWith('/uploads/assets/')) throw new BadRequestException('آدرس تصویر نامعتبر است');
+    return this.service.addImage(id, body.url, body.caption);
+  }
+
+  @Delete(':id/images/:imageId')
+  @Roles('ADMIN', 'MANAGER', 'EXPERT')
+  removeImage(@Param('id') id: string, @Param('imageId') imageId: string) { return this.service.removeImage(id, imageId); }
+
   @Get(':id/qr.png')
-  @Roles('ADMIN', 'MANAGER', 'USER')
+  @Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
   async qr(@Param('id') id: string, @Res() res: Response) {
-    const item = await this.service.get(id);
-    if (!item) { res.status(404).end(); return; }
+    await this.service.get(id);
     const appUrl = this.config.get<string>('APP_URL') || 'http://localhost:3000';
     const url = `${appUrl}/dashboard/assets/${id}`;
     const png = await generateQrPng(url);
@@ -45,11 +58,10 @@ export class AssetsController {
   }
 
   @Get(':id/barcode.png')
-  @Roles('ADMIN', 'MANAGER', 'USER')
+  @Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
   async barcode(@Param('id') id: string, @Res() res: Response) {
     const item = await this.service.get(id);
-    if (!item) { res.status(404).end(); return; }
-  const png = await generateCode128Png(item.barcode || id);
+    const png = await generateCode128Png(item.barcode || id);
     res.setHeader('Content-Type', 'image/png');
     res.send(png);
   }

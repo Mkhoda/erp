@@ -50,9 +50,9 @@ export class ChatHistoryController {
   send(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { content: string; safeMode?: boolean },
+    @Body() body: { content: string; safeMode?: boolean; providerId?: string },
   ) {
-    return this.svc.sendMessage(this.uid(req), id, body.content, body.safeMode ?? false);
+    return this.svc.sendMessage(this.uid(req), id, body.content, body.safeMode ?? false, body.providerId);
   }
 
   @Post('conversations/:id/compact')

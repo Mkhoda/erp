@@ -17,6 +17,8 @@ const DEFAULT_URLS: Record<string, string> = {
   custom:     '',
 };
 
+const SAFE_MODE_PROMPT = 'You are a helpful, safe, and professional assistant. Respond in the same language as the user. Avoid harmful content.';
+
 export const VALID_PROVIDER_TYPES = ['agnes', 'openai', 'anthropic', 'gemini', 'deepseek', 'groq', 'openrouter', 'ollama', 'whisper', 'custom'] as const;
 export type ProviderType = typeof VALID_PROVIDER_TYPES[number];
 
@@ -367,35 +369,59 @@ export class AiSettingsService {
     return { message: 'Connected successfully', response: JSON.stringify(data).substring(0, 200) };
   }
 
+  /**
+   * Splits system instructions from the dialogue and cleans the dialogue so every
+   * provider accepts it: drops empty turns, merges consecutive same-role turns
+   * (e.g. a user message whose reply failed), and makes sure it starts with a user turn.
+   */
+  private prepareMessages(messages: Array<{ role: string; content: string }>, safeMode: boolean) {
+    const systemParts: string[] = [];
+    if (safeMode) systemParts.push(SAFE_MODE_PROMPT);
+    const dialogue: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+    for (const m of messages || []) {
+      const content = typeof m?.content === 'string' ? m.content.trim() : '';
+      if (!content) continue;
+      if (m.role === 'system') { systemParts.push(content); continue; }
+      const role = m.role === 'assistant' ? 'assistant' : 'user';
+      const last = dialogue[dialogue.length - 1];
+      if (last && last.role === role) last.content += `\n\n${content}`;
+      else dialogue.push({ role, content });
+    }
+    while (dialogue.length && dialogue[0].role !== 'user') dialogue.shift();
+    return { system: systemParts.join('\n\n'), dialogue };
+  }
+
   private async callChat(provider: any, messages: Array<{ role: string; content: string }>, safeMode: boolean) {
     const baseUrl = provider.apiUrl || DEFAULT_URLS[provider.type] || '';
+    const { system, dialogue } = this.prepareMessages(messages, safeMode);
     switch (provider.type) {
-      case 'anthropic':  return this.chatAnthropic(baseUrl, provider.apiKey, provider.model, messages, safeMode);
-      case 'gemini':     return this.chatGemini(baseUrl, provider.apiKey, provider.model, messages, safeMode);
-      case 'agnes':      return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, messages, safeMode, true);
-      case 'openrouter': return this.chatOpenRouter(baseUrl, provider.apiKey, provider.model, messages, safeMode);
-      case 'ollama':     return this.chatOpenAI(baseUrl, provider.apiKey || 'ollama', provider.model, messages, safeMode);
-      default:           return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, messages, safeMode);
+      case 'anthropic':  return this.chatAnthropic(baseUrl, provider.apiKey, provider.model, system, dialogue);
+      case 'gemini':     return this.chatGemini(baseUrl, provider.apiKey, provider.model, system, dialogue, safeMode);
+      case 'agnes':      return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, system, dialogue, safeMode, true);
+      case 'openrouter': return this.chatOpenRouter(baseUrl, provider.apiKey, provider.model, system, dialogue);
+      case 'ollama':     return this.chatOllama(baseUrl, provider.model, system, dialogue, safeMode, provider.config);
+      default:           return this.chatOpenAI(baseUrl, provider.apiKey, provider.model, system, dialogue, safeMode);
     }
   }
 
-  private async chatOpenAI(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean, isAgnes = false) {
+  private async chatOpenAI(baseUrl: string, apiKey: string, model: string | null, system: string, messages: any[], safeMode: boolean, isAgnes = false) {
     let finalMessages: any[];
-    if (safeMode && isAgnes) {
+    if (!system) {
+      finalMessages = messages;
+    } else if (isAgnes) {
+      // Agnes rejects the system role — pass instructions as an opening exchange instead
       finalMessages = [
-        { role: 'user',      content: 'You are a helpful, safe, and professional assistant. Respond in the same language as the user.' },
-        { role: 'assistant', content: 'Understood. I will be helpful and respond in the same language.' },
+        { role: 'user',      content: system },
+        { role: 'assistant', content: 'متوجه شدم. طبق همین دستورالعمل‌ها و با در نظر گرفتن کل گفتگو پاسخ می‌دهم.' },
         ...messages,
       ];
-    } else if (safeMode) {
-      finalMessages = [{ role: 'system', content: 'You are a helpful, safe, and professional assistant. Respond in the same language as the user. Avoid harmful content.' }, ...messages];
     } else {
-      finalMessages = messages;
+      finalMessages = [{ role: 'system', content: system }, ...messages];
     }
     const { data } = await firstValueFrom(this.http.post(
       `${baseUrl}/chat/completions`,
       { model: model || 'gpt-4o-mini', messages: finalMessages, temperature: safeMode ? 0.3 : 0.7, max_tokens: 2048, stream: false },
-      { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 30000 },
+      { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 90000 },
     ));
     const rawContent = data.choices?.[0]?.message?.content;
     let content = '';
@@ -408,22 +434,48 @@ export class AiSettingsService {
     return { content, promptTokens: data.usage?.prompt_tokens || 0, completionTokens: data.usage?.completion_tokens || 0, totalTokens: data.usage?.total_tokens || 0, rawResponse };
   }
 
-  private async chatAnthropic(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean) {
-    const sysPrompt = safeMode ? 'You are a helpful, safe, and professional assistant. Respond in the same language as the user. Avoid harmful content.' : '';
+  /**
+   * Ollama via its native /api/chat so we can raise num_ctx: the OpenAI-compatible
+   * endpoint silently uses the model's small default window (2–4k tokens) and
+   * drops the oldest turns — which made the assistant "forget" the conversation.
+   * Override the window per provider with config `{ "numCtx": 16384 }`.
+   */
+  private async chatOllama(baseUrl: string, model: string | null, system: string, messages: any[], safeMode: boolean, config?: any) {
+    const root = baseUrl.replace(/\/v1\/?$/, '');
+    const numCtx = Number(config?.numCtx) > 0 ? Number(config.numCtx) : 8192;
+    const { data } = await firstValueFrom(this.http.post(
+      `${root}/api/chat`,
+      {
+        model: model || 'llama3',
+        messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
+        stream: false,
+        options: { num_ctx: numCtx, temperature: safeMode ? 0.3 : 0.7 },
+      },
+      { headers: { 'Content-Type': 'application/json' }, timeout: 180000 },
+    ));
+    const content: string = data?.message?.content || '';
+    const promptTokens = data?.prompt_eval_count || 0;
+    const completionTokens = data?.eval_count || 0;
+    if (!content) console.warn('[AI Chat] Empty content from Ollama. Raw:', JSON.stringify(data).substring(0, 500));
+    return { content, promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, rawResponse: content ? null : JSON.stringify(data).substring(0, 1000) };
+  }
+
+  private async chatAnthropic(baseUrl: string, apiKey: string, model: string | null, system: string, messages: any[]) {
     const { data } = await firstValueFrom(this.http.post(
       `${baseUrl}/messages`,
       {
         model: model || 'claude-sonnet-4-20250514',
         max_tokens: 2048,
-        ...(sysPrompt ? { system: sysPrompt } : {}),
-        messages: messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
+        ...(system ? { system } : {}),
+        messages,
       },
-      { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' } },
+      { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 90000 },
     ));
-    return { content: data.content?.[0]?.text || '', promptTokens: data.usage?.input_tokens || 0, completionTokens: data.usage?.output_tokens || 0, totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0) };
+    const content = (data.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text || '').join('');
+    return { content, promptTokens: data.usage?.input_tokens || 0, completionTokens: data.usage?.output_tokens || 0, totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0) };
   }
 
-  private async chatGemini(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean) {
+  private async chatGemini(baseUrl: string, apiKey: string, model: string | null, system: string, messages: any[], safeMode: boolean) {
     const m = model || 'gemini-pro';
     const contents = messages.map(msg => ({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] }));
     const safetySetting = safeMode
@@ -431,18 +483,25 @@ export class AiSettingsService {
       : [];
     const { data } = await firstValueFrom(this.http.post(
       `${baseUrl}/models/${m}:generateContent?key=${apiKey}`,
-      { contents, generationConfig: { temperature: safeMode ? 0.3 : 0.7, maxOutputTokens: 2048 }, safetySettings: safetySetting },
+      {
+        contents,
+        ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+        generationConfig: { temperature: safeMode ? 0.3 : 0.7, maxOutputTokens: 2048 },
+        safetySettings: safetySetting,
+      },
+      { timeout: 90000 },
     ));
     const usage = data.usageMetadata;
-    return { content: data.candidates?.[0]?.content?.parts?.[0]?.text || '', promptTokens: usage?.promptTokenCount || 0, completionTokens: usage?.candidatesTokenCount || 0, totalTokens: usage?.totalTokenCount || 0 };
+    const content = (data.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('');
+    return { content, promptTokens: usage?.promptTokenCount || 0, completionTokens: usage?.candidatesTokenCount || 0, totalTokens: usage?.totalTokenCount || 0 };
   }
 
-  private async chatOpenRouter(baseUrl: string, apiKey: string, model: string | null, messages: any[], safeMode: boolean) {
-    const sys = safeMode ? [{ role: 'system', content: 'You are a helpful, safe, and professional assistant. Respond in the same language as the user.' }] : [];
+  private async chatOpenRouter(baseUrl: string, apiKey: string, model: string | null, system: string, messages: any[]) {
+    const sys = system ? [{ role: 'system', content: system }] : [];
     const { data } = await firstValueFrom(this.http.post(
       `${baseUrl}/chat/completions`,
       { model: model || 'openai/gpt-4o-mini', messages: [...sys, ...messages], max_tokens: 2048, stream: false },
-      { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://erp.arzesh.net', 'X-Title': 'Arzesh ERP' }, timeout: 30000 },
+      { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://erp.arzesh.net', 'X-Title': 'Arzesh ERP' }, timeout: 90000 },
     ));
     const rawContent = data.choices?.[0]?.message?.content;
     return { content: typeof rawContent === 'string' ? rawContent : '', promptTokens: data.usage?.prompt_tokens || 0, completionTokens: data.usage?.completion_tokens || 0, totalTokens: data.usage?.total_tokens || 0 };

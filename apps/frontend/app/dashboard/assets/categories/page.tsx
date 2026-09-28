@@ -8,9 +8,10 @@ import Modal from "../../../components/ui/Modal";
 import { useConfirm } from "../../../components/ui/ConfirmDialog";
 import { useToast } from "../../../components/ui/Toast";
 import { pageTitle } from "../../../../lib/branding";
+import { readError } from "../../../../lib/http";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
-type Item = { id: string; name: string; codePrefix?: string; description?: string };
+type Item = { id: string; name: string; codePrefix?: string; description?: string; _count?: { assets: number } };
 
 export default function AssetCategoriesPage() {
   React.useEffect(() => { document.title = pageTitle("دسته‌بندی دارایی"); }, []);
@@ -37,8 +38,8 @@ export default function AssetCategoriesPage() {
     setSaving(true);
     try {
       const isNew = !editing.id;
-      const res = await fetch(isNew ? `${API}/asset-categories` : `${API}/asset-categories/${editing.id}`, { method: isNew ? "POST" : "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(editing) });
-      if (!res.ok) throw new Error();
+      const res = await fetch(isNew ? `${API}/asset-categories` : `${API}/asset-categories/${editing.id}`, { method: isNew ? "POST" : "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: editing.name || "", codePrefix: editing.codePrefix || "", description: editing.description || "" }) });
+      if (!res.ok) { toast.error(await readError(res, "خطا در ذخیره")); return; }
       toast.success(isNew ? "دسته‌بندی اضافه شد" : "ویرایش شد");
       setOpen(false); setEditing(null); await load();
     } catch { toast.error("خطا در ذخیره"); } finally { setSaving(false); }
@@ -47,7 +48,8 @@ export default function AssetCategoriesPage() {
   async function onDelete(id: string, name: string) {
     const ok = await confirm("حذف دسته‌بندی", `آیا از حذف "${name}" اطمینان دارید؟`);
     if (!ok) return;
-    await fetch(`${API}/asset-categories/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API}/asset-categories/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) { toast.error(await readError(res, "خطا در حذف")); return; }
     toast.success("دسته‌بندی حذف شد"); await load();
   }
 
@@ -59,16 +61,17 @@ export default function AssetCategoriesPage() {
       <div className="table-theme-container">
         <div className="overflow-x-auto">
           <table className="table-theme">
-            <thead><tr><th>نام</th><th>پیشوند کد</th><th>توضیحات</th><th>اقدامات</th></tr></thead>
-            {loading ? <SkeletonTable cols={4} rows={4} /> : (
+            <thead><tr><th>نام</th><th>پیشوند کد</th><th>توضیحات</th><th>تعداد دارایی</th><th>اقدامات</th></tr></thead>
+            {loading ? <SkeletonTable cols={5} rows={4} /> : (
               <tbody>
                 {items.length === 0 ? (
-                  <EmptyStateRow icon={Tag} title="دسته‌بندی ثبت نشده" actionLabel="افزودن دسته" onAction={() => { setEditing({ name: "" }); setOpen(true); }} colSpan={4} />
+                  <EmptyStateRow icon={Tag} title="دسته‌بندی ثبت نشده" actionLabel="افزودن دسته" onAction={() => { setEditing({ name: "" }); setOpen(true); }} colSpan={5} />
                 ) : items.map(it => (
                   <tr key={it.id}>
                     <td><span className="font-medium text-theme-primary">{it.name}</span></td>
                     <td><code className="bg-theme-secondary px-2 py-0.5 rounded text-xs font-mono text-theme-secondary">{it.codePrefix || "-"}</code></td>
                     <td><span className="text-theme-muted text-sm">{it.description || "-"}</span></td>
+                    <td><span className="text-theme-secondary text-sm">{(it._count?.assets ?? 0).toLocaleString("fa-IR")}</span></td>
                     <td>
                       <div className="flex gap-2">
                         <button onClick={() => { setEditing(it); setOpen(true); }} className="btn-theme-secondary text-xs py-1 px-2.5 gap-1"><Pencil className="w-3 h-3" />ویرایش</button>
@@ -88,7 +91,7 @@ export default function AssetCategoriesPage() {
       >
         <form id="cat-form" onSubmit={onSubmit} className="space-y-4">
           <div><label className="block mb-1.5 font-medium text-theme-secondary text-sm">نام *</label><input value={editing?.name || ""} onChange={e => setEditing(s => s ? { ...s, name: e.target.value } : s)} required className="input-theme" placeholder="نام دسته‌بندی" /></div>
-          <div><label className="block mb-1.5 font-medium text-theme-secondary text-sm">پیشوند کد</label><input value={editing?.codePrefix || ""} onChange={e => setEditing(s => s ? { ...s, codePrefix: e.target.value } : s)} className="input-theme font-mono" placeholder="مثال: COMP" dir="ltr" /></div>
+          <div><label className="block mb-1.5 font-medium text-theme-secondary text-sm">پیشوند کد</label><input value={editing?.codePrefix || ""} onChange={e => setEditing(s => s ? { ...s, codePrefix: e.target.value } : s)} className="input-theme font-mono" placeholder="مثال: COMP" dir="ltr" /><p className="text-theme-muted text-[11px] mt-1">در بارکد خودکار استفاده می‌شود: PREFIX-سال‌ماه-شماره</p></div>
           <div><label className="block mb-1.5 font-medium text-theme-secondary text-sm">توضیحات</label><input value={editing?.description || ""} onChange={e => setEditing(s => s ? { ...s, description: e.target.value } : s)} className="input-theme" /></div>
         </form>
       </Modal>

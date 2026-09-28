@@ -43,6 +43,8 @@ export class CreateAnnouncementDto {
   @IsDateString() @IsOptional() expireAt?: string;
   @IsBoolean() @IsOptional() showOnce?: boolean;
   @IsBoolean() @IsOptional() showUntilAck?: boolean;
+  // Uploaded files ({ url, name, size, mimeType }) — sanitized in AnnouncementsService
+  @IsArray() @IsOptional() attachments?: any[];
 }
 
 export class UpdateAnnouncementDto {
@@ -61,6 +63,7 @@ export class UpdateAnnouncementDto {
   @IsDateString() @IsOptional() expireAt?: string;
   @IsBoolean() @IsOptional() showOnce?: boolean;
   @IsBoolean() @IsOptional() showUntilAck?: boolean;
+  @IsArray() @IsOptional() attachments?: any[];
 }
 
 export class AnnouncementFilterDto {

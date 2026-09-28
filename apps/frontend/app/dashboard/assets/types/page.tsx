@@ -7,6 +7,7 @@ import Modal from "../../../components/ui/Modal";
 import { useConfirm } from "../../../components/ui/ConfirmDialog";
 import { useToast } from "../../../components/ui/Toast";
 import { pageTitle } from "../../../../lib/branding";
+import { readError } from "../../../../lib/http";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 type Item = { id: string; name: string; description?: string };
@@ -31,8 +32,8 @@ export default function AssetTypesPage() {
     setSaving(true);
     try {
       const isNew = !editing.id;
-      const res = await fetch(isNew ? `${API}/asset-types` : `${API}/asset-types/${editing.id}`, { method: isNew ? "POST" : "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(editing) });
-      if (!res.ok) throw new Error();
+      const res = await fetch(isNew ? `${API}/asset-types` : `${API}/asset-types/${editing.id}`, { method: isNew ? "POST" : "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: editing.name || "", description: editing.description || "" }) });
+      if (!res.ok) { toast.error(await readError(res, "خطا در ذخیره")); return; }
       toast.success(isNew ? "نوع دارایی اضافه شد" : "ویرایش شد");
       setOpen(false); setEditing(null); await load();
     } catch { toast.error("خطا در ذخیره"); } finally { setSaving(false); }
@@ -41,7 +42,8 @@ export default function AssetTypesPage() {
   async function onDelete(id: string, name: string) {
     const ok = await confirm("حذف نوع دارایی", `آیا از حذف "${name}" اطمینان دارید؟`);
     if (!ok) return;
-    await fetch(`${API}/asset-types/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API}/asset-types/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) { toast.error(await readError(res, "خطا در حذف")); return; }
     toast.success("حذف شد"); await load();
   }
 
@@ -57,7 +59,8 @@ export default function AssetTypesPage() {
           <div key={it.id} className="card-theme">
             <div className="card-theme-body">
               <div className="font-semibold text-theme-primary mb-1">{it.name}</div>
-              <div className="text-theme-muted text-xs mb-4">{it.description || "-"}</div>
+              <div className="text-theme-muted text-xs mb-1">{it.description || "-"}</div>
+              <div className="text-theme-muted text-[11px] mb-4">{((it as any)._count?.assets ?? 0).toLocaleString("fa-IR")} دارایی</div>
               <div className="flex gap-2">
                 <button onClick={() => { setEditing(it); setOpen(true); }} className="btn-theme-secondary text-xs flex-1 justify-center py-1.5 gap-1"><Pencil className="w-3 h-3" />ویرایش</button>
                 <button onClick={() => onDelete(it.id, it.name)} className="btn-theme-danger text-xs py-1.5 px-3"><Trash2 className="w-3 h-3" /></button>

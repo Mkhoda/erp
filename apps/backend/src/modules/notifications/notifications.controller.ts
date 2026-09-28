@@ -1,7 +1,11 @@
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query,
-  UseGuards, Request,
+  UseGuards, Request, UploadedFile, UseInterceptors, BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as fs from 'fs';
+import * as path from 'path';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -11,6 +15,17 @@ import {
   NotificationFilterDto, MarkReadDto,
   CreateAnnouncementDto, UpdateAnnouncementDto, AnnouncementFilterDto,
 } from './dto/notification.dto';
+
+const annUploadRoot = path.join(process.cwd(), 'uploads', 'announcements');
+fs.mkdirSync(annUploadRoot, { recursive: true });
+
+// Files are served from our own origin, so only allow inert document/media
+// types — never html/svg/js that a browser would execute.
+const ANN_ALLOWED_EXT = new Set([
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.csv', '.txt',
+  '.zip', '.rar', '.7z', '.mp3', '.wav', '.ogg', '.m4a', '.mp4', '.webm', '.mov',
+]);
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
@@ -107,6 +122,37 @@ export class NotificationsController {
       role: req.user.role,
       departmentId: req.user.departmentId,
     });
+  }
+
+  /** Upload one file to attach to an announcement; returns its descriptor. */
+  @Post('announcements/upload')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: diskStorage({
+      destination: annUploadRoot,
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+      },
+    }),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!ANN_ALLOWED_EXT.has(ext)) return cb(new BadRequestException('این نوع فایل مجاز نیست'), false);
+      cb(null, true);
+    },
+  }))
+  uploadAnnouncementFile(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('فایلی ارسال نشد');
+    // multer decodes the multipart filename as latin1; re-decode so Persian names survive
+    const name = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    return {
+      url: `/uploads/announcements/${file.filename}`,
+      name,
+      size: file.size,
+      mimeType: file.mimetype,
+    };
   }
 
   @Get('announcements/:id')

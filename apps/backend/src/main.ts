@@ -33,7 +33,13 @@ async function bootstrap() {
     credentials: true,
   });
   // static for uploaded files
-  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+  // Also mounted under /api/uploads so files resolve through the frontend's
+  // /api proxy when the site is reached without nginx in front.
+  const uploadsStatic = express.static(join(process.cwd(), 'uploads'), {
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+  });
+  app.use('/uploads', uploadsStatic);
+  app.use('/api/uploads', uploadsStatic);
   app.setGlobalPrefix('api');
   app.useWebSocketAdapter(new IoAdapter(app));
   // enableImplicitConversion so query-string DTOs (e.g. ?page=1&limit=20) get

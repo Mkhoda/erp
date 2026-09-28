@@ -15,7 +15,7 @@ import CommandPalette from "../components/CommandPalette";
 import { ToastProvider } from "../components/ui/Toast";
 import { MessagingProvider, useMessagingOptional } from "../../lib/messaging";
 import ChatWidget from "../components/messaging/ChatWidget";
-import AnnouncementPopupHost from "../components/announcements/AnnouncementPopupHost";
+import AnnouncementCenter from "../components/announcements/AnnouncementCenter";
 import type { Role } from "../../lib/menu";
 import { getSystemName, refreshSystemName } from "../../lib/branding";
 
@@ -205,8 +205,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     for (let i = 0; i < parts.length; i++) {
       acc += "/" + parts[i];
       if (acc.startsWith("/dashboard/assets/") && acc.split("/").length === 4 && !ROUTE_MAP[acc]) {
-        items.push({ href: "/dashboard", label: "فضای کاری", Icon: LayoutDashboard });
-        items.push({ href: "/dashboard/assets", label: "دارایی‌ها", Icon: Boxes });
+        // "/dashboard" and "/dashboard/assets" were already added by earlier iterations
         items.push({ href: acc, label: "جزئیات دارایی", Icon: Boxes });
         break;
       }
@@ -432,7 +431,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Page content */}
         <main className="flex-1 p-4 overflow-auto">
           <ToastProvider>
-            <AnnouncementPopupHost />
+            <AnnouncementCenter />
             {allowedPages === null ? (
               // Permissions still loading — don't render page content yet
               <div className="flex items-center justify-center min-h-[40vh]">

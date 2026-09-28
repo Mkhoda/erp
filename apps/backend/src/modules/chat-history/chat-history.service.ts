@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiSettingsService } from '../ai-settings/ai-settings.service';
 
-const AUTO_COMPACT_THRESHOLD = 30;  // compact when messages exceed this
 const AUTO_EXTRACT_THRESHOLD = 12;  // extract memories when messages reach this
-const RECENT_WINDOW = 10;           // verbatim recent messages sent per request; older turns are covered by rollingContext + summary
+const RECENT_WINDOW = 30;           // most recent messages sent verbatim with every request
+const HISTORY_CHAR_BUDGET = 24000;  // …but never more than this many characters of them
+const SUMMARY_EVERY = 10;           // refresh the summary of older turns every N new messages
+const ERROR_PREFIX = '⚠️ خطا در دریافت پاسخ'; // failed replies are stored for display but never fed back to the model
 
 @Injectable()
 export class ChatHistoryService {
@@ -39,6 +41,7 @@ export class ChatHistoryService {
   }
 
   async createConversation(userId: string, provider: string, model?: string) {
+    if (!provider) throw new BadRequestException('مدل هوش مصنوعی را انتخاب کنید');
     // Ensure pinned memories exist for this user
     await this.ensurePinnedMemories(userId);
     return this.prisma.conversation.create({
@@ -68,7 +71,15 @@ export class ChatHistoryService {
 
   // ── Send message ─────────────────────────────────────────────
 
-  async sendMessage(userId: string, conversationId: string, userContent: string, safeMode = false) {
+  /**
+   * Stores the user's message, sends the conversation (system prompt with the
+   * user's memories + summary of older turns + recent turns verbatim) to the
+   * model, and stores the reply. `providerId` switches the conversation's model.
+   */
+  async sendMessage(userId: string, conversationId: string, userContent: string, safeMode = false, providerId?: string) {
+    const content = (userContent || '').trim();
+    if (!content) throw new BadRequestException('متن پیام خالی است');
+
     const conv = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
       include: { messages: { orderBy: { createdAt: 'asc' } } },
@@ -76,18 +87,25 @@ export class ChatHistoryService {
     if (!conv) throw new NotFoundException();
     if (conv.userId !== userId) throw new ForbiddenException();
 
-    // Store user message
+    let provider = conv.provider;
+    if (providerId && providerId !== conv.provider) {
+      const p = await this.prisma.aiProvider.findUnique({ where: { id: providerId }, select: { id: true, model: true } });
+      if (p) {
+        provider = p.id;
+        await this.prisma.conversation.update({ where: { id: conversationId }, data: { provider: p.id, model: p.model } });
+      }
+    }
+
+    // Build the prompt from the history *before* this message, then store it
+    const history = await this.buildHistory(userId, conv, content);
     await this.prisma.conversationMessage.create({
-      data: { conversationId, role: 'user', content: userContent },
+      data: { conversationId, role: 'user', content },
     });
 
-    // Build history and call AI
-    const history = await this.buildHistory(userId, conv, userContent);
-    const result = await this.ai.chat(userId, conv.provider, history, safeMode);
+    const result = await this.ai.chat(userId, provider, history, safeMode);
 
-    // Store assistant response
     const assistantMsg = await this.prisma.conversationMessage.create({
-      data: { conversationId, role: 'assistant', content: result.content, latencyMs: result.latencyMs },
+      data: { conversationId, role: 'assistant', content: result.content || 'پاسخی دریافت نشد.', latencyMs: result.latencyMs },
     });
 
     // Auto-generate title from first user message
@@ -95,7 +113,7 @@ export class ChatHistoryService {
     await this.prisma.conversation.update({
       where: { id: conversationId },
       data: {
-        title: isFirstMsg ? userContent.substring(0, 60).trim() : undefined,
+        title: isFirstMsg ? content.substring(0, 60).trim() : undefined,
         updatedAt: new Date(),
       },
     });
@@ -103,61 +121,23 @@ export class ChatHistoryService {
     const totalMessages = conv.messages.length + 2; // +user +assistant
 
     // Background tasks (fire and forget)
-    this.updateRollingContext(userId, conversationId, conv, userContent, result.content).catch(() => {});
-
-    if (totalMessages >= AUTO_EXTRACT_THRESHOLD && totalMessages % 10 === 0) {
+    if (result.success && totalMessages >= AUTO_EXTRACT_THRESHOLD && totalMessages % 10 === 0) {
       this.autoExtractMemories(userId, conversationId).catch(() => {});
     }
-    if (totalMessages >= AUTO_COMPACT_THRESHOLD && totalMessages % 5 === 0) {
+    if (result.success && totalMessages > RECENT_WINDOW && totalMessages % SUMMARY_EVERY === 0) {
       this.compactConversation(userId, conversationId).catch(() => {});
     }
 
-    return { ...result, messageId: assistantMsg.id };
+    return { ...result, messageId: assistantMsg.id, conversationId };
   }
 
-  // ── Rolling context update (background) ──────────────────────
+  // ── Summary of older turns ───────────────────────────────────
 
-  private async updateRollingContext(
-    userId: string,
-    conversationId: string,
-    conv: any,
-    userMsg: string,
-    aiResponse: string,
-  ) {
-    const prevContext = conv.rollingContext || '';
-    const prompt = [
-      {
-        role: 'user' as const,
-        content: `You are a context tracker. Update the conversation context summary based on the latest exchange.
-
-Previous context:
-${prevContext || '(none yet)'}
-
-Latest exchange:
-User: ${userMsg.substring(0, 500)}
-Assistant: ${aiResponse.substring(0, 500)}
-
-Write an updated context in 2-3 sentences that captures:
-1. What the user is trying to accomplish
-2. Key facts or decisions established
-3. Current state of the conversation
-
-Write ONLY the context text, nothing else. Match the user's language.`,
-      },
-    ];
-    try {
-      const result = await this.ai.chat(userId, conv.provider, prompt, false);
-      if (result.success && result.content) {
-        await this.prisma.conversation.update({
-          where: { id: conversationId },
-          data: { rollingContext: result.content.substring(0, 1000) },
-        });
-      }
-    } catch { /* silent */ }
-  }
-
-  // ── Compact ──────────────────────────────────────────────────
-
+  /**
+   * Summarizes the turns that no longer fit in the verbatim window into
+   * `conversation.summary`. Messages are NOT deleted — the full thread stays
+   * visible in the chat page; only the prompt uses the summary for old turns.
+   */
   async compactConversation(userId: string, conversationId: string) {
     const conv = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -165,23 +145,31 @@ Write ONLY the context text, nothing else. Match the user's language.`,
     });
     if (!conv || conv.userId !== userId) throw new ForbiddenException();
 
-    const msgs = conv.messages;
-    if (msgs.length < 10) return { ok: true, summary: null, compacted: 0 };
+    const usable = conv.messages.filter((m) => !this.isErrorReply(m));
+    const older = usable.slice(0, Math.max(0, usable.length - RECENT_WINDOW));
+    if (older.length === 0) return { ok: true, summary: conv.summary, compacted: 0 };
 
-    const toCompact = msgs.slice(0, msgs.length - 8);
-    const text = toCompact.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
-    const summaryRequest = [
-      { role: 'user' as const, content: `Summarize this conversation concisely, preserving key facts, decisions, and important details. Match the user's language:\n\n${text}` },
-    ];
+    // Previous summary + the most recent of the older turns keeps the input bounded
+    const slice = older.slice(-40);
+    const text = slice.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.substring(0, 1500)}`).join('\n');
+    const request = [{
+      role: 'user' as const,
+      content: `Update the running summary of this conversation. Keep every fact, name, number, decision and open question the user may refer back to. Write it in the conversation's language, as compact bullet points, max ~400 words.
+
+Previous summary:
+${conv.summary || '(none)'}
+
+Earlier turns to fold in:
+${text}`,
+    }];
 
     try {
-      const summaryResult = await this.ai.chat(userId, conv.provider, summaryRequest, false);
-      const summary = (conv.summary ? conv.summary + '\n\n---\n\n' : '') + summaryResult.content;
-      await this.prisma.conversationMessage.deleteMany({ where: { id: { in: toCompact.map(m => m.id) } } });
-      await this.prisma.conversation.update({ where: { id: conversationId }, data: { summary } });
-      return { ok: true, summary, compacted: toCompact.length, remaining: msgs.length - toCompact.length };
+      const res = await this.ai.chat(userId, conv.provider, request, false);
+      if (!res.success || !res.content) return { ok: false, summary: conv.summary, compacted: 0 };
+      await this.prisma.conversation.update({ where: { id: conversationId }, data: { summary: res.content.substring(0, 6000) } });
+      return { ok: true, summary: res.content, compacted: older.length, remaining: usable.length - older.length };
     } catch {
-      return { ok: false, summary: null, compacted: 0 };
+      return { ok: false, summary: conv.summary, compacted: 0 };
     }
   }
 
@@ -223,15 +211,20 @@ Write ONLY the context text, nothing else. Match the user's language.`,
   private async autoExtractMemories(userId: string, conversationId: string) {
     const conv = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
-      include: { messages: { orderBy: { createdAt: 'asc' }, take: 30 } },
+      include: { messages: { orderBy: { createdAt: 'desc' }, take: 30 } },
     });
     if (!conv || conv.userId !== userId) return;
 
-    const text = conv.messages.map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
+    const existing = await this.prisma.userMemory.findMany({ where: { userId }, select: { content: true } });
+    const text = conv.messages.reverse().filter((m) => !this.isErrorReply(m))
+      .map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
     const prompt = [
       {
         role: 'user' as const,
-        content: `Extract up to 3 important facts about the USER (not the topic) from this conversation that are worth remembering for future conversations. Return ONLY a JSON array of strings. If nothing personal/important about the user, return [].
+        content: `Extract up to 3 important facts about the USER (not the topic) from this conversation that are worth remembering for future conversations. Skip anything already known. Return ONLY a JSON array of strings. If nothing personal/important about the user, return [].
+
+Already known:
+${existing.map(m => `- ${m.content}`).join('\n') || '(nothing)'}
 
 Examples: ["کاربر ترجیح می‌دهد پاسخ‌ها فارسی باشند", "کاربر در حوزه مالی کار می‌کند"]
 
@@ -243,8 +236,9 @@ ${text.substring(0, 3000)}`,
     try {
       const result = await this.ai.chat(userId, conv.provider, prompt, false);
       const facts = JSON.parse(result.content.match(/\[[\s\S]*\]/)?.[0] || '[]') as string[];
-      for (const f of facts.filter((f: string) => f?.length > 5).slice(0, 3)) {
-        await this.prisma.userMemory.create({ data: { userId, content: f } });
+      const known = new Set(existing.map(m => m.content.trim()));
+      for (const f of facts.filter((f: string) => typeof f === 'string' && f.length > 5 && !known.has(f.trim())).slice(0, 3)) {
+        await this.prisma.userMemory.create({ data: { userId, content: f.trim() } });
       }
     } catch { /* silent */ }
   }
@@ -277,59 +271,56 @@ ${text.substring(0, 3000)}`,
 
   // ── History builder ───────────────────────────────────────────
 
+  private isErrorReply(m: { role: string; content: string }) {
+    return m.role === 'assistant' && m.content.startsWith(ERROR_PREFIX);
+  }
+
+  /**
+   * [system prompt, …recent turns verbatim, new user message]. Older turns that
+   * don't fit the window are represented by `conv.summary`.
+   */
   private async buildHistory(userId: string, conv: any, newUserMessage: string) {
-    const memories = await this.prisma.userMemory.findMany({
-      where: { userId },
-      orderBy: [{ isPinned: 'desc' }, { updatedAt: 'desc' }],
-      take: 15,
-    });
+    const [memories, user, settings] = await Promise.all([
+      this.prisma.userMemory.findMany({
+        where: { userId },
+        orderBy: [{ isPinned: 'desc' }, { updatedAt: 'desc' }],
+        take: 20,
+      }),
+      this.prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, lastName: true } }),
+      this.prisma.systemSettings.findUnique({ where: { id: 'singleton' }, select: { orgName: true } }).catch(() => null),
+    ]);
 
-    const history: Array<{ role: string; content: string }> = [];
+    const today = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { dateStyle: 'full', timeZone: 'Asia/Tehran' }).format(new Date());
+    const org = settings?.orgName?.trim();
 
-    // Inject pinned + user memories as system context
+    const system: string[] = [
+      `تو دستیار هوشمند سامانه ${org ? `«${org}»` : 'سازمان'} هستی و با ${user ? `${user.firstName} ${user.lastName}`.trim() : 'کاربر'} گفتگو می‌کنی.`,
+      'این یک گفتگوی پیوسته است: پیام‌های قبلی همین گفتگو را به خاطر داشته باش و در پاسخ‌ها از آن‌ها استفاده کن. اگر کاربر به چیزی که قبلاً گفته اشاره کرد، از تاریخچه گفتگو استفاده کن.',
+      'به زبان خود کاربر پاسخ بده (پیش‌فرض فارسی).',
+      `تاریخ امروز: ${today}`,
+    ];
     if (memories.length > 0) {
-      const memText = memories.map(m => `- ${m.content}`).join('\n');
-      history.push({
-        role: 'user',
-        content: `[اطلاعات مهم درباره من که باید در تمام پاسخ‌ها در نظر بگیری:\n${memText}]`,
-      });
-      history.push({
-        role: 'assistant',
-        content: 'متوجه شدم. این اطلاعات را در تمام پاسخ‌هایم لحاظ می‌کنم.',
-      });
+      system.push(`اطلاعاتی که درباره کاربر می‌دانی:\n${memories.map(m => `- ${m.content}`).join('\n')}`);
     }
-
-    // Inject rolling context
-    if (conv.rollingContext) {
-      history.push({
-        role: 'user',
-        content: `[خلاصه زمینه این مکالمه:\n${conv.rollingContext}]`,
-      });
-      history.push({
-        role: 'assistant',
-        content: 'متوجه شدم.',
-      });
-    }
-
-    // Inject compact summary if exists
     if (conv.summary) {
-      history.push({
-        role: 'user',
-        content: `[خلاصه پیام‌های قدیمی‌تر این مکالمه:\n${conv.summary}]`,
-      });
-      history.push({ role: 'assistant', content: 'متوجه شدم، ادامه می‌دهیم.' });
+      system.push(`خلاصه بخش‌های قدیمی‌تر همین گفتگو (پیام‌هایی که در ادامه نیامده‌اند):\n${conv.summary}`);
     }
 
-    // Add only the most recent messages verbatim — older turns are already
-    // represented by the rolling context + compact summary injected above.
-    // This caps tokens per request instead of resending the whole thread.
-    const recent = conv.messages.slice(-RECENT_WINDOW);
-    for (const m of recent) {
-      history.push({ role: m.role, content: m.content });
+    // Most recent turns verbatim, newest first until the window/character budget is used
+    const usable = (conv.messages as Array<{ role: string; content: string }>).filter(m => !this.isErrorReply(m));
+    const recent: Array<{ role: string; content: string }> = [];
+    let budget = HISTORY_CHAR_BUDGET;
+    for (let i = usable.length - 1; i >= 0 && recent.length < RECENT_WINDOW; i--) {
+      const len = usable[i].content.length;
+      if (len > budget && recent.length > 0) break;
+      recent.unshift({ role: usable[i].role, content: usable[i].content.substring(0, Math.max(budget, 2000)) });
+      budget -= len;
     }
 
-    // New user message
-    history.push({ role: 'user', content: newUserMessage });
-    return history;
+    return [
+      { role: 'system', content: system.join('\n\n') },
+      ...recent,
+      { role: 'user', content: newUserMessage },
+    ];
   }
 }

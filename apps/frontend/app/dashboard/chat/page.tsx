@@ -9,6 +9,7 @@ import {
   Paperclip, Image as ImageIcon, Pin,
 } from "lucide-react";
 import { getSystemName, pageTitle } from "../../../lib/branding";
+import { readError } from "../../../lib/http";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -73,6 +74,8 @@ function ChatPageInner() {
   const [loading, setLoading] = React.useState(true);
   const [attachment, setAttachment] = React.useState<{ file: File; preview?: string } | null>(null);
   const [quota, setQuota] = React.useState<any>(null);
+  const providersRef = React.useRef<Provider[]>([]);
+  React.useEffect(() => { providersRef.current = providers; }, [providers]);
   const endRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -90,6 +93,7 @@ function ChatPageInner() {
       fetch(`${API}/chat-history/memory`, { headers: h() }).then(r => r.ok ? r.json() : []),
     ]).then(([provs, convList, mems]) => {
       setProviders(provs);
+      providersRef.current = provs;
       if (provs.length > 0) {
         setSelectedProvider(provs[0]);
         fetch(`${API}/quota/me/${provs[0].id}`, { headers: h() })
@@ -119,31 +123,35 @@ function ChatPageInner() {
     const data = await res.json();
     const msgs: Message[] = data.messages.map((m: any) => ({
       id: m.id, role: m.role, content: m.content, latencyMs: m.latencyMs,
-      createdAt: m.createdAt,
+      createdAt: m.createdAt, error: m.role === "assistant" && String(m.content).startsWith("⚠️"),
     }));
-    if (data.summary) {
-      msgs.unshift({ id: "__summary__", role: "assistant", content: `📝 **خلاصه مکالمات قبلی:**\n\n${data.summary}` });
-    }
+    // Continue with the model this conversation was using
+    const convProvider = providersRef.current.find(p => p.id === data.provider);
+    if (convProvider) setSelectedProvider(convProvider);
     setMessages(msgs);
   };
 
-  const newConvo = async () => {
-    if (!selectedProvider) return;
+  const newConvo = async (): Promise<string | null> => {
+    if (!selectedProvider) return null;
     const res = await fetch(`${API}/chat-history/conversations`, {
       method: "POST", headers: hj(),
       body: JSON.stringify({ provider: selectedProvider.id, model: selectedProvider.model }),
     });
-    if (!res.ok) return;
+    if (!res.ok) return null;
     const c = await res.json();
     setConvos(prev => [{ ...c, messages: [] }, ...prev]);
     setActiveId(c.id);
     setMessages([]);
     inputRef.current?.focus();
+    return c.id;
   };
 
   const sendMessage = async () => {
     const content = input.trim();
-    if ((!content && !attachment) || sending || !activeId) return;
+    if ((!content && !attachment) || sending || !selectedProvider) return;
+    // Start a conversation on the first message instead of requiring "new chat" first
+    const convId = activeId || await newConvo();
+    if (!convId) return;
     setInput("");
 
     let fullContent = content;
@@ -165,10 +173,15 @@ function ChatPageInner() {
     setSending(true);
 
     try {
-      const res = await fetch(`${API}/chat-history/conversations/${activeId}/send`, {
+      const res = await fetch(`${API}/chat-history/conversations/${convId}/send`, {
         method: "POST", headers: hj(),
-        body: JSON.stringify({ content: fullContent, safeMode }),
+        body: JSON.stringify({ content: fullContent, safeMode, providerId: selectedProvider.id }),
       });
+      if (!res.ok) {
+        const msg = await readError(res, "خطا در ارسال پیام");
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: `⚠️ ${msg}`, error: true, createdAt: new Date().toISOString() }]);
+        return;
+      }
       const data = await res.json();
       setMessages(prev => [...prev, {
         id: data.messageId || (Date.now() + 1).toString(),
@@ -176,7 +189,7 @@ function ChatPageInner() {
         latencyMs: data.latencyMs, createdAt: new Date().toISOString(),
         error: !data.success,
       }]);
-      setConvos(prev => prev.map(c => c.id === activeId
+      setConvos(prev => prev.map(c => c.id === convId
         ? { ...c, updatedAt: new Date().toISOString(), title: c.title || content.substring(0, 50) || attachInfo?.name, messages: [{ content: data.content, role: "assistant" }] }
         : c
       ).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
@@ -447,7 +460,7 @@ function ChatPageInner() {
               </div>
               <h2 className="text-xl font-bold text-theme-primary mb-2">دستیار هوشمند {getSystemName()}</h2>
               <p className="text-theme-muted text-sm max-w-sm mb-6">
-                {providers.length === 0 ? "هیچ مدل AI فعالی تنظیم نشده." : "یک گفتگوی جدید شروع کنید."}
+                {providers.length === 0 ? "هیچ مدل AI فعالی تنظیم نشده." : "پیام خود را بنویسید تا گفتگوی جدید شروع شود؛ دستیار کل گفتگو را به خاطر می‌سپارد."}
               </p>
               {providers.length > 0 && (
                 <button onClick={newConvo} className="btn-primary flex items-center gap-2">
@@ -545,7 +558,7 @@ function ChatPageInner() {
         )}
 
         {/* Input */}
-        {activeId && (
+        {providers.length > 0 && (
           <div className="px-4 pb-4 pt-1 shrink-0">
             <input ref={fileRef} type="file" className="hidden" accept="image/*,.pdf,.doc,.docx,.txt,.xlsx,.csv" onChange={handleFile} />
             <div className="flex gap-2 items-end bg-theme-secondary border border-theme rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-blue-500/40 transition-colors">

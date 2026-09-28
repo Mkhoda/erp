@@ -1,17 +1,49 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MessagingGateway } from '../messaging/messaging.gateway';
 import { NotificationsService } from './notifications.service';
 import { NotificationCategory } from '@prisma/client';
 import { CreateAnnouncementDto, UpdateAnnouncementDto, AnnouncementFilterDto } from './dto/notification.dto';
 
+type Viewer = { role: string; deptIds: string[] };
+
+export type AnnouncementAttachment = { url: string; name: string; size?: number; mimeType?: string };
+
+/** Keeps only well-formed attachments that point at our own announcement upload folder. */
+export function sanitizeAttachments(input: any): AnnouncementAttachment[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((a) => a && typeof a.url === 'string' && a.url.startsWith('/uploads/announcements/'))
+    .slice(0, 10)
+    .map((a) => ({
+      url: a.url,
+      name: typeof a.name === 'string' && a.name.trim() ? a.name.trim().slice(0, 200) : a.url.split('/').pop(),
+      size: typeof a.size === 'number' ? a.size : undefined,
+      mimeType: typeof a.mimeType === 'string' ? a.mimeType.slice(0, 100) : undefined,
+    }));
+}
+
 @Injectable()
-export class AnnouncementsService {
+export class AnnouncementsService implements OnModuleInit {
+  private readonly logger = new Logger(AnnouncementsService.name);
+
   constructor(
     private prisma: PrismaService,
     private gateway: MessagingGateway,
     private notificationsService: NotificationsService,
   ) {}
+
+  /**
+   * Production schema is managed with `prisma db push` and deploys don't reliably
+   * apply migrations, so make sure the attachments column exists (idempotent).
+   */
+  async onModuleInit() {
+    try {
+      await this.prisma.$executeRawUnsafe('ALTER TABLE "Announcement" ADD COLUMN IF NOT EXISTS "attachments" JSONB');
+    } catch (err: any) {
+      this.logger.warn(`could not ensure Announcement.attachments column: ${err?.message ?? err}`);
+    }
+  }
 
   async create(dto: CreateAnnouncementDto, authorId: string) {
     return this.prisma.announcement.create({
@@ -30,6 +62,7 @@ export class AnnouncementsService {
         expireAt: dto.expireAt ? new Date(dto.expireAt) : null,
         showOnce: dto.showOnce ?? false,
         showUntilAck: dto.showUntilAck ?? false,
+        attachments: sanitizeAttachments(dto.attachments) as any,
         authorId,
       },
       include: { author: { select: { id: true, firstName: true, lastName: true } }, _count: { select: { acks: true } } },
@@ -45,6 +78,7 @@ export class AnnouncementsService {
         ...dto,
         publishAt: dto.publishAt ? new Date(dto.publishAt) : undefined,
         expireAt: dto.expireAt ? new Date(dto.expireAt) : undefined,
+        attachments: dto.attachments !== undefined ? (sanitizeAttachments(dto.attachments) as any) : undefined,
       },
       include: { author: { select: { id: true, firstName: true, lastName: true } }, _count: { select: { acks: true } } },
     });
@@ -59,9 +93,10 @@ export class AnnouncementsService {
     });
 
     // Broadcast to matching users via notification + socket
-    const userIds = await this.resolveTargetUsers(ann);
+    const visibleNow = !updated.publishAt || updated.publishAt <= new Date();
+    const userIds = visibleNow ? await this.resolveTargetUsers(ann) : [];
     if (userIds.length > 0) {
-      // Create in-app notifications for NOTIFICATION type
+      // NOTIFICATION type also lands in the bell / notification center
       if (ann.type === 'NOTIFICATION') {
         await this.notificationsService.publish({
           userIds,
@@ -69,24 +104,27 @@ export class AnnouncementsService {
           priority: ann.priority,
           title: ann.title,
           body: ann.body,
-          link: '/dashboard/notifications',
+          link: '/dashboard/announcements',
           sourceModule: 'announcements',
           sourceId: id,
         });
-      } else {
-        // BANNER / POPUP: emit via socket only
-        for (const userId of userIds) {
-          this.gateway.server?.to(`user:${userId}`).emit('announcement:new', {
-            id: ann.id,
-            title: ann.title,
-            body: ann.body,
-            type: ann.type,
-            priority: ann.priority,
-            isSticky: ann.isSticky,
-            showOnce: ann.showOnce,
-            showUntilAck: ann.showUntilAck,
-          });
-        }
+      }
+      // Every type is pushed live so the dashboard can show it immediately
+      // (banner on top, popup modal, or a notification card in the corner).
+      const payload = {
+        id: ann.id,
+        title: ann.title,
+        body: ann.body,
+        type: ann.type,
+        priority: ann.priority,
+        isSticky: ann.isSticky,
+        showOnce: ann.showOnce,
+        showUntilAck: ann.showUntilAck,
+        attachments: sanitizeAttachments((ann as any).attachments),
+        publishAt: updated.publishAt,
+      };
+      for (const userId of userIds) {
+        this.gateway.server?.to(`user:${userId}`).emit('announcement:new', payload);
       }
     }
 
@@ -138,76 +176,83 @@ export class AnnouncementsService {
     return ann;
   }
 
-  /** Returns active announcements visible to a specific user. */
-  async getActiveForUser(userId: string, user: { role: string; departmentId?: string | null }) {
-    const now = new Date();
-    // Resolve actual departmentId from DB since JWT doesn't carry it
-    let deptId = user.departmentId ?? null;
-    if (!deptId) {
-      const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { departmentId: true } });
-      deptId = u?.departmentId ?? null;
-    }
-    const resolvedUser = { ...user, departmentId: deptId };
+  /** Loads the user's role + every department they belong to (primary + memberships). */
+  private async resolveViewer(userId: string, role: string): Promise<Viewer> {
+    const u = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, departmentId: true, userDepartments: { select: { departmentId: true } } },
+    });
+    const deptIds = new Set<string>();
+    if (u?.departmentId) deptIds.add(u.departmentId);
+    u?.userDepartments?.forEach((d) => deptIds.add(d.departmentId));
+    return { role: u?.role ?? role, deptIds: [...deptIds] };
+  }
 
+  private activeWhere(extra: any = {}) {
+    const now = new Date();
+    return {
+      isPublished: true,
+      OR: [{ publishAt: null }, { publishAt: { lte: now } }],
+      AND: [{ OR: [{ expireAt: null }, { expireAt: { gt: now } }] }],
+      ...extra,
+    };
+  }
+
+  /**
+   * Returns active announcements visible to a specific user, each flagged with
+   * `seen` / `acked` so the dashboard can decide what to surface as a banner,
+   * popup or notification card.
+   */
+  async getActiveForUser(userId: string, user: { role: string; departmentId?: string | null }) {
+    const viewer = await this.resolveViewer(userId, user.role);
     const all = await this.prisma.announcement.findMany({
-      where: {
-        isPublished: true,
-        OR: [{ publishAt: null }, { publishAt: { lte: now } }],
-        AND: [{ OR: [{ expireAt: null }, { expireAt: { gt: now } }] }],
+      where: this.activeWhere(),
+      include: {
+        author: { select: { id: true, firstName: true, lastName: true } },
+        popupSeens: { where: { userId }, select: { id: true } },
+        acks: { where: { userId }, select: { id: true } },
       },
-      include: { author: { select: { id: true, firstName: true, lastName: true } } },
       orderBy: [{ isPinned: 'desc' }, { isSticky: 'desc' }, { createdAt: 'desc' }],
     });
 
-    return all.filter((ann) => this.isTargetedAt(ann, userId, resolvedUser));
+    return all
+      .filter((ann) => this.isTargetedAt(ann, userId, viewer))
+      .map(({ popupSeens, acks, ...ann }) => ({
+        ...ann,
+        attachments: sanitizeAttachments((ann as any).attachments),
+        seen: popupSeens.length > 0,
+        acked: acks.length > 0,
+      }));
   }
 
   /** Count of active announcements the user hasn't seen yet — badge for the "اطلاعیه‌ها" menu item. */
   async getUnreadCount(userId: string, user: { role: string; departmentId?: string | null }) {
-    const now = new Date();
-    let deptId = user.departmentId ?? null;
-    if (!deptId) {
-      const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { departmentId: true } });
-      deptId = u?.departmentId ?? null;
-    }
-    const resolvedUser = { ...user, departmentId: deptId };
-
+    const viewer = await this.resolveViewer(userId, user.role);
     const all = await this.prisma.announcement.findMany({
-      where: {
-        isPublished: true,
-        OR: [{ publishAt: null }, { publishAt: { lte: now } }],
-        AND: [{ OR: [{ expireAt: null }, { expireAt: { gt: now } }] }],
-      },
+      where: this.activeWhere(),
       include: { popupSeens: { where: { userId } } },
     });
-
-    const count = all.filter((ann) => this.isTargetedAt(ann, userId, resolvedUser) && ann.popupSeens.length === 0).length;
+    const count = all.filter((ann) => this.isTargetedAt(ann, userId, viewer) && ann.popupSeens.length === 0).length;
     return { count };
   }
 
   /** Returns pending popup announcements the user hasn't seen (or hasn't acknowledged). */
   async getPendingPopups(userId: string, user: { role: string; departmentId?: string | null }) {
-    const now = new Date();
+    const viewer = await this.resolveViewer(userId, user.role);
     const active = await this.prisma.announcement.findMany({
-      where: {
-        isPublished: true,
-        type: 'POPUP',
-        OR: [{ publishAt: null }, { publishAt: { lte: now } }],
-        AND: [{ OR: [{ expireAt: null }, { expireAt: { gt: now } }] }],
-      },
+      where: this.activeWhere({ type: 'POPUP' }),
       include: { popupSeens: { where: { userId } }, acks: { where: { userId } } },
     });
 
-    return active.filter((ann) => {
-      if (!this.isTargetedAt(ann, userId, user)) return false;
-      const seen = ann.popupSeens.length > 0;
-      const acked = ann.acks.length > 0;
-      if (ann.showUntilAck && !acked) return true;
-      if (ann.showOnce && seen) return false;
-      if (!ann.showOnce && seen && !ann.showUntilAck) return false;
-      if (seen) return false;
-      return true;
-    });
+    return active
+      .filter((ann) => {
+        if (!this.isTargetedAt(ann, userId, viewer)) return false;
+        const seen = ann.popupSeens.length > 0;
+        const acked = ann.acks.length > 0;
+        if (ann.showUntilAck) return !acked;
+        return !seen;
+      })
+      .map(({ popupSeens, acks, ...ann }) => ({ ...ann, attachments: sanitizeAttachments((ann as any).attachments) }));
   }
 
   async markPopupSeen(announcementId: string, userId: string) {
@@ -240,13 +285,11 @@ export class AnnouncementsService {
     return { ackCount, acks };
   }
 
-  private isTargetedAt(ann: any, userId: string, user: { role: string; departmentId?: string | null }): boolean {
+  private isTargetedAt(ann: any, userId: string, viewer: Viewer): boolean {
     if (ann.targetType === 'ALL') return true;
     if (ann.targetType === 'USER') return ann.targetUserIds.includes(userId);
-    if (ann.targetType === 'ROLE') return ann.targetRoles.includes(user.role);
-    if (ann.targetType === 'DEPARTMENT') {
-      return user.departmentId ? ann.targetDeptIds.includes(user.departmentId) : false;
-    }
+    if (ann.targetType === 'ROLE') return ann.targetRoles.includes(viewer.role);
+    if (ann.targetType === 'DEPARTMENT') return viewer.deptIds.some((d) => ann.targetDeptIds.includes(d));
     return false;
   }
 
@@ -265,7 +308,13 @@ export class AnnouncementsService {
     }
     if (ann.targetType === 'DEPARTMENT') {
       const users = await this.prisma.user.findMany({
-        where: { departmentId: { in: ann.targetDeptIds }, disabled: false },
+        where: {
+          disabled: false,
+          OR: [
+            { departmentId: { in: ann.targetDeptIds } },
+            { userDepartments: { some: { departmentId: { in: ann.targetDeptIds } } } },
+          ],
+        },
         select: { id: true },
       });
       return users.map((u) => u.id);

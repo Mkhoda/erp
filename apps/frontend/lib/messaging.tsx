@@ -247,6 +247,12 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       patch({ notifUnreadCount: data.unreadCount });
     });
 
+    // Re-broadcast published announcements as a DOM event so the banner /
+    // popup / notification-card components can react without their own socket.
+    socket.on("announcement:new", (data: unknown) => {
+      window.dispatchEvent(new CustomEvent("announcement:new", { detail: data }));
+    });
+
     socket.on("disconnect", () => patch({ isConnected: false }));
 
     socket.on("connected", (data: { userId: string; onlineCount: number; onlineUserIds?: string[] }) => {

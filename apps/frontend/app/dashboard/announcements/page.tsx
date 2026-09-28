@@ -2,6 +2,7 @@
 import React from "react";
 import { Megaphone, Loader2, Pin, AlertCircle, Info, AlertTriangle, Bell, CheckCircle2 } from "lucide-react";
 import { pageTitle } from "../../../lib/branding";
+import { AttachmentList } from "../../components/announcements/shared";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -134,6 +135,7 @@ function AnnCard({ ann }: { ann: any }) {
             </span>
           </div>
           <p className="text-sm text-theme-secondary leading-relaxed whitespace-pre-wrap">{ann.body}</p>
+          <AttachmentList items={ann.attachments} />
           <div className="flex items-center gap-3 mt-2 text-xs text-theme-muted flex-wrap">
             {ann.publishAt && (
               <span className="flex items-center gap-1">

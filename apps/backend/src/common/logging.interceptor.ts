@@ -42,15 +42,16 @@ export class LoggingInterceptor implements NestInterceptor {
           });
         } catch { /* don't crash on log failure */ }
       }),
-      catchError(async (err) => {
+      // Must return the error observable synchronously: an async selector would
+      // resolve to the throwError() Observable itself, which Nest then sent back as
+      // a "201 {}" success — hiding every exception thrown by any endpoint.
+      catchError((err) => {
         const latencyMs = Date.now() - start;
         const statusCode = err?.status || err?.statusCode || 500;
         const errorMsg = err?.message || String(err);
-        try {
-          await this.prisma.requestLog.create({
-            data: { method, path, statusCode, userId, body: bodyStr, latencyMs, errorMsg, ip },
-          });
-        } catch { /* don't crash on log failure */ }
+        this.prisma.requestLog.create({
+          data: { method, path, statusCode, userId, body: bodyStr, latencyMs, errorMsg, ip },
+        }).catch(() => { /* don't crash on log failure */ });
         return throwError(() => err);
       }),
     );

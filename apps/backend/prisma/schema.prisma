@@ -1454,6 +1454,8 @@ model Announcement {
   expireAt      DateTime?
   showOnce      Boolean              @default(false)
   showUntilAck  Boolean              @default(false)
+  // Files attached to the announcement: [{ url, name, size, mimeType }]
+  attachments   Json?
   authorId      String
   author        User                 @relation("AnnouncementAuthor", fields: [authorId], references: [id])
   acks          AnnouncementAck[]

@@ -3,7 +3,7 @@ import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { pageTitle } from "../../lib/branding";
-import AnnouncementBanner from "../components/announcements/AnnouncementBanner";
+import { readError } from "../../lib/http";
 import {
   Sparkles, Send, ArrowLeft,
   Boxes, Users, Handshake, Building, BarChart3,
@@ -313,6 +313,9 @@ export default function WorkspacePage() {
   const [provider, setProvider] = React.useState<Provider | null>(null);
   const [recentConvos, setRecentConvos] = React.useState<RecentConvo[]>([]);
   const [messages, setMessages] = React.useState<Message[]>([]);
+  // Server-side conversation backing this widget, so the assistant keeps context
+  // across messages and the thread can be continued on the full chat page.
+  const [convId, setConvId] = React.useState<string | null>(null);
   const [inputValue, setInputValue] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [leave, setLeave] = React.useState<any>(null);
@@ -363,16 +366,26 @@ export default function WorkspacePage() {
     if (!content || sending) return;
     if (!provider) { window.location.href = "/dashboard/ai-settings"; return; }
     setInputValue("");
-    const newMessages = [...messages, { id: Date.now().toString(), role: "user" as const, content }];
-    setMessages(newMessages);
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user" as const, content }]);
     setSending(true);
     try {
-      const history = newMessages.filter(m => m.id !== "welcome").map(m => ({ role: m.role, content: m.content }));
-      const res = await fetch(`${API}/ai-settings/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ providerType: provider.type, messages: history, safeMode: true }),
+      const hj = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      let id = convId;
+      if (!id) {
+        const cr = await fetch(`${API}/chat-history/conversations`, { method: "POST", headers: hj, body: JSON.stringify({ provider: provider.id, model: provider.model }) });
+        if (!cr.ok) throw new Error();
+        id = (await cr.json()).id as string;
+        setConvId(id);
+      }
+      const res = await fetch(`${API}/chat-history/conversations/${id}/send`, {
+        method: "POST", headers: hj,
+        body: JSON.stringify({ content, safeMode: true, providerId: provider.id }),
       });
+      if (!res.ok) {
+        const msg = await readError(res, "خطا در ارسال پیام");
+        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `⚠️ ${msg}`, error: true }]);
+        return;
+      }
       const data = await res.json();
       setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: data.content || "پاسخی دریافت نشد.", error: !data.success }]);
     } catch {
@@ -432,9 +445,6 @@ export default function WorkspacePage() {
           </div>
         </motion.div>
 
-        {/* ── Announcement banners ── */}
-        <AnnouncementBanner />
-
         {/* ── Stat cards (2×2 grid for better visual weight) ── */}
         {statCards.length > 0 && (
           <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.25, delay:0.05 }}
@@ -476,10 +486,10 @@ export default function WorkspacePage() {
                 <Sparkles className="w-3.5 h-3.5 text-white" />
               </div>
               {allProviders.length > 1 ? (
-                <select value={provider?.type || ""}
-                  onChange={e => { const p = allProviders.find(x => x.type === e.target.value); if (p) { setProvider(p); setMessages([{ id: "welcome", role: "assistant", content: `مدل تغییر یافت به **${p.name}**.` }]); } }}
+                <select value={provider?.id || ""}
+                  onChange={e => { const p = allProviders.find(x => x.id === e.target.value); if (p) { setProvider(p); setMessages(prev => [...prev, { id: `switch-${Date.now()}`, role: "assistant", content: `مدل تغییر یافت به **${p.name}** — ادامه همین گفتگو.` }]); } }}
                   className="bg-transparent text-theme-primary text-sm font-semibold outline-none border-none cursor-pointer">
-                  {allProviders.map(p => <option key={p.type} value={p.type}>{p.name}</option>)}
+                  {allProviders.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               ) : (
                 <div>
@@ -488,8 +498,8 @@ export default function WorkspacePage() {
                 </div>
               )}
             </div>
-            <Link href="/dashboard/chat" className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 text-xs hover:underline shrink-0">
-              چت کامل <ArrowLeft className="w-3 h-3" />
+            <Link href={convId ? `/dashboard/chat?id=${convId}` : "/dashboard/chat"} className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 text-xs hover:underline shrink-0">
+              {convId ? "ادامه در چت کامل" : "چت کامل"} <ArrowLeft className="w-3 h-3" />
             </Link>
           </div>
 

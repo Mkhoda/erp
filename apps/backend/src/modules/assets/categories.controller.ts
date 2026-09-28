@@ -1,16 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseFilters, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AssetCategoriesService } from './categories.service';
+import { AssetsPrismaErrorFilter } from './prisma-error.filter';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@UseFilters(AssetsPrismaErrorFilter)
 @Controller('asset-categories')
 export class AssetCategoriesController {
   constructor(private readonly service: AssetCategoriesService) {}
 
   @Get()
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'MANAGER', 'EXPERT')
   list() { return this.service.list(); }
 
   @Post()

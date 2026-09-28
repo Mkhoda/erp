@@ -20,6 +20,8 @@ const nextConfig = {
     const backend = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:3001';
     return [
       { source: '/api/:path*', destination: `${backend}/api/:path*` },
+      // Uploaded files (asset images, announcement attachments, …) live on the backend
+      { source: '/uploads/:path*', destination: `${backend}/uploads/:path*` },
     ];
   },
 

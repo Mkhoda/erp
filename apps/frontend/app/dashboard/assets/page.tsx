@@ -12,6 +12,7 @@ import { useConfirm } from "../../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ui/Toast";
 import JalaliDatePicker from "../../components/ui/JalaliDatePicker";
 import { pageTitle } from "../../../lib/branding";
+import { readError } from "../../../lib/http";
 
 type Asset = {
   id: string; name: string; barcode: string; oldBarcode?: string; description?: string;
@@ -21,6 +22,7 @@ type Asset = {
   purchaseDate?: string; cost?: number;
   type?: { id: string; name: string }; category?: { id: string; name: string };
   images?: Array<{ id: string; url: string; caption?: string }>;
+  assignments?: Array<{ user?: { firstName?: string; lastName?: string }; department?: { name: string }; building?: { name: string }; room?: { name: string } }>;
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -32,6 +34,13 @@ const AVAIL: Record<string, { label: string; cls: string }> = {
   RETIRED: { label: "خارج از رده", cls: "bg-theme-secondary text-theme-muted border-theme" },
   LOST: { label: "مفقود", cls: "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800" },
   CONSUMED: { label: "مصرف شده", cls: "bg-theme-secondary text-theme-muted border-theme" },
+};
+
+const holderLabel = (a: Asset) => {
+  const cur = a.assignments?.[0];
+  if (!cur) return "";
+  if (cur.user) return `${cur.user.firstName || ""} ${cur.user.lastName || ""}`.trim();
+  return cur.department?.name || cur.room?.name || cur.building?.name || "";
 };
 
 const avLabel = (a?: string) => AVAIL[a || ""] || { label: a || "-", cls: "bg-theme-secondary text-theme-muted border-theme" };
@@ -90,32 +99,56 @@ export default function AssetsPage() {
     await load();
   }
 
-  async function uploadImages(assetId: string) {
-    if (!selectedImages.length) return;
+  /** Uploads the picked images to the server (stored on local disk) and returns their urls. */
+  async function uploadImages(): Promise<string[]> {
+    if (!selectedImages.length) return [];
     setUploading(true);
+    const urls: string[] = [];
     try {
       for (const file of selectedImages) {
-        const fd = new FormData(); fd.append("file", file); fd.append("assetId", assetId);
-        await fetch(`${API}/uploads/asset-image`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+        const fd = new FormData(); fd.append("file", file);
+        const r = await fetch(`${API}/uploads/asset-image`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+        if (!r.ok) { toast.error(`آپلود «${file.name}»: ${await readError(r, "ناموفق")}`); continue; }
+        const d = await r.json();
+        if (d?.url) urls.push(d.url);
       }
     } finally { setUploading(false); }
+    return urls;
+  }
+
+  async function removeExistingImage(imageId: string) {
+    if (!editing || !editing.id || editing.id === "0") return;
+    const r = await fetch(`${API}/assets/${editing.id}/images/${imageId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) { toast.error(await readError(r, "خطا در حذف تصویر")); return; }
+    setEditing(s => s ? { ...s, images: (s.images || []).filter(i => i.id !== imageId) } : s);
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!editing || !editing.name || !editing.barcode) return;
+    if (!editing || !editing.name?.trim()) return;
+    if (!editing.categoryId) { toast.warning("دسته‌بندی دارایی را انتخاب کنید"); return; }
+    if (!editing.typeId) { toast.warning("نوع دارایی را انتخاب کنید"); return; }
     setSaving(true);
     try {
-      const isNew = (editing as any).id === "0" || !(editing as any).id;
-      const url = isNew ? `${API}/assets` : `${API}/assets/${(editing as any).id}`;
-      const res = await fetch(url, { method: isNew ? "POST" : "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(editing) });
-      if (!res.ok) throw new Error();
-      const saved = await res.json();
-      if (selectedImages.length) await uploadImages(saved.id);
+      const isNew = editing.id === "0" || !editing.id;
+      const newUrls = await uploadImages();
+      // Send only editable columns — never the nested type/category/images objects
+      const payload: Record<string, any> = {
+        name: editing.name, barcode: editing.barcode || "", oldBarcode: editing.oldBarcode || "",
+        description: editing.description || "", serialNumber: editing.serialNumber || "", location: editing.location || "",
+        typeId: editing.typeId, categoryId: editing.categoryId,
+        condition: editing.condition || "NEW", availability: editing.availability || "AVAILABLE", barcodeType: editing.barcodeType || "QR",
+        purchaseDate: editing.purchaseDate || null, cost: editing.cost ?? null,
+        images: [...(editing.images || []).map(i => i.url), ...newUrls],
+      };
+      if (isNew && !payload.barcode) delete payload.barcode; // server auto-generates
+      const url = isNew ? `${API}/assets` : `${API}/assets/${editing.id}`;
+      const res = await fetch(url, { method: isNew ? "POST" : "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
+      if (!res.ok) { toast.error(await readError(res, "خطا در ذخیره دارایی")); return; }
       toast.success(isNew ? "دارایی جدید اضافه شد" : "دارایی ویرایش شد");
       setOpen(false); setEditing(null); setSelectedImages([]);
       await load();
-    } catch { toast.error("خطا در ذخیره دارایی"); } finally { setSaving(false); }
+    } catch { toast.error("خطا در ارتباط با سرور"); } finally { setSaving(false); }
   }
 
   // View toggle
@@ -150,7 +183,7 @@ export default function AssetsPage() {
             <table className="table-theme">
               <thead>
                 <tr>
-                  <th>بارکد</th><th>نام</th><th>نوع</th><th>دسته</th><th>وضعیت</th><th>مکان</th><th>اقدامات</th>
+                  <th>بارکد</th><th>نام</th><th>نوع</th><th>دسته</th><th>وضعیت</th><th>تحویل‌گیرنده / مکان</th><th>اقدامات</th>
                 </tr>
               </thead>
               {loading ? (
@@ -168,7 +201,7 @@ export default function AssetsPage() {
                         <td><span className="text-theme-secondary text-sm">{a.type?.name || "-"}</span></td>
                         <td><span className="text-theme-secondary text-sm">{a.category?.name || "-"}</span></td>
                         <td><span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${av.cls}`}>{av.label}</span></td>
-                        <td><span className="text-theme-muted text-sm">{a.location || "-"}</span></td>
+                        <td><span className="text-theme-muted text-sm">{holderLabel(a) || a.location || "-"}</span></td>
                         <td>
                           <div className="flex gap-2">
                             <button onClick={() => onEdit(a)} className="btn-theme-secondary text-xs py-1 px-2.5 gap-1"><Pencil className="w-3 h-3" />ویرایش</button>
@@ -238,8 +271,8 @@ export default function AssetsPage() {
               <input required value={editing?.name || ""} onChange={e => setEditing(s => s ? { ...s, name: e.target.value } : s)} className="input-theme" placeholder="نام دارایی" />
             </div>
             <div>
-              <label className="block mb-1.5 font-medium text-theme-secondary text-sm">بارکد *</label>
-              <input required value={editing?.barcode || ""} onChange={e => setEditing(s => s ? { ...s, barcode: e.target.value } : s)} className="input-theme font-mono" placeholder="بارکد" dir="ltr" />
+              <label className="block mb-1.5 font-medium text-theme-secondary text-sm">بارکد {editing?.id && editing.id !== "0" ? "*" : ""}</label>
+              <input required={!!editing?.id && editing.id !== "0"} value={editing?.barcode || ""} onChange={e => setEditing(s => s ? { ...s, barcode: e.target.value } : s)} className="input-theme font-mono" placeholder={editing?.id && editing.id !== "0" ? "بارکد" : "خالی = تولید خودکار"} dir="ltr" />
             </div>
             <div>
               <label className="block mb-1.5 font-medium text-theme-secondary text-sm">بارکد قدیم</label>
@@ -253,15 +286,15 @@ export default function AssetsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-1.5 font-medium text-theme-secondary text-sm">نوع دارایی</label>
-              <select value={editing?.typeId || ""} onChange={e => setEditing(s => s ? { ...s, typeId: e.target.value } : s)} className="select-theme">
+              <label className="block mb-1.5 font-medium text-theme-secondary text-sm">نوع دارایی *</label>
+              <select required value={editing?.typeId || ""} onChange={e => setEditing(s => s ? { ...s, typeId: e.target.value } : s)} className="select-theme">
                 <option value="">انتخاب نوع...</option>
                 {assetTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block mb-1.5 font-medium text-theme-secondary text-sm">دسته‌بندی</label>
-              <select value={editing?.categoryId || ""} onChange={e => setEditing(s => s ? { ...s, categoryId: e.target.value } : s)} className="select-theme">
+              <label className="block mb-1.5 font-medium text-theme-secondary text-sm">دسته‌بندی *</label>
+              <select required value={editing?.categoryId || ""} onChange={e => setEditing(s => s ? { ...s, categoryId: e.target.value } : s)} className="select-theme">
                 <option value="">انتخاب دسته...</option>
                 {assetCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -322,8 +355,8 @@ export default function AssetsPage() {
             <label className="flex flex-col items-center justify-center border-2 border-dashed border-theme rounded-xl p-6 cursor-pointer hover:bg-theme-hover transition-colors">
               <ImageIcon className="w-8 h-8 text-theme-muted mb-2" />
               <span className="text-theme-muted text-sm">کلیک کنید یا تصویر را بکشید</span>
-              <span className="text-theme-muted text-xs mt-1">PNG, JPG تا 10MB</span>
-              <input type="file" multiple accept="image/*" onChange={e => setSelectedImages(p => [...p, ...Array.from(e.target.files || [])])} className="hidden" />
+              <span className="text-theme-muted text-xs mt-1">PNG, JPG, WEBP تا ۱۵ مگابایت — روی سرور ذخیره می‌شود</span>
+              <input type="file" multiple accept="image/*" onChange={e => { setSelectedImages(p => [...p, ...Array.from(e.target.files || [])]); e.target.value = ""; }} className="hidden" />
             </label>
             {selectedImages.length > 0 && (
               <div className="mt-3 grid grid-cols-4 gap-2">
@@ -342,7 +375,12 @@ export default function AssetsPage() {
                 <p className="text-theme-muted text-xs mb-2">تصاویر موجود:</p>
                 <div className="grid grid-cols-4 gap-2">
                   {editing.images.map(img => (
-                    <img key={img.id} src={img.url} alt={img.caption || ""} className="w-full h-20 object-cover rounded-lg border border-theme" />
+                    <div key={img.id} className="relative">
+                      <img src={img.url} alt={img.caption || ""} className="w-full h-20 object-cover rounded-lg border border-theme" />
+                      <button type="button" onClick={() => removeExistingImage(img.id)} title="حذف تصویر" className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-white">
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
