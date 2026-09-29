@@ -67,6 +67,17 @@ export class RecordsController {
     });
   }
 
+  // Unmapped-card raw punches for the same date filter — "نمایش کارت‌های
+  // بدون کاربر" checkbox. Dept/user/status filters don't apply (no user).
+  @Get('unmapped')
+  async unmapped(@Query() q: any) {
+    return this.records.unmappedCards({
+      jYear: q.jYear ? +q.jYear : undefined,
+      jMonth: q.jMonth ? +q.jMonth : undefined,
+      jDay: q.jDay ? +q.jDay : undefined,
+    });
+  }
+
   @Get('day')
   async day(@Query('userId') userId: string, @Query('date') date: string) {
     return this.records.dayDetail(userId, parseWorkDate(date));

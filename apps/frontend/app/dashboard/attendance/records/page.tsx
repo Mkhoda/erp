@@ -3,7 +3,7 @@ import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
   FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, ScrollText, Filter,
-  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon,
+  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon, ChevronDown,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
@@ -13,7 +13,7 @@ import Link from "next/link";
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
-const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", SICK_LEAVE:"استعلاجی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار" };
+const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", SICK_LEAVE:"استعلاجی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار", UNMAPPED:"کارت بدون کاربر" };
 const STATUS_CLS: Record<string,string> = {
   PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600",
   EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600",
@@ -23,6 +23,7 @@ const STATUS_CLS: Record<string,string> = {
   HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500",
   OFF_DUTY:"bg-slate-300/20 text-slate-500",
   WORKING:"bg-teal-500/15 text-teal-600",
+  UNMAPPED:"bg-red-500/15 text-red-600",
 };
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 function liveStatus(r: any): string {
@@ -61,10 +62,15 @@ const hhmm = (min: number) => toFa(`${String(Math.floor((min||0)/60)).padStart(2
 const DOW_FA: Record<number,string> = { 6:"شنبه", 0:"یکشنبه", 1:"دوشنبه", 2:"سه‌شنبه", 3:"چهارشنبه", 4:"پنج‌شنبه", 5:"جمعه" };
 const FA_ORDER = [6,0,1,2,3,4,5];
 
-// Current Jalali year/month (Tehran) — used to default the filters on load.
+// Current Jalali date (Tehran) — used to default the filters on load: the
+// page opens scoped to today's still-working people, not the whole month.
 function currentJalali() {
-  const p = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", timeZone: "Asia/Tehran" }).formatToParts(new Date());
-  return { jYear: +(p.find(x => x.type === "year")?.value || 0), jMonth: +(p.find(x => x.type === "month")?.value || 0) };
+  const p = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", day: "numeric", timeZone: "Asia/Tehran" }).formatToParts(new Date());
+  return {
+    jYear: +(p.find(x => x.type === "year")?.value || 0),
+    jMonth: +(p.find(x => x.type === "month")?.value || 0),
+    jDay: +(p.find(x => x.type === "day")?.value || 0),
+  };
 }
 
 export default function AttendanceRecordsPage() {
@@ -110,14 +116,21 @@ export default function AttendanceRecordsPage() {
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(50);
 
-  // Default to the current Jalali month/year on load (0 = "all" once cleared).
+  // Default to today, status "در حال کار" — the page opens on "who's working
+  // right now", not a month-wide dump. 0 = "all" once the user clears a field.
   const [jYear, setJYear] = React.useState<number>(() => currentJalali().jYear);
   const [jMonth, setJMonth] = React.useState<number>(() => currentJalali().jMonth);
-  const [jDay, setJDay] = React.useState<number>(0);
+  const [jDay, setJDay] = React.useState<number>(() => currentJalali().jDay);
   const [deptId, setDeptId] = React.useState("");
   const [userId, setUserId] = React.useState("");
-  const [status, setStatus] = React.useState("");
+  const [status, setStatus] = React.useState("WORKING");
   React.useEffect(() => { setPage(1); }, [rows, pageSize, status]);
+
+  // Advanced search (collapsed accordion) — currently just the unmapped-card toggle.
+  const [advOpen, setAdvOpen] = React.useState(false);
+  const [showUnmapped, setShowUnmapped] = React.useState(false);
+  const [unmapped, setUnmapped] = React.useState<any[]>([]);
+  const [unmappedLoading, setUnmappedLoading] = React.useState(false);
 
   const qs = React.useCallback(() => {
     const p = new URLSearchParams();
@@ -152,6 +165,21 @@ export default function AttendanceRecordsPage() {
   }, [qs]);
 
   React.useEffect(() => { load(); }, [load]);
+
+  const loadUnmapped = React.useCallback(async () => {
+    setUnmappedLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (jYear) p.set("jYear", String(jYear));
+      if (jMonth) p.set("jMonth", String(jMonth));
+      if (jDay) p.set("jDay", String(jDay));
+      const r = await fetch(`${API}/attendance/records/unmapped?${p}`, { headers: h }).then(x => x.ok ? x.json() : []);
+      setUnmapped(Array.isArray(r) ? r : []);
+    } finally { setUnmappedLoading(false); }
+    // eslint-disable-next-line
+  }, [jYear, jMonth, jDay]);
+  React.useEffect(() => { if (showUnmapped) loadUnmapped(); else setUnmapped([]); }, [showUnmapped, loadUnmapped]);
+
   React.useEffect(() => {
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
     fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
@@ -225,11 +253,24 @@ export default function AttendanceRecordsPage() {
   const monthOpts = [...new Set([...(jMonth ? [jMonth] : []), ...periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth)])].sort((a, b) => a - b);
   // Split the backend's raw INCOMPLETE set into "still working today" vs.
   // genuinely incomplete, so the status filter doesn't lump the two together.
+  // Unmapped-card pseudo-rows (no AttendanceDay, no status) are appended
+  // regardless of the status filter — they have no status to filter by.
   const displayRows = React.useMemo(() => {
-    if (status === "INCOMPLETE") return rows.filter(r => liveStatus(r) !== "WORKING");
-    if (status === "WORKING") return rows.filter(r => liveStatus(r) === "WORKING");
-    return rows;
-  }, [rows, status]);
+    const base = status === "INCOMPLETE" ? rows.filter(r => liveStatus(r) !== "WORKING")
+      : status === "WORKING" ? rows.filter(r => liveStatus(r) === "WORKING")
+      : rows;
+    if (!showUnmapped || !unmapped.length) return base;
+    const pseudo = unmapped.map(u => ({
+      id: `unmapped-${u.cardNo}-${u.gregDate}`,
+      userId: null, user: null,
+      gregDate: u.gregDate, firstCheckIn: u.firstPunch, lastCheckOut: u.lastPunch,
+      workedMinutes: 0, delayMinutes: 0, earlyLeaveMinutes: 0, deficitMinutes: 0,
+      leaveMinutes: 0, overtimeMinutes: 0, holidayOvertimeMinutes: 0, nightMinutes: 0,
+      status: "UNMAPPED",
+      __unmappedCard: u.cardNo, __punchCount: u.punchCount,
+    }));
+    return [...base, ...pseudo];
+  }, [rows, status, showUnmapped, unmapped]);
 
   // ── Column sort (client-side, applied after the status split above) ──
   const [sortK, setSortK] = React.useState<string | null>(null);
@@ -241,8 +282,8 @@ export default function AttendanceRecordsPage() {
   const arrow = (k: string) => sortK === k ? (sortDir === "asc" ? " ↑" : " ↓") : "";
   const sortValue = React.useCallback((r: any, k: string): string | number => {
     switch (k) {
-      case "name": return r.user ? `${r.user.firstName || ""} ${r.user.lastName || ""}` : "";
-      case "card": return r.user?.attendanceCardNo || "";
+      case "name": return r.user ? `${r.user.firstName || ""} ${r.user.lastName || ""}` : (r.__unmappedCard ? "کارت بدون کاربر" : "");
+      case "card": return r.user?.attendanceCardNo || r.__unmappedCard || "";
       case "dept": return r.user?.department?.name || "";
       case "date": return r.gregDate || "";
       case "in": return r.firstCheckIn || "";
@@ -319,7 +360,7 @@ export default function AttendanceRecordsPage() {
         </select>
         <select className="input-theme text-sm" value={status} onChange={e => setStatus(e.target.value)}>
           <option value="">همه وضعیت‌ها</option>
-          {Object.entries(STATUS_FA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          {Object.entries(STATUS_FA).filter(([k]) => k !== "UNMAPPED").map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <SearchSelect
           className="col-span-2"
@@ -330,6 +371,24 @@ export default function AttendanceRecordsPage() {
           emptyLabel="همه افراد"
           placeholder="جستجوی شخص (نام/موبایل/کارت)"
         />
+      </div>
+
+      {/* Advanced search (accordion) */}
+      <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
+        <button type="button" onClick={() => setAdvOpen(o => !o)} className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-theme-primary">
+          <span className="flex items-center gap-1.5"><Filter className="w-4 h-4 text-blue-500" /> جستجوی پیشرفته</span>
+          <ChevronDown className={`w-4 h-4 text-theme-muted transition-transform ${advOpen ? "rotate-180" : ""}`} />
+        </button>
+        {advOpen && (
+          <div className="px-3 pb-3 border-t border-theme pt-3">
+            <label className="flex items-center gap-2 text-sm text-theme-primary cursor-pointer w-fit">
+              <input type="checkbox" checked={showUnmapped} onChange={e => setShowUnmapped(e.target.checked)} />
+              نمایش کارت‌های بدون کاربر
+              {unmappedLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-theme-muted" />}
+            </label>
+            <p className="mt-1 text-xs text-theme-muted">پانچ‌های خام دستگاه برای کارت‌هایی که هنوز به هیچ کاربری متصل نشده‌اند، در همین بازه‌ی تاریخ — به انتهای جدول اضافه می‌شود.</p>
+          </div>
+        )}
       </div>
 
       {/* Summary — click a card (or its icon) to see which days/hours make up that total */}
@@ -410,8 +469,10 @@ export default function AttendanceRecordsPage() {
                 ) : sortedRows.slice((page-1)*pageSize, page*pageSize).map((r, i) => (
                   <tr key={r.id} className="border-b border-theme/40 hover:bg-theme-hover">
                     <td className="py-1.5 px-2 text-theme-muted">{faNum((page-1)*pageSize + i + 1)}</td>
-                    <td className="px-2 text-theme-primary whitespace-nowrap">{r.user ? `${r.user.firstName} ${r.user.lastName}` : "—"}</td>
-                    <td className="px-2 text-theme-muted" dir="ltr">{r.user?.attendanceCardNo || "—"}</td>
+                    <td className="px-2 text-theme-primary whitespace-nowrap">
+                      {r.user ? `${r.user.firstName} ${r.user.lastName}` : r.__unmappedCard ? <span className="text-red-600 font-medium">کارت بدون کاربر{r.__punchCount > 1 ? ` (${faNum(r.__punchCount)} پانچ)` : ""}</span> : "—"}
+                    </td>
+                    <td className="px-2 text-theme-muted" dir="ltr">{r.user?.attendanceCardNo || r.__unmappedCard || "—"}</td>
                     <td className="px-2 text-theme-muted whitespace-nowrap">{r.user?.department?.name || "—"}</td>
                     <td className="px-2">
                       <div className="text-theme-muted text-xs" dir="ltr">{faDate(r.gregDate)}</div>
@@ -428,16 +489,20 @@ export default function AttendanceRecordsPage() {
                     <td className="px-2 text-rose-600" dir="ltr">{r.holidayOvertimeMinutes ? fmtMin(r.holidayOvertimeMinutes) : "—"}</td>
                     <td className="px-2"><span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATUS_CLS[liveStatus(r)] || "bg-theme-secondary"}`}>{STATUS_FA[liveStatus(r)] || r.status}</span></td>
                     <td className="px-2">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => openDetail(r)} title="مشاهده جزئیات و پانچ‌ها"
-                          className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setUserId(r.userId)} title={`فیلتر بر اساس ${r.user ? `${r.user.firstName} ${r.user.lastName}` : "این کاربر"}`}
-                          className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-theme-muted hover:bg-blue-500/10 hover:text-blue-500 transition-colors">
-                          <Filter className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {r.userId ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openDetail(r)} title="مشاهده جزئیات و پانچ‌ها"
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors">
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setUserId(r.userId)} title={`فیلتر بر اساس ${r.user ? `${r.user.firstName} ${r.user.lastName}` : "این کاربر"}`}
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-theme-muted hover:bg-blue-500/10 hover:text-blue-500 transition-colors">
+                            <Filter className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-theme-muted text-xs">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}

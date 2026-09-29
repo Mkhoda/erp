@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { tehranMidnightInstant } from '../engine/jalali.util';
+import { jalaliRange, tehranMidnightInstant, workDateOf } from '../engine/jalali.util';
 
 export interface RecordFilter {
   jYear?: number;
@@ -288,6 +288,35 @@ export class RecordsService {
       sickRemainingMinutes: sickRemainingMin,
       sickRemainingDays: r2(sickRemainingMin / dailyReq),
     };
+  }
+
+  // Raw punches for card numbers with no linked user, grouped by card + work
+  // date — the "نمایش کارت‌های بدون کاربر" filter on the records page. These
+  // never produce an AttendanceDay row (userId is required there), so they're
+  // otherwise invisible on this page even though the device saw the punch.
+  async unmappedCards(f: Pick<RecordFilter, 'jYear' | 'jMonth' | 'jDay'>) {
+    const range = jalaliRange(f.jYear, f.jMonth, f.jDay);
+    const where: Prisma.RawAttendanceRecordWhereInput = { userId: null };
+    if (range) where.punchAt = { gte: tehranMidnightInstant(range.start), lt: tehranMidnightInstant(range.endExcl) };
+    const recs = await this.prisma.rawAttendanceRecord.findMany({
+      where,
+      orderBy: { punchAt: 'desc' },
+      take: 2000,
+      select: { cardNo: true, punchAt: true },
+    });
+    const groups = new Map<string, { cardNo: string; gregDate: Date; firstPunch: Date; lastPunch: Date; punchCount: number }>();
+    for (const r of recs) {
+      const gregDate = workDateOf(r.punchAt);
+      const key = `${r.cardNo}|${gregDate.getTime()}`;
+      const g = groups.get(key);
+      if (!g) groups.set(key, { cardNo: r.cardNo, gregDate, firstPunch: r.punchAt, lastPunch: r.punchAt, punchCount: 1 });
+      else {
+        g.punchCount++;
+        if (r.punchAt < g.firstPunch) g.firstPunch = r.punchAt;
+        if (r.punchAt > g.lastPunch) g.lastPunch = r.punchAt;
+      }
+    }
+    return [...groups.values()].sort((a, b) => b.gregDate.getTime() - a.gregDate.getTime() || a.cardNo.localeCompare(b.cardNo));
   }
 
   // Day detail: computed row + every raw punch + any override (audit view).

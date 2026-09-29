@@ -72,6 +72,24 @@ export function jalaliMonthRange(jYear: number, jMonth: number): { start: Date; 
   return { start, endExcl };
 }
 
+// Gregorian [start, endExclusive) UTC-midnight range for a Jalali date filter
+// fragment — year only, year+month, or a full year+month+day, each narrowing
+// the one before. Returns null when no year is given (unbounded).
+export function jalaliRange(jYear?: number, jMonth?: number, jDay?: number): { start: Date; endExcl: Date } | null {
+  if (!jYear) return null;
+  const startM = jMonth && jDay
+    ? moment(`${jYear}/${jMonth}/${jDay}`, 'jYYYY/jM/jD').startOf('day')
+    : moment(`${jYear}/${jMonth || 1}/1`, 'jYYYY/jM/jD').startOf('day');
+  const endM = jMonth && jDay
+    ? startM.clone().add(1, 'day')
+    : jMonth
+      ? startM.clone().add(1, 'jMonth')
+      : startM.clone().add(1, 'jYear');
+  const start = new Date(Date.UTC(startM.year(), startM.month(), startM.date()));
+  const endExcl = new Date(Date.UTC(endM.year(), endM.month(), endM.date()));
+  return { start, endExcl };
+}
+
 // "HH:mm" → minutes since midnight. Returns null on bad input.
 export function parseHHmm(s?: string | null): number | null {
   if (!s) return null;
