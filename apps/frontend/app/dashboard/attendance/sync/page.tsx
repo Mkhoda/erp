@@ -159,6 +159,37 @@ export default function SyncMonitorPage() {
     finally { setPreviewLoading(false); }
   }
 
+  // Cleanup for the future-day auto-leave bug: a fixed prior recompute run
+  // (before computeDay() learned to skip empty future days) left real
+  // AttendanceDay rows — mostly auto-converted to LEAVE — sitting on every
+  // remaining day of the month for every user. Same preview-then-apply
+  // shape as above: see exactly what would be deleted before deleting it.
+  const [cleanup, setCleanup] = React.useState<any[] | null>(null);
+  const [cleanupOpen, setCleanupOpen] = React.useState(false);
+  const [cleanupBusy, setCleanupBusy] = React.useState(false);
+
+  async function previewCleanup() {
+    setCleanupBusy(true); setMaintMsg(null);
+    try {
+      const r = await fetch(`${API}/attendance/maintenance/future-cleanup/preview`, { headers: h });
+      setCleanup(r.ok ? await r.json() : []);
+      setCleanupOpen(true);
+    } catch { setMaintMsg("خطا در پیش‌نمایش پاک‌سازی"); setTimeout(() => setMaintMsg(null), 6000); }
+    finally { setCleanupBusy(false); }
+  }
+
+  async function applyCleanup() {
+    if (!cleanup?.length) return;
+    if (!confirm(`${faNum(cleanup.length)} رکورد روز آینده (بدون پانچ یا اصلاح واقعی) حذف می‌شود. این کار قابل بازگشت نیست. ادامه می‌دهید؟`)) return;
+    setCleanupBusy(true);
+    try {
+      const r = await fetch(`${API}/attendance/maintenance/future-cleanup/apply`, { method: "POST", headers: h }).then(x => x.json());
+      setMaintMsg(`${faNum(r.deleted ?? 0)} رکورد حذف شد`);
+      setCleanupOpen(false); setCleanup(null);
+    } catch { setMaintMsg("خطا در حذف"); }
+    finally { setCleanupBusy(false); setTimeout(() => setMaintMsg(null), 8000); }
+  }
+
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
 
   return (
@@ -209,6 +240,13 @@ export default function SyncMonitorPage() {
               {previewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TimerReset className="w-4 h-4" />} پیش‌نمایش تغییرات
             </button>
           </div>
+        </div>
+
+        <div className="pt-2 border-t border-theme space-y-2">
+          <span className="text-xs text-theme-muted flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-red-500" /> پاک‌سازی رکوردهای اشتباهِ روزهای آینده (باگ تبدیل خودکار روزهای آینده به مرخصی — همه‌ی کاربران)</span>
+          <button onClick={previewCleanup} disabled={cleanupBusy} className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50">
+            {cleanupBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />} پیش‌نمایش رکوردهای اشتباه
+          </button>
         </div>
 
         {diag && (
@@ -387,6 +425,59 @@ export default function SyncMonitorPage() {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={cleanupOpen}
+        onClose={() => setCleanupOpen(false)}
+        title="پاک‌سازی رکوردهای اشتباه روزهای آینده"
+        size="xl"
+        footer={
+          <>
+            <button onClick={() => setCleanupOpen(false)} className="btn-theme-secondary text-sm">بستن</button>
+            {!!cleanup?.length && (
+              <button onClick={applyCleanup} disabled={cleanupBusy} className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50">
+                {cleanupBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />} حذف {faNum(cleanup.length)} رکورد
+              </button>
+            )}
+          </>
+        }
+      >
+        {!cleanup?.length ? (
+          <div className="text-sm text-theme-muted text-center py-8">
+            هیچ رکورد اشتباهی پیدا نشد.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-theme-muted">
+              {faNum(cleanup.length)} رکورد روز آینده بدون پانچ یا اصلاح واقعی — احتمالاً باقی‌مانده‌ی باگ تبدیل خودکار به مرخصی. این فقط پیش‌نمایش است، چیزی هنوز حذف نشده.
+            </p>
+            <div className="max-h-96 overflow-y-auto -mx-1">
+              <table className="w-full text-xs text-center">
+                <thead className="sticky top-0 bg-theme-card">
+                  <tr className="text-theme-muted border-b border-theme">
+                    <th className="py-2 px-2 font-medium">کاربر</th>
+                    <th className="px-2 font-medium">تاریخ</th>
+                    <th className="px-2 font-medium">وضعیت</th>
+                    <th className="px-2 font-medium">مرخصی</th>
+                    <th className="px-2 font-medium">تبدیل خودکار</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cleanup.map((d: any) => (
+                    <tr key={d.id} className="border-b border-theme/40 hover:bg-theme-hover">
+                      <td className="py-1.5 px-2 text-theme-primary whitespace-nowrap">{d.user ? `${d.user.firstName} ${d.user.lastName}` : "—"}</td>
+                      <td className="px-2 text-theme-primary whitespace-nowrap" dir="ltr">{faDateOnly(d.gregDate)}</td>
+                      <td className="px-2 text-theme-muted">{STATUS_FA[d.status] || d.status}</td>
+                      <td className="px-2 text-theme-muted" dir="ltr">{fmtMin(d.leaveMinutes)}</td>
+                      <td className="px-2">{d.autoConvertedLeave ? <span className="text-amber-600">بله</span> : <span className="text-theme-muted">خیر</span>}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

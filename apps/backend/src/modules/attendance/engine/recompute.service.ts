@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CalcService } from './calc.service';
 import { GuardCalcService } from './guard-calc.service';
-import { jalaliMonthRange, workDateOf } from './jalali.util';
+import { jalaliMonthRange, tehranMidnightInstant, workDateOf } from './jalali.util';
 
 // Orchestrates recomputation of AttendanceDay rows. All entry points funnel
 // through recomputeDays(), which routes each user's dates to either
@@ -134,19 +134,76 @@ export class RecomputeService {
     if (shiftId) return { isGuard: true, days: [] as any[] };
 
     const results: Array<{
-      gregDate: Date; isNew: boolean; changedFields: string[];
-      current: Record<string, any> | null; computed: Record<string, any>;
+      gregDate: Date; isNew: boolean; isStale: boolean; changedFields: string[];
+      current: Record<string, any> | null; computed: Record<string, any> | null;
     }> = [];
     for (const gregDate of days) {
       const { current, computed } = await this.calc.previewDay(userId, gregDate);
+      if (computed === null) {
+        // A future day the (now-fixed) engine would no longer write anything
+        // for — if a row already exists here, it's stale (almost certainly
+        // the future-day auto-leave bug); flag it instead of diffing fields
+        // against nothing.
+        if (current) results.push({ gregDate, isNew: false, isStale: true, changedFields: [], current, computed: null });
+        continue;
+      }
       const changedFields = RecomputeService.DIFF_FIELDS.filter(
         (f) => !current || (current as any)[f] !== (computed as any)[f],
       );
       if (!current || changedFields.length) {
-        results.push({ gregDate, isNew: !current, changedFields, current, computed });
+        results.push({ gregDate, isNew: !current, isStale: false, changedFields, current, computed });
       }
     }
     return { isGuard: false, days: results };
+  }
+
+  /**
+   * Every AttendanceDay row for a day strictly after today that has neither
+   * a real punch nor an override — i.e. rows that could only have been
+   * created by the future-day auto-leave bug (see CalcService.
+   * computeDayValues()'s future-day guard): recomputing a future month used
+   * to fall through to "no punch -> ABSENT" and then auto-convert that into
+   * a full day of LEAVE for every remaining day, for anyone with enough
+   * annual balance left. Read-only.
+   */
+  async findFutureBogusDays() {
+    const today = workDateOf(new Date());
+    const futureDays = await this.prisma.attendanceDay.findMany({
+      where: { gregDate: { gt: today } },
+      include: { user: { select: { firstName: true, lastName: true, attendanceCardNo: true } } },
+      orderBy: [{ gregDate: 'asc' }, { userId: 'asc' }],
+    });
+    if (!futureDays.length) return [];
+
+    const [overrides, futurePunches] = await Promise.all([
+      this.prisma.attendanceOverride.findMany({
+        where: { gregDate: { gt: today } },
+        select: { userId: true, gregDate: true },
+      }),
+      // Real punches can't actually be dated in the future, but check
+      // defensively rather than assume — bounded to the same range.
+      this.prisma.rawAttendanceRecord.findMany({
+        where: { userId: { not: null }, punchAt: { gte: tehranMidnightInstant(new Date(today.getTime() + 86400000)) } },
+        select: { userId: true, punchAt: true },
+      }),
+    ]);
+    const key = (userId: string | null, gregDate: Date) => `${userId}|${gregDate.getTime()}`;
+    const overrideKeys = new Set(overrides.map((o) => key(o.userId, o.gregDate)));
+    const punchDayKeys = new Set(futurePunches.map((p) => key(p.userId, workDateOf(p.punchAt))));
+
+    return futureDays.filter((d) => !overrideKeys.has(key(d.userId, d.gregDate)) && !punchDayKeys.has(key(d.userId, d.gregDate)));
+  }
+
+  // Deletes exactly the rows findFutureBogusDays() finds. Safe by
+  // construction: a future day with no override and no punch has nothing
+  // legitimate to record yet, so removing the row just returns it to its
+  // natural "not computed" state — the same state any future day is in
+  // before anything ever touches it.
+  async deleteFutureBogusDays(): Promise<number> {
+    const bogus = await this.findFutureBogusDays();
+    if (!bogus.length) return 0;
+    const result = await this.prisma.attendanceDay.deleteMany({ where: { id: { in: bogus.map((d) => d.id) } } });
+    return result.count;
   }
 
   /**

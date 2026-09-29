@@ -92,4 +92,18 @@ export class MaintenanceController {
     if (!body.userId) throw new BadRequestException('برای پیش‌نمایش، انتخاب یک کاربر الزامی است');
     return this.recompute.previewUserMonth(body.userId, +body.jYear, +body.jMonth);
   }
+
+  // Read-only: every AttendanceDay row for a future date with no real punch
+  // or override — i.e. rows the (now-fixed) engine would never create again,
+  // almost certainly leftovers from the future-day auto-leave bug.
+  @Get('future-cleanup/preview')
+  previewFutureCleanup() {
+    return this.recompute.findFutureBogusDays();
+  }
+
+  // Deletes exactly those rows. See RecomputeService.deleteFutureBogusDays().
+  @Post('future-cleanup/apply')
+  applyFutureCleanup() {
+    return this.recompute.deleteFutureBogusDays().then((deleted) => ({ deleted }));
+  }
 }

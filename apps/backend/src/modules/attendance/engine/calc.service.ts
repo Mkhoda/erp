@@ -216,10 +216,13 @@ export class CalcService {
   /**
    * Recompute the AttendanceDay for one user on one Gregorian work date from the
    * raw punches, schedule, holidays, and any manual override. Idempotent: always
-   * derives the row fresh and upserts it. Never reads/writes RawAttendanceRecord.
+   * derives the row fresh and upserts it — EXCEPT a future day with nothing real
+   * on record yet (see computeDayValues()), which is left untouched rather than
+   * getting a fabricated ABSENT/LEAVE row. Never reads/writes RawAttendanceRecord.
    */
   async computeDay(userId: string, gregDate: Date): Promise<void> {
     const v = await this.computeDayValues(userId, gregDate);
+    if (v === null) return;
     await this.prisma.attendanceDay.upsert({
       where: { userId_gregDate: { userId, gregDate } },
       create: { userId, gregDate, ...v },
@@ -232,7 +235,8 @@ export class CalcService {
   // there (if anything) — so a caller can diff before/after and decide
   // whether to actually apply it. Used by the maintenance "preview month"
   // tool so an admin can review a bulk recompute's effect before committing
-  // to it (see RecomputeService.previewUserMonth).
+  // to it (see RecomputeService.previewUserMonth). null `computed` means
+  // computeDay() would skip this day entirely (see computeDayValues()).
   async previewDay(userId: string, gregDate: Date) {
     const [current, computed] = await Promise.all([
       this.prisma.attendanceDay.findUnique({ where: { userId_gregDate: { userId, gregDate } } }),
@@ -266,6 +270,20 @@ export class CalcService {
       }),
       this.holidayFor(gregDate, sched.scheduleId),
     ]);
+
+    // A day strictly after today can't have real punches yet — it hasn't
+    // happened. If nothing has been decided for it either (no admin/approved
+    // request override), there is nothing real to compute: skip entirely
+    // rather than falling through to "no punch -> ABSENT" and then, for most
+    // schedules, immediately auto-converting that into a full day of LEAVE
+    // (absentToLeaveEnabled fires whenever the annual balance allows it —
+    // see below). Bulk-recomputing a future month used to silently pre-spend
+    // the rest of everyone's leave balance this way, one "day" at a time,
+    // for every remaining day in the month. A future day WITH an override
+    // (e.g. pre-approved leave) still computes normally below.
+    if (gregDate.getTime() > workDateOf(new Date()).getTime() && !override && punches.length === 0) {
+      return null;
+    }
 
     const { jYear, jMonth, jDay } = toJalaliParts(gregDate);
     const isWeekend = forcedOff || !sched.workDays.includes(dow);
