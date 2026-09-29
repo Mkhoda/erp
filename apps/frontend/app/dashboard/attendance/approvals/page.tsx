@@ -26,6 +26,7 @@ export default function ApprovalsPage() {
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
   const [sickOnly, setSickOnly] = React.useState(false);
+  const [attF, setAttF] = React.useState<"" | "with" | "without">("");
   const [sortK, setSortK] = React.useState<null | "name" | "date" | "type" | "status">(null);
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
   const [loading, setLoading] = React.useState(true);
@@ -36,11 +37,14 @@ export default function ApprovalsPage() {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/attendance/requests?status=${statusF}`, { headers: h }).then(x => x.ok ? x.json() : []);
+      const p = new URLSearchParams({ status: statusF });
+      if (sickOnly) p.set("sick", "1");
+      if (attF) p.set("attachment", attF);
+      const r = await fetch(`${API}/attendance/requests?${p}`, { headers: h }).then(x => x.ok ? x.json() : []);
       setRows(Array.isArray(r) ? r : []);
     } finally { setLoading(false); }
     // eslint-disable-next-line
-  }, [statusF]);
+  }, [statusF, sickOnly, attF]);
   React.useEffect(() => { load(); }, [load]);
 
   function thSort(k: NonNullable<typeof sortK>) {
@@ -134,6 +138,11 @@ export default function ApprovalsPage() {
             <input type="checkbox" checked={sickOnly} onChange={e => setSickOnly(e.target.checked)} />
             فقط استعلاجی
           </label>
+          <select className="input-theme text-sm w-auto" value={attF} onChange={e => setAttF(e.target.value as any)}>
+            <option value="">برگه مرخصی: همه</option>
+            <option value="with">دارای برگه مرخصی</option>
+            <option value="without">بدون برگه مرخصی</option>
+          </select>
         </div>
       </div>
 
@@ -145,12 +154,12 @@ export default function ApprovalsPage() {
                 <th className="py-2 px-2 font-medium cursor-pointer hover:text-theme-primary" onClick={() => thSort("name")}>کارمند{arrow("name")}</th>
                 <th className="px-2 font-medium cursor-pointer hover:text-theme-primary" onClick={() => thSort("date")}>تاریخ{arrow("date")}</th>
                 <th className="px-2 font-medium cursor-pointer hover:text-theme-primary" onClick={() => thSort("type")}>نوع{arrow("type")}</th>
-                <th className="px-2 font-medium">ورود</th><th className="px-2 font-medium">خروج</th><th className="px-2 font-medium">توضیح</th>
+                <th className="px-2 font-medium">ورود</th><th className="px-2 font-medium">خروج</th><th className="px-2 font-medium">توضیح</th><th className="px-2 font-medium">برگه مرخصی</th>
                 <th className="px-2 font-medium cursor-pointer hover:text-theme-primary" onClick={() => thSort("status")}>وضعیت{arrow("status")}</th>
                 <th className="px-2 font-medium">اقدام</th>
               </tr></thead>
               <tbody>
-                {filteredRows.length === 0 ? <tr><td colSpan={8} className="py-10 text-theme-muted">درخواستی نیست</td></tr> : filteredRows.map(q => (
+                {filteredRows.length === 0 ? <tr><td colSpan={9} className="py-10 text-theme-muted">درخواستی نیست</td></tr> : filteredRows.map(q => (
                   <tr key={q.id} onClick={() => openRow(q)} className="border-b border-theme/40 hover:bg-theme-hover cursor-pointer">
                     <td className="py-1.5 px-2 text-theme-primary whitespace-nowrap">{q.user ? `${q.user.firstName} ${q.user.lastName}` : "—"}</td>
                     <td className="px-2 text-theme-muted" dir="ltr">{faDate(q.gregDate)}</td>
@@ -158,6 +167,15 @@ export default function ApprovalsPage() {
                     <td className={`px-2 ${q.clearCheckIn ? "text-red-600 font-medium" : "text-theme-primary"}`} dir="ltr">{q.clearCheckIn ? "حذف" : faTime(q.requestedIn)}</td>
                     <td className={`px-2 ${q.clearCheckOut ? "text-red-600 font-medium" : "text-theme-primary"}`} dir="ltr">{q.clearCheckOut ? "حذف" : faTime(q.requestedOut)}</td>
                     <td className="px-2 text-theme-muted text-xs max-w-[180px] truncate" title={q.description}>{q.description || "—"}</td>
+                    <td className="px-2" onClick={e => e.stopPropagation()}>
+                      {q.attachment ? (
+                        <a href={attachmentUrl(q.attachment)} target="_blank" rel="noopener noreferrer" title="مشاهده برگه مرخصی" className="inline-block">
+                          <img src={attachmentUrl(q.attachment)} alt="برگه مرخصی" className="h-9 w-9 object-cover rounded border border-theme hover:opacity-80" />
+                        </a>
+                      ) : q.isSickLeave ? (
+                        <span className="text-[11px] text-red-600">ندارد</span>
+                      ) : <span className="text-theme-muted">—</span>}
+                    </td>
                     <td className="px-2"><span className={`text-xs px-2 py-0.5 rounded-full ${q.status === "APPROVED" ? "bg-green-500/15 text-green-600" : q.status === "REJECTED" ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600"}`}>{REQ_STATUS_FA[q.status] || q.status}</span></td>
                     <td className="px-2">
                       <button onClick={(e) => { e.stopPropagation(); openRow(q); }} className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-theme-secondary border border-theme text-theme-primary hover:bg-theme-hover">
@@ -208,7 +226,7 @@ export default function ApprovalsPage() {
             {sel.req.description && <div className="text-sm"><span className="text-theme-muted">توضیح کارمند: </span><span className="text-theme-primary">{sel.req.description}</span></div>}
             {sel.req.attachment && (
               <div>
-                <div className="text-xs text-theme-muted mb-1">مدرک پیوست‌شده</div>
+                <div className="text-xs text-theme-muted mb-1">برگه مرخصی / مدرک پیوست‌شده (برای بزرگ‌نمایی کلیک کنید)</div>
                 <a href={attachmentUrl(sel.req.attachment)} target="_blank" rel="noopener noreferrer">
                   <img src={attachmentUrl(sel.req.attachment)} alt="مدرک پیوست‌شده" className="max-h-48 rounded-lg border border-theme hover:opacity-90 transition-opacity" />
                 </a>

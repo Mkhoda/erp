@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Clock, Pencil, Info as InfoIcon, ListChecks, HelpCircle, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Clock, Pencil, Info as InfoIcon, ListChecks, HelpCircle, AlertTriangle, ArrowLeft, Upload, X, Loader2 } from "lucide-react";
 import Modal from "../ui/Modal";
 import TimeSelect from "../ui/TimeSelect";
 
@@ -55,16 +55,19 @@ type Props = {
   detail: DayDetail | null;
   // Admin-only "اصلاح ساعت ورود/خروج" tab — omit for self-service (read-only) use.
   allowOverride?: boolean;
-  ov?: { inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean; isSickLeave: boolean };
-  setOv?: React.Dispatch<React.SetStateAction<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean; isSickLeave: boolean }>>;
+  ov?: { inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean; isSickLeave: boolean; attachment: string };
+  setOv?: React.Dispatch<React.SetStateAction<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean; isSickLeave: boolean; attachment: string }>>;
   onSaveOverride?: () => void;
   ovSaving?: boolean;
+  // Doctor's-note upload for the "استعلاجی" checkbox above — same requirement as employee self-service.
+  ovUploading?: boolean;
+  onPickOvAttachment?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   // Self-service (employee) path: open the parent's request modal pre-set to
   // this kind instead of editing directly. Ignored when allowOverride is set.
   onRequestKind?: (kind: "LEAVE" | "MISSION") => void;
 };
 
-export default function DayDetailModal({ open, onClose, detail, allowOverride, ov, setOv, onSaveOverride, ovSaving, onRequestKind }: Props) {
+export default function DayDetailModal({ open, onClose, detail, allowOverride, ov, setOv, onSaveOverride, ovSaving, ovUploading, onPickOvAttachment, onRequestKind }: Props) {
   const [tab, setTab] = React.useState<"summary" | "punches" | "edit">("summary");
   React.useEffect(() => { if (open) setTab("summary"); }, [open, detail?.row?.id]);
 
@@ -238,12 +241,35 @@ export default function DayDetailModal({ open, onClose, detail, allowOverride, o
                     استعلاجی (از موجودی جدا کسر شود)
                   </label>
                 </div>
+                {ov.isSickLeave && (
+                  <div className="sm:col-span-2">
+                    <label className="block mb-1 text-theme-secondary text-xs">
+                      برگه مرخصی / گواهی پزشک <span className="text-red-500">* الزامی</span>
+                    </label>
+                    {ov.attachment ? (
+                      <div className="flex items-start gap-2">
+                        <a href={attachmentUrl(ov.attachment)} target="_blank" rel="noopener noreferrer">
+                          <img src={attachmentUrl(ov.attachment)} alt="برگه مرخصی" className="h-24 rounded-lg border border-theme object-cover" />
+                        </a>
+                        <button type="button" onClick={() => setOv(s => ({ ...s, attachment: "" }))} className="flex items-center gap-1 text-xs text-red-500 hover:underline">
+                          <X className="w-3 h-3" /> حذف و انتخاب دوباره
+                        </button>
+                      </div>
+                    ) : (
+                      <label className={`flex items-center justify-center gap-2 border-2 border-dashed border-rose-300 dark:border-rose-800 rounded-xl px-4 py-4 text-sm text-theme-muted ${ovUploading ? "opacity-60" : "cursor-pointer hover:bg-theme-hover"}`}>
+                        {ovUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        {ovUploading ? "در حال بارگذاری..." : "انتخاب تصویر برگه مرخصی (JPG/PNG تا ۱۰ مگابایت)"}
+                        <input type="file" accept="image/*" className="hidden" disabled={ovUploading} onChange={onPickOvAttachment} />
+                      </label>
+                    )}
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <label className="block mb-1 text-theme-secondary text-xs">دلیل</label>
                   <input value={ov.reason} onChange={e => setOv(s => ({ ...s, reason: e.target.value }))} className="input-theme text-sm" placeholder="دلیل اصلاح" />
                 </div>
               </div>
-              <button onClick={onSaveOverride} disabled={ovSaving} className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
+              <button onClick={onSaveOverride} disabled={ovSaving || (ov.isSickLeave && !ov.attachment)} className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
                 <Pencil className="w-4 h-4" /> ذخیره اصلاح
               </button>
               <p className="mt-1 text-[11px] text-theme-muted">این اصلاح ثبت می‌شود و در پایش مجدد از بین نمی‌رود.</p>

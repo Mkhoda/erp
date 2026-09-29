@@ -20,8 +20,13 @@ export class RequestsController {
   @Get('requests')
   @Page('/dashboard/attendance/approvals')
   @UseGuards(PagePermissionGuard)
-  async queue(@Req() req: any, @Query('status') status?: string) {
-    return this.requests.queue(await resolveDeptScope(this.prisma, req.user), status);
+  async queue(
+    @Req() req: any,
+    @Query('status') status?: string,
+    @Query('sick') sick?: string,             // '1' → sick-leave requests only
+    @Query('attachment') attachment?: string, // 'with' | 'without'
+  ) {
+    return this.requests.queue(await resolveDeptScope(this.prisma, req.user), status, { sick: sick === '1' || sick === 'true', attachment });
   }
 
   @Get('requests/pending-count')

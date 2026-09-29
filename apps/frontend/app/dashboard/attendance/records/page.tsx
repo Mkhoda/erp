@@ -81,8 +81,26 @@ export default function AttendanceRecordsPage() {
   const [detail, setDetail] = React.useState<any>(null);
   const [exporting, setExporting] = React.useState<string | null>(null);
   // Admin edit (override) form in the detail modal.
-  const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean; isSickLeave: boolean }>({ inTime: "", outTime: "", status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false, isSickLeave: false });
+  const [ov, setOv] = React.useState<{ inTime: string; outTime: string; status: string; reason: string; leaveHours: string; clearCheckIn: boolean; clearCheckOut: boolean; isSickLeave: boolean; attachment: string }>({ inTime: "", outTime: "", status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false, isSickLeave: false, attachment: "" });
   const [ovSaving, setOvSaving] = React.useState(false);
+  const [ovUploading, setOvUploading] = React.useState(false);
+
+  // Same doctor's-note upload endpoint as employee self-service — any authenticated user may use it.
+  async function onPickOvAttachment(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setOvUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch(`${API}/attendance/me/requests/attachment`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      if (!res.ok) { const e2 = await res.json().catch(() => ({})); alert(e2.message || "خطا در آپلود عکس"); return; }
+      const d = await res.json();
+      setOv(s => ({ ...s, attachment: d.url }));
+    } catch { alert("خطا در آپلود عکس"); }
+    finally { setOvUploading(false); }
+  }
   const [leave, setLeave] = React.useState<any>(null);
   const [rules, setRules] = React.useState<any>(null);
   const [rulesOpen, setRulesOpen] = React.useState(false);
@@ -158,12 +176,13 @@ export default function AttendanceRecordsPage() {
   async function openDetail(row: any) {
     const date = row.gregDate.slice(0, 10);
     const d = await fetch(`${API}/attendance/records/day?userId=${row.userId}&date=${date}`, { headers: h }).then(r => r.ok ? r.json() : null);
-    setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false, isSickLeave: false });
+    setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false, isSickLeave: false, attachment: "" });
     setDetail({ row, ...d });
   }
 
   async function saveOverride() {
     if (!detail) return;
+    if (ov.isSickLeave && !ov.attachment) { alert("برای مرخصی استعلاجی، بارگذاری تصویر برگه مرخصی (گواهی پزشک) الزامی است"); return; }
     setOvSaving(true);
     try {
       const body = {
@@ -176,6 +195,7 @@ export default function AttendanceRecordsPage() {
         forceStatus: ov.status || undefined,
         leaveMinutes: ov.leaveHours ? Math.round(Number(ov.leaveHours) * 60) : undefined,
         isSickLeave: ov.isSickLeave || undefined,
+        attachment: ov.isSickLeave ? ov.attachment : undefined,
         reason: ov.reason || "اصلاح توسط مدیر",
       };
       const res = await fetch(`${API}/attendance/overrides`, { method: "POST", headers: h, body: JSON.stringify(body) });
@@ -453,6 +473,8 @@ export default function AttendanceRecordsPage() {
         setOv={setOv}
         onSaveOverride={saveOverride}
         ovSaving={ovSaving}
+        ovUploading={ovUploading}
+        onPickOvAttachment={onPickOvAttachment}
       />
 
       <BreakdownModal metricKey={breakdown} rows={rows} onClose={() => setBreakdown(null)} />

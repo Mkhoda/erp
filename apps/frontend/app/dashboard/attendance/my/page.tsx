@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Loader2, Fingerprint, Pencil, AlertTriangle, Send, Hourglass, Eye } from "lucide-react";
+import { Loader2, Fingerprint, Pencil, AlertTriangle, Send, Hourglass, Eye, Paperclip, Upload, X } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import TimeSelect from "../../../components/ui/TimeSelect";
 import DayDetailModal from "../../../components/attendance/DayDetailModal";
@@ -59,6 +59,36 @@ function rangeMinutes(start?: string, end?: string): number | null {
 // A root-relative /uploads/... path from the backend needs the site origin
 // prefixed, NOT the API base (which is .../api and has no static mount there).
 const attachmentUrl = (raw: string) => raw.startsWith("http") ? raw : `${typeof window !== "undefined" ? window.location.origin : ""}${raw}`;
+
+/** Required doctor's-note image for sick-leave requests: pick → upload → preview. */
+function SickNoteField({ value, uploading, onPick, onClear }: {
+  value: string; uploading: boolean;
+  onPick: (e: React.ChangeEvent<HTMLInputElement>) => void; onClear: () => void;
+}) {
+  return (
+    <div>
+      <label className="block mb-1 text-theme-secondary text-xs">
+        برگه مرخصی / گواهی پزشک <span className="text-red-500">* الزامی</span>
+      </label>
+      {value ? (
+        <div className="flex items-start gap-2">
+          <a href={attachmentUrl(value)} target="_blank" rel="noopener noreferrer">
+            <img src={attachmentUrl(value)} alt="برگه مرخصی" className="h-24 rounded-lg border border-theme object-cover" />
+          </a>
+          <button type="button" onClick={onClear} className="flex items-center gap-1 text-xs text-red-500 hover:underline">
+            <X className="w-3 h-3" /> حذف و انتخاب دوباره
+          </button>
+        </div>
+      ) : (
+        <label className={`flex items-center justify-center gap-2 border-2 border-dashed border-rose-300 dark:border-rose-800 rounded-xl px-4 py-4 text-sm text-theme-muted ${uploading ? "opacity-60" : "cursor-pointer hover:bg-theme-hover"}`}>
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {uploading ? "در حال بارگذاری..." : "انتخاب تصویر برگه مرخصی (JPG/PNG تا ۱۰ مگابایت)"}
+          <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={onPick} />
+        </label>
+      )}
+    </div>
+  );
+}
 
 // Current Jalali year/month (Tehran) — used to default the filters on load.
 function currentJalali() {
@@ -463,8 +493,18 @@ export default function MyAttendancePage() {
               <div key={q.id} className="flex items-center justify-between text-sm border border-theme rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span dir="ltr" className="text-theme-primary">{faDate(q.gregDate)}</span>
-                  <span className="text-theme-muted">{q.targetStatus ? STATUS_FA[q.targetStatus] : (q.clearCheckIn || q.clearCheckOut) ? "حذف رکورد ورود/خروج" : "اصلاح ساعت"}</span>
+                  <span className="text-theme-muted">{q.targetStatus ? STATUS_FA[q.targetStatus] : q.leaveMinutes ? (q.isSickLeave ? "استعلاجی ساعتی" : "مرخصی ساعتی") : (q.clearCheckIn || q.clearCheckOut) ? "حذف رکورد ورود/خروج" : "اصلاح ساعت"}</span>
                   {q.description && <span className="text-theme-muted text-xs">— {q.description}</span>}
+                  {q.attachment && (
+                    <a href={attachmentUrl(q.attachment)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                      <Paperclip className="w-3 h-3" /> برگه مرخصی
+                    </a>
+                  )}
+                  {q.attachment && (
+                    <a href={attachmentUrl(q.attachment)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                      <Paperclip className="w-3 h-3" /> مدرک
+                    </a>
+                  )}
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${q.status === "APPROVED" ? "bg-green-500/15 text-green-600" : q.status === "REJECTED" ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600"}`}>{REQ_STATUS_FA[q.status] || q.status}</span>
               </div>
@@ -482,7 +522,7 @@ export default function MyAttendancePage() {
         footer={
           <div className="flex items-center justify-end gap-2">
             <button onClick={() => setLeaveModal(false)} className="btn-theme-secondary text-sm">انصراف</button>
-            <button onClick={submitLeaveRequest} disabled={leaveSending} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
+            <button onClick={submitLeaveRequest} disabled={leaveSending || leaveUploading}className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
               {leaveSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} ثبت درخواست
             </button>
           </div>
@@ -552,6 +592,10 @@ export default function MyAttendancePage() {
             <textarea value={leaveForm.description} onChange={e => setLeaveForm(s => ({ ...s, description: e.target.value }))}
               className="input-theme text-sm" rows={2} placeholder="دلیل یا توضیح درخواست..." />
           </div>
+          {(leaveForm.type === "SICK_LEAVE" || leaveForm.type === "SICK_HOURLY") && (
+            <SickNoteField value={leaveForm.attachment} uploading={leaveUploading} onPick={onPickLeaveAttachment}
+              onClear={() => setLeaveForm(s => ({ ...s, attachment: "" }))} />
+          )}
         </div>
       </Modal>
 
@@ -565,7 +609,7 @@ export default function MyAttendancePage() {
         footer={modal && (
           <div className="flex items-center justify-end gap-2">
             <button onClick={() => setModal(null)} className="btn-theme-secondary text-sm">انصراف</button>
-            <button onClick={submitRequest} disabled={sending} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
+            <button onClick={submitRequest} disabled={sending || reqUploading}className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50">
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} ثبت درخواست
             </button>
           </div>
@@ -645,6 +689,10 @@ export default function MyAttendancePage() {
               <label className="block mb-1 text-theme-secondary text-xs">توضیحات</label>
               <textarea value={reqForm.description} onChange={e => setReqForm((s: any) => ({ ...s, description: e.target.value }))} className="input-theme text-sm" rows={2} placeholder="دلیل درخواست..." />
             </div>
+            {(reqForm.kind === "SICK_LEAVE" || reqForm.kind === "SICK_HOURLY") && (
+              <SickNoteField value={reqForm.attachment} uploading={reqUploading} onPick={onPickReqAttachment}
+                onClear={() => setReqForm((s: any) => ({ ...s, attachment: "" }))} />
+            )}
           </div>
         )}
       </Modal>

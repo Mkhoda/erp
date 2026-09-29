@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RecomputeService } from '../engine/recompute.service';
 import { parseWorkDate } from '../scope.util';
@@ -30,6 +30,10 @@ export class RequestsService {
   // ── Employee self-service ──────────────────────────────────────────────
   async create(userId: string, dto: any) {
     const gregDate = parseWorkDate(dto.date);
+    const isSick = !!dto.isSickLeave || dto.targetStatus === 'SICK_LEAVE';
+    const attachment = typeof dto.attachment === 'string' && dto.attachment.startsWith('/uploads/attendance/') ? dto.attachment : null;
+    // Sick leave is only accepted with the doctor's note / leave form image
+    if (isSick && !attachment) throw new BadRequestException('برای مرخصی استعلاجی، بارگذاری تصویر برگه مرخصی (گواهی پزشک) الزامی است');
     // One open request per day.
     const existing = await this.prisma.attendanceRequest.findFirst({
       where: { userId, gregDate, status: 'PENDING' },
@@ -46,9 +50,9 @@ export class RequestsService {
         clearCheckOut: !!dto.clearCheckOut,
         targetStatus: (dto.targetStatus as any) || null,
         leaveMinutes: dto.leaveMinutes ? Math.round(+dto.leaveMinutes) : null,
-        isSickLeave: !!dto.isSickLeave,
+        isSickLeave: isSick,
         description: dto.description || '',
-        attachment: dto.attachment || null,
+        attachment,
       },
     });
   }
@@ -62,10 +66,14 @@ export class RequestsService {
   }
 
   // ── Admin / manager queue ──────────────────────────────────────────────
-  async queue(scopeDeptIds?: string[], status?: string) {
+  async queue(scopeDeptIds?: string[], status?: string, filters: { sick?: boolean; attachment?: string } = {}) {
     const where: any = {};
+    // 'ALL' means every status; no status defaults to the pending queue
     if (status && status !== 'ALL') where.status = status;
-    else where.status = 'PENDING';
+    else if (!status) where.status = 'PENDING';
+    if (filters.sick) where.isSickLeave = true;
+    if (filters.attachment === 'with') where.attachment = { not: null };
+    if (filters.attachment === 'without') where.attachment = null;
     if (scopeDeptIds && scopeDeptIds.length) {
       where.user = {
         OR: [
@@ -77,8 +85,9 @@ export class RequestsService {
     return this.prisma.attendanceRequest.findMany({
       where,
       include: { user: { select: USER_SELECT } },
-      orderBy: { createdAt: 'asc' },
-      take: 300,
+      // pending queue: oldest first; history views: newest first
+      orderBy: { createdAt: where.status === 'PENDING' ? 'asc' : 'desc' },
+      take: 500,
     });
   }
 
@@ -123,6 +132,11 @@ export class RequestsService {
   // Direct admin edit on the records page — creates an override immediately.
   async adminOverride(adminId: string, dto: any) {
     const gregDate = parseWorkDate(dto.date);
+    const isSick = !!dto.isSickLeave;
+    const attachment = typeof dto.attachment === 'string' && dto.attachment.startsWith('/uploads/attendance/') ? dto.attachment : null;
+    // Same rule as employee self-service: sick leave needs the doctor's note on file,
+    // whether it was submitted by the employee or set directly here by an admin.
+    if (isSick && !attachment) throw new BadRequestException('برای مرخصی استعلاجی، بارگذاری تصویر برگه مرخصی (گواهی پزشک) الزامی است');
     await this.prisma.attendanceOverride.create({
       data: {
         userId: dto.userId,
@@ -133,8 +147,8 @@ export class RequestsService {
         clearCheckOut: !!dto.clearCheckOut,
         forceStatus: (dto.forceStatus as any) || null,
         leaveMinutes: dto.leaveMinutes ? Math.round(+dto.leaveMinutes) : null,
-        isSickLeave: !!dto.isSickLeave,
-        attachment: dto.attachment || null,
+        isSickLeave: isSick,
+        attachment,
         reason: dto.reason || 'اصلاح توسط مدیر',
         createdById: adminId,
       },
