@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, AlertCircle, Info, X } from "lucide-react";
 
@@ -36,6 +37,8 @@ const colors: Record<ToastType, { bg: string; border: string; icon: string; text
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<Toast[]>([]);
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
 
   const remove = (id: string) => setToasts(p => p.filter(t => t.id !== id));
 
@@ -55,8 +58,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={ctx}>
       {children}
-      {/* Toast container */}
-      <div className="fixed bottom-4 left-4 z-[300] flex flex-col gap-2 pointer-events-none" dir="rtl">
+      {/* Toast container — portaled to <body> so it stacks above modals (z-[9999]) and TimeSelect (z-[10000]) */}
+      {mounted && createPortal(
+      <div className="fixed bottom-4 left-4 z-[10050] flex flex-col gap-2 pointer-events-none" dir="rtl">
         <AnimatePresence>
           {toasts.map(t => {
             const c = colors[t.type];
@@ -82,7 +86,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             );
           })}
         </AnimatePresence>
-      </div>
+      </div>,
+      document.body,
+      )}
     </ToastContext.Provider>
   );
 }
