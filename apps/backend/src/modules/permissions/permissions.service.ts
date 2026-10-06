@@ -74,12 +74,17 @@ export class PermissionsService {
     });
   }
 
-  /** Upsert a permission row. role defaults to '*' (all roles). */
-  upsert(departmentId: string, page: string, role: string = '*', data: { canRead?: boolean; canWrite?: boolean }) {
+  /** Upsert a permission row. role defaults to '*' (all roles). Only the flags sent are changed. */
+  upsert(departmentId: string, page: string, role: string = '*', data: { canRead?: boolean; canWrite?: boolean; canDelete?: boolean }) {
+    const flags = {
+      ...(data.canRead !== undefined ? { canRead: data.canRead } : {}),
+      ...(data.canWrite !== undefined ? { canWrite: data.canWrite } : {}),
+      ...(data.canDelete !== undefined ? { canDelete: data.canDelete } : {}),
+    };
     return this.prisma.pagePermission.upsert({
       where: { departmentId_page_role: { departmentId, page, role } },
-      update: { canRead: data.canRead ?? true, canWrite: data.canWrite ?? false },
-      create: { departmentId, page, role, canRead: data.canRead ?? true, canWrite: data.canWrite ?? false },
+      update: flags,
+      create: { departmentId, page, role, canRead: true, canWrite: false, canDelete: false, ...flags },
     });
   }
 

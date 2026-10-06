@@ -2,7 +2,7 @@
 import React from "react";
 import { pageTitle } from "../../../lib/branding";
 import {
-  Lock, ShieldCheck, Building2, Check, X, RefreshCw, ChevronDown,
+  Lock, ShieldCheck, Building2, Check, X, RefreshCw, ChevronDown, Eye, Pencil, Trash2,
   Boxes, Users, BarChart3, Fingerprint, MapPin, Navigation,
   LayoutDashboard, MessageSquare, User,
 } from "lucide-react";
@@ -12,7 +12,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 type Dept = { id: string; name: string };
 type KnownPage = { page: string; label: string };
-type PermRow = { page: string; role: string; canRead: boolean; canWrite: boolean };
+type PermRow = { page: string; role: string; canRead: boolean; canWrite: boolean; canDelete: boolean };
 
 const ADMIN_LOCKED = [
   "/dashboard/ai-settings",
@@ -42,7 +42,33 @@ const ROLE_COLORS: Record<string, string> = {
   USER: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
 };
 
-type Matrix = Record<string, Record<CRole, boolean>>;
+type Flags = { canRead: boolean; canWrite: boolean; canDelete: boolean };
+type Matrix = Record<string, Record<CRole, Flags>>;
+
+const NONE: Flags = { canRead: false, canWrite: false, canDelete: false };
+const ALL: Flags = { canRead: true, canWrite: true, canDelete: true };
+const emptyRow = (): Record<CRole, Flags> => ({ MANAGER: { ...NONE }, EXPERT: { ...NONE }, USER: { ...NONE } });
+
+// Pages whose API enforces add/edit and delete separately (PageAccessGuard on the backend)
+const ACTION_PAGES = new Set([
+  "/dashboard/assets",
+  "/dashboard/assets/types",
+  "/dashboard/assets/categories",
+  "/dashboard/assets/assignments",
+]);
+
+const ACTIONS: { key: keyof Flags; label: string; icon: React.ElementType; on: string }[] = [
+  { key: "canRead",   label: "مشاهده",       icon: Eye,    on: "bg-emerald-500 border-emerald-400 text-white hover:bg-emerald-600" },
+  { key: "canWrite",  label: "ثبت و ویرایش", icon: Pencil, on: "bg-blue-500 border-blue-400 text-white hover:bg-blue-600" },
+  { key: "canDelete", label: "حذف",          icon: Trash2, on: "bg-red-500 border-red-400 text-white hover:bg-red-600" },
+];
+
+/** Whether a role is fully granted on a page (every action on action pages, view otherwise) */
+const isFull = (page: string, f: Flags) => ACTION_PAGES.has(page) ? f.canRead && f.canWrite && f.canDelete : f.canRead;
+
+/** Flags that grant/revoke a whole page for a role */
+const fullFlags = (page: string, on: boolean): Partial<Flags> =>
+  ACTION_PAGES.has(page) ? (on ? ALL : NONE) : { canRead: on };
 
 type PageGroup = { id: string; title: string; icon: React.ElementType; pages: string[] };
 type Section = { id: string; title: string; groups: PageGroup[] };
@@ -178,43 +204,43 @@ export default function AccessPage() {
     if (!res.ok) return;
     const rows: PermRow[] = await res.json();
     const m: Matrix = {};
-    for (const p of pagesRef.current) {
-      m[p.page] = { MANAGER: false, EXPERT: false, USER: false };
-    }
-    const wildcardValues: Record<string, boolean> = {};
+    const flagsOf = (r: PermRow): Flags => ({ canRead: r.canRead, canWrite: !!r.canWrite, canDelete: !!r.canDelete });
+    for (const p of pagesRef.current) m[p.page] = emptyRow();
+    const wildcardValues: Record<string, Flags> = {};
     for (const r of rows) {
-      if (r.role === "*") wildcardValues[r.page] = r.canRead;
+      if (r.role === "*") wildcardValues[r.page] = flagsOf(r);
     }
     for (const page of Object.keys(m)) {
       if (wildcardValues[page] !== undefined) {
-        CONFIGURABLE_ROLES.forEach(ro => { m[page][ro] = wildcardValues[page]; });
+        CONFIGURABLE_ROLES.forEach(ro => { m[page][ro] = { ...wildcardValues[page] }; });
       }
     }
     for (const r of rows) {
       if (CONFIGURABLE_ROLES.includes(r.role as CRole)) {
-        if (!m[r.page]) m[r.page] = { MANAGER: false, EXPERT: false, USER: false };
-        m[r.page][r.role as CRole] = r.canRead;
+        if (!m[r.page]) m[r.page] = emptyRow();
+        m[r.page][r.role as CRole] = flagsOf(r);
       }
     }
     setMatrix(m);
   }
 
-  async function savePermission(page: string, role: CRole, value: boolean) {
+  async function savePermission(page: string, role: CRole, flags: Partial<Flags>) {
     const res = await fetch(`${API}/permissions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authH },
-      body: JSON.stringify({ departmentId: selectedDept, page, role, canRead: value, canWrite: false }),
+      body: JSON.stringify({ departmentId: selectedDept, page, role, ...flags }),
     });
     if (!res.ok) throw new Error("save failed");
   }
 
-  async function toggle(page: string, role: CRole) {
+  async function toggle(page: string, role: CRole, action: keyof Flags = "canRead") {
     if (!selectedDept) return;
-    const cur = matrix[page]?.[role] ?? false;
-    const key = `${page}|${role}`;
+    const next = !(matrix[page]?.[role] ?? NONE)[action];
+    const key = `${page}|${role}|${action}`;
     setSaving(key);
     try {
-      await savePermission(page, role, !cur);
+      // Add/edit and delete need the page to be visible, so granting them also grants view
+      await savePermission(page, role, action === "canRead" ? { canRead: next } : { [action]: next, ...(next ? { canRead: true } : {}) });
       await loadDeptPerms(selectedDept);
     } catch { toast.error("خطا در ذخیره"); }
     finally { setSaving(null); }
@@ -222,12 +248,12 @@ export default function AccessPage() {
 
   async function toggleAll(page: string) {
     if (!selectedDept) return;
-    const cur = matrix[page] ?? { MANAGER: false, EXPERT: false, USER: false };
-    const newVal = !CONFIGURABLE_ROLES.every(r => cur[r]);
+    const cur = matrix[page] ?? emptyRow();
+    const newVal = !CONFIGURABLE_ROLES.every(r => isFull(page, cur[r]));
     const key = `${page}|all`;
     setSaving(key);
     try {
-      await Promise.all(CONFIGURABLE_ROLES.map(r => savePermission(page, r, newVal)));
+      await Promise.all(CONFIGURABLE_ROLES.map(r => savePermission(page, r, fullFlags(page, newVal))));
       await loadDeptPerms(selectedDept);
     } catch { toast.error("خطا در ذخیره"); }
     finally { setSaving(null); }
@@ -240,7 +266,7 @@ export default function AccessPage() {
     try {
       await Promise.all(
         groupPages.flatMap(page =>
-          CONFIGURABLE_ROLES.map(role => savePermission(page, role, enable))
+          CONFIGURABLE_ROLES.map(role => savePermission(page, role, fullFlags(page, enable)))
         )
       );
       await loadDeptPerms(selectedDept);
@@ -384,8 +410,8 @@ export default function AccessPage() {
                     // Compute group-level stats
                     const totalCells = group.resolvedPages.length * CONFIGURABLE_ROLES.length;
                     const grantedCells = group.resolvedPages.reduce((acc, p) => {
-                      const cur = matrix[p.page] ?? { MANAGER: false, EXPERT: false, USER: false };
-                      return acc + CONFIGURABLE_ROLES.filter(r => cur[r]).length;
+                      const cur = matrix[p.page] ?? emptyRow();
+                      return acc + CONFIGURABLE_ROLES.filter(r => isFull(p.page, cur[r])).length;
                     }, 0);
                     const groupAllOn = grantedCells === totalCells;
                     const groupSomeOn = grantedCells > 0;
@@ -436,7 +462,7 @@ export default function AccessPage() {
                                 <tr className="border-b border-theme bg-theme-secondary/30">
                                   <th className="text-right px-4 py-2 font-medium text-theme-muted text-xs">صفحه</th>
                                   {CONFIGURABLE_ROLES.map(r => (
-                                    <th key={r} className="text-center px-3 py-2 font-medium text-xs w-24">
+                                    <th key={r} className="text-center px-3 py-2 font-medium text-xs w-32">
                                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${ROLE_COLORS[r]}`}>
                                         {ROLE_LABELS[r]}
                                       </span>
@@ -447,9 +473,9 @@ export default function AccessPage() {
                               </thead>
                               <tbody className="divide-y divide-theme">
                                 {group.resolvedPages.map(({ page, label }) => {
-                                  const cur = matrix[page] ?? { MANAGER: false, EXPERT: false, USER: false };
-                                  const allOn = CONFIGURABLE_ROLES.every(r => cur[r]);
-                                  const someOn = CONFIGURABLE_ROLES.some(r => cur[r]);
+                                  const cur = matrix[page] ?? emptyRow();
+                                  const allOn = CONFIGURABLE_ROLES.every(r => isFull(page, cur[r]));
+                                  const someOn = CONFIGURABLE_ROLES.some(r => cur[r].canRead);
                                   const allKey = `${page}|all`;
                                   return (
                                     <tr key={page} className="hover:bg-theme-hover/50 transition-colors group">
@@ -460,9 +486,36 @@ export default function AccessPage() {
                                         </div>
                                       </td>
                                       {CONFIGURABLE_ROLES.map(role => {
-                                        const on = cur[role];
-                                        const key = `${page}|${role}`;
+                                        const on = cur[role].canRead;
+                                        const key = `${page}|${role}|canRead`;
                                         const isSaving = saving === key || saving === allKey || saving === groupKey;
+                                        if (ACTION_PAGES.has(page)) return (
+                                          <td key={role} className="px-3 py-2.5 text-center">
+                                            <div className="inline-flex items-center gap-1">
+                                              {ACTIONS.map(a => {
+                                                const aOn = cur[role][a.key];
+                                                const aSaving = saving === `${page}|${role}|${a.key}` || saving === allKey || saving === groupKey;
+                                                return (
+                                                  <button
+                                                    key={a.key}
+                                                    onClick={() => toggle(page, role, a.key)}
+                                                    disabled={!!saving}
+                                                    title={`${a.label}: ${aOn ? "دارد" : "ندارد"}`}
+                                                    className={`inline-flex items-center justify-center w-7 h-7 rounded-md border transition-all ${
+                                                      aSaving ? "opacity-60 cursor-wait" :
+                                                      aOn ? a.on : "bg-theme-secondary border-theme text-theme-muted hover:border-slate-400 hover:text-theme-secondary"
+                                                    }`}
+                                                  >
+                                                    {aSaving
+                                                      ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                                      : <a.icon className="w-3.5 h-3.5" />
+                                                    }
+                                                  </button>
+                                                );
+                                              })}
+                                            </div>
+                                          </td>
+                                        );
                                         return (
                                           <td key={role} className="px-3 py-2.5 text-center">
                                             <button
@@ -526,7 +579,7 @@ export default function AccessPage() {
       )}
 
       {/* Legend */}
-      <div className="flex items-center gap-4 px-4 py-2.5 rounded-xl border border-theme bg-theme-secondary/30">
+      <div className="flex flex-wrap items-center gap-4 px-4 py-2.5 rounded-xl border border-theme bg-theme-secondary/30">
         <span className="flex items-center gap-1.5 text-xs text-theme-muted">
           <span className="w-4 h-4 rounded bg-emerald-500 flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" /></span>
           دسترسی دارد — در منوی کاربر نمایش داده می‌شود
@@ -535,6 +588,12 @@ export default function AccessPage() {
           <span className="w-4 h-4 rounded bg-theme-secondary border border-theme flex items-center justify-center"><X className="w-2.5 h-2.5" /></span>
           بدون دسترسی — از منوی کاربر پنهان می‌شود
         </span>
+        {ACTIONS.map(a => (
+          <span key={a.key} className="flex items-center gap-1.5 text-xs text-theme-muted">
+            <span className={`w-4 h-4 rounded flex items-center justify-center ${a.on}`}><a.icon className="w-2.5 h-2.5" /></span>
+            {a.label} (صفحات دارایی)
+          </span>
+        ))}
         <span className="text-xs text-theme-muted mr-auto">مدیر ارشد (ADMIN) همیشه به تمام صفحات دسترسی دارد</span>
       </div>
     </div>

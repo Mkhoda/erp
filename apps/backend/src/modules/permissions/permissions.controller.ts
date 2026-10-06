@@ -64,9 +64,9 @@ export class PermissionsController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
-  upsert(@Body() body: { departmentId: string; page: string; role?: string; canRead?: boolean; canWrite?: boolean }) {
-    const { departmentId, page, role = '*', canRead, canWrite } = body;
-    return this.service.upsert(departmentId, page, role, { canRead, canWrite });
+  upsert(@Body() body: { departmentId: string; page: string; role?: string; canRead?: boolean; canWrite?: boolean; canDelete?: boolean }) {
+    const { departmentId, page, role = '*', canRead, canWrite, canDelete } = body;
+    return this.service.upsert(departmentId, page, role, { canRead, canWrite, canDelete });
   }
 
   // ── Sync defaults: upsert canRead=true rows for all pages × all depts ──────

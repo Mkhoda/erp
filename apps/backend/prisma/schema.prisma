@@ -305,6 +305,7 @@ model PagePermission {
   role          String      @default("*")
   canRead       Boolean     @default(true)
   canWrite      Boolean     @default(false)
+  canDelete     Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

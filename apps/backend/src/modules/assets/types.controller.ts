@@ -1,11 +1,11 @@
 import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, UseFilters, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RolesGuard } from '../auth/roles.guard';
+import { PageAccess, PageAccessGuard } from '../permissions/page-access.guard';
 import { AssetsPrismaErrorFilter } from './prisma-error.filter';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PageAccessGuard)
+@PageAccess({ pages: ['/dashboard/assets/types'], readAlso: ['/dashboard/assets'] })
 @UseFilters(AssetsPrismaErrorFilter)
 @Controller('asset-types')
 export class AssetTypesController {
@@ -21,22 +21,18 @@ export class AssetTypesController {
   }
 
   @Get()
-  @Roles('ADMIN', 'MANAGER', 'EXPERT')
   list() { return this.prisma.assetType.findMany({ orderBy: { name: 'asc' }, include: { _count: { select: { assets: true } } } }); }
 
   @Post()
-  @Roles('ADMIN', 'MANAGER')
   async create(@Body() data: any) { return this.prisma.assetType.create({ data: await this.pick(data) }); }
 
   @Patch(':id')
-  @Roles('ADMIN', 'MANAGER')
   async update(@Param('id') id: string, @Body() data: any) {
     if (!(await this.prisma.assetType.findUnique({ where: { id } }))) throw new NotFoundException('نوع دارایی یافت نشد');
     return this.prisma.assetType.update({ where: { id }, data: await this.pick(data, id) });
   }
 
   @Delete(':id')
-  @Roles('ADMIN')
   async remove(@Param('id') id: string) {
     const t = await this.prisma.assetType.findUnique({ where: { id }, include: { _count: { select: { assets: true } } } });
     if (!t) throw new NotFoundException('نوع دارایی یافت نشد');

@@ -6,8 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as sharpModule from 'sharp';
 import { JwtAuthGuard } from '../auth/jwt.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { PageAccess, PageAccessGuard } from '../permissions/page-access.guard';
 import { AssetsService } from './assets.service';
 import { AssetsPrismaErrorFilter } from './prisma-error.filter';
 
@@ -17,7 +16,8 @@ fs.mkdirSync(uploadRoot, { recursive: true });
 // Formats a browser can display as-is if sharp can't process the file.
 const DISPLAYABLE = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PageAccessGuard)
+@PageAccess({ pages: ['/dashboard/assets'] })
 @UseFilters(AssetsPrismaErrorFilter)
 @Controller('uploads')
 export class UploadController {
@@ -32,7 +32,6 @@ export class UploadController {
    * the asset's `images` list.
    */
   @Post('asset-image')
-  @Roles('ADMIN', 'MANAGER', 'EXPERT')
   @UseInterceptors(FileInterceptor('file', {
     storage: diskStorage({
       destination: uploadRoot,

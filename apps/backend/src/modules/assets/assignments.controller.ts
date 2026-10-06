@@ -1,7 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, UseFilters, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RolesGuard } from '../auth/roles.guard';
+import { PageAccess, PageAccessGuard } from '../permissions/page-access.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ASSIGNMENT_INCLUDE } from './assets.service';
 import { AssetsPrismaErrorFilter } from './prisma-error.filter';
@@ -24,7 +23,8 @@ const NOT_ASSIGNABLE: Record<string, string> = {
   CONSUMED: 'این دارایی مصرف شده و قابل واگذاری نیست',
 };
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PageAccessGuard)
+@PageAccess({ pages: ['/dashboard/assets/assignments', '/dashboard/assets'], readAlso: ['/dashboard/reports'] })
 @UseFilters(AssetsPrismaErrorFilter)
 @Controller('asset-assignments')
 export class AssetAssignmentsController {
@@ -35,7 +35,6 @@ export class AssetAssignmentsController {
    * `returnedAt`), so filtering by assetId gives the full chain of custody.
    */
   @Get()
-  @Roles('ADMIN', 'MANAGER', 'EXPERT')
   list(
     @Query('assetId') assetId?: string,
     @Query('userId') userId?: string,
@@ -54,7 +53,6 @@ export class AssetAssignmentsController {
   }
 
   @Post()
-  @Roles('ADMIN', 'MANAGER')
   async create(@Body() data: any, @Req() req: any) {
     const assignedById = req?.user?.id as string | undefined;
     const assetId = str(data?.assetId);
@@ -102,7 +100,6 @@ export class AssetAssignmentsController {
 
   /** Ends an active assignment (asset returned to stock). */
   @Patch(':id/return')
-  @Roles('ADMIN', 'MANAGER')
   async returnAsset(@Param('id') id: string, @Body() body: { note?: string } = {}) {
     const row = await this.prisma.assetAssignment.findUnique({ where: { id } });
     if (!row) throw new NotFoundException('واگذاری یافت نشد');
@@ -132,7 +129,6 @@ export class AssetAssignmentsController {
 
   /** Removes a (mistaken) assignment record. Deleting the open one frees the asset. */
   @Delete(':id')
-  @Roles('ADMIN')
   async remove(@Param('id') id: string) {
     const row = await this.prisma.assetAssignment.findUnique({ where: { id } });
     if (!row) throw new NotFoundException('واگذاری یافت نشد');
