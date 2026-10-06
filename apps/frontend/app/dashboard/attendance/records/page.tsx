@@ -3,7 +3,7 @@ import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
   FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, ScrollText, Filter,
-  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon, ChevronDown,
+  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon, ChevronDown, X,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
@@ -342,26 +342,26 @@ export default function AttendanceRecordsPage() {
 
       {/* Filters */}
       <div className="bg-theme-card border border-theme rounded-xl p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
-        <select className="input-theme text-sm" value={jYear} onChange={e => { setJYear(+e.target.value); setJMonth(0); setJDay(0); }}>
+        <ClearableSelect value={jYear} onChange={v => { setJYear(+v); setJMonth(0); setJDay(0); }}>
           <option value={0}>همه سال‌ها</option>
           {yearOpts.map(y => <option key={y} value={y}>سال {faY(y)}</option>)}
-        </select>
-        <select className="input-theme text-sm" value={jMonth} onChange={e => { setJMonth(+e.target.value); setJDay(0); }}>
+        </ClearableSelect>
+        <ClearableSelect value={jMonth} onChange={v => { setJMonth(+v); setJDay(0); }}>
           <option value={0}>همه ماه‌ها</option>
           {monthOpts.map(m => <option key={m} value={m}>{J_MONTHS[m-1]}</option>)}
-        </select>
-        <select className="input-theme text-sm" value={jDay} onChange={e => setJDay(+e.target.value)}>
+        </ClearableSelect>
+        <ClearableSelect value={jDay} onChange={v => setJDay(+v)}>
           <option value={0}>همه روزها</option>
           {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>روز {toFa(String(d))}</option>)}
-        </select>
-        <select className="input-theme text-sm" value={deptId} onChange={e => setDeptId(e.target.value)}>
+        </ClearableSelect>
+        <ClearableSelect value={deptId} onChange={setDeptId}>
           <option value="">همه دپارتمان‌ها</option>
           {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
-        <select className="input-theme text-sm" value={status} onChange={e => setStatus(e.target.value)}>
+        </ClearableSelect>
+        <ClearableSelect value={status} onChange={setStatus}>
           <option value="">همه وضعیت‌ها</option>
           {Object.entries(STATUS_FA).filter(([k]) => k !== "UNMAPPED").map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        </ClearableSelect>
         <SearchSelect
           className="col-span-2"
           options={personOptions}
@@ -495,7 +495,8 @@ export default function AttendanceRecordsPage() {
                             className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors">
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button onClick={() => setUserId(r.userId)} title={`فیلتر بر اساس ${r.user ? `${r.user.firstName} ${r.user.lastName}` : "این کاربر"}`}
+                          {/* Drill into one person: drop the day/status narrowing (page opens on today + "در حال کار") so their whole period shows. */}
+                          <button onClick={() => { setUserId(r.userId); setJDay(0); setStatus(""); }} title={`فیلتر بر اساس ${r.user ? `${r.user.firstName} ${r.user.lastName}` : "این کاربر"}`}
                             className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-theme-muted hover:bg-blue-500/10 hover:text-blue-500 transition-colors">
                             <Filter className="w-4 h-4" />
                           </button>
@@ -627,6 +628,25 @@ function RulesPanel({ rules: r }: { rules: any }) {
           </ul>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Native filter <select> with a red ✕ that resets it to its "همه …" option
+// (0 for numeric filters, "" for id/status). Hidden while already on "all".
+function ClearableSelect({ value, onChange, children }: { value: string | number; onChange: (v: string) => void; children: React.ReactNode }) {
+  const isSet = typeof value === "number" ? value !== 0 : value !== "";
+  return (
+    <div className="relative">
+      <select className={`input-theme text-sm ${isSet ? "pl-12" : ""}`} value={value} onChange={e => onChange(e.target.value)}>
+        {children}
+      </select>
+      {isSet && (
+        <button type="button" onClick={() => onChange(typeof value === "number" ? "0" : "")} title="پاک کردن فیلتر" aria-label="پاک کردن فیلتر"
+          className="absolute left-7 top-1/2 -translate-y-1/2 p-0.5 rounded text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   );
 }
