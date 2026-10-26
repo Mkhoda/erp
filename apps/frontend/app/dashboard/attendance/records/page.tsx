@@ -3,7 +3,7 @@ import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
   FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, ScrollText, Filter,
-  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon, ChevronDown, X,
+  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon, ChevronDown, X, Plus,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
@@ -180,7 +180,10 @@ export default function AttendanceRecordsPage() {
   }, [jYear, jMonth, jDay]);
   React.useEffect(() => { if (showUnmapped) loadUnmapped(); else setUnmapped([]); }, [showUnmapped, loadUnmapped]);
 
+  // Manual check-in/out entry (POST /attendance/overrides) is ADMIN/MANAGER-only server-side.
+  const [role, setRole] = React.useState<string | null>(null);
   React.useEffect(() => {
+    fetch(`${API}/auth/me`, { headers: h }).then(r => r.ok ? r.json() : null).then(d => setRole(d?.role ?? null)).catch(() => {});
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
     fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
     fetch(`${API}/attendance/records/periods`, { headers: h }).then(r => r.ok ? r.json() : []).then(p => setPeriods(Array.isArray(p) ? p : [])).catch(() => {});
@@ -328,6 +331,11 @@ export default function AttendanceRecordsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link href="/dashboard/attendance" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> داشبورد</Link>
+          {(role === "ADMIN" || role === "MANAGER") && (
+            <Link href={`/dashboard/attendance/records/new${userId ? `?userId=${userId}` : ""}`} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white">
+              <Plus className="w-4 h-4" /> ثبت ورود/خروج
+            </Link>
+          )}
           <button onClick={openRules} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary">
             <ScrollText className="w-4 h-4" /> قوانین کارکرد
           </button>
