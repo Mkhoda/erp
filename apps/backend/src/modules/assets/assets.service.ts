@@ -78,7 +78,9 @@ export class AssetsService {
       },
       skip: Number(skip) || 0,
       take: Math.min(Number(take) || 50, 500),
-      orderBy: { createdAt: 'desc' },
+      // Most recently changed first, so a capped page keeps the assets people
+      // just edited (an old asset updated today must not fall off the list).
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     });
   }
 

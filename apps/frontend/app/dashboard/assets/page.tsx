@@ -19,7 +19,7 @@ type Asset = {
   typeId?: string; categoryId?: string; condition?: "NEW" | "USED_GOOD" | "DEFECTIVE";
   availability?: "AVAILABLE" | "IN_USE" | "CONSUMED" | "MAINTENANCE" | "RETIRED" | "LOST";
   barcodeType?: "QR" | "CODE128"; serialNumber?: string; location?: string;
-  purchaseDate?: string; cost?: number;
+  purchaseDate?: string; cost?: number; createdAt?: string; updatedAt?: string;
   type?: { id: string; name: string }; category?: { id: string; name: string };
   images?: Array<{ id: string; url: string; caption?: string }>;
   assignments?: Array<{ user?: { firstName?: string; lastName?: string }; department?: { name: string }; building?: { name: string }; room?: { name: string } }>;
@@ -45,6 +45,29 @@ const holderLabel = (a: Asset) => {
 
 const avLabel = (a?: string) => AVAIL[a || ""] || { label: a || "-", cls: "bg-theme-secondary text-theme-muted border-theme" };
 
+const faDateTime = (iso?: string) => iso
+  ? new Date(iso).toLocaleString("fa-IR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tehran" })
+  : "-";
+
+type SortKey = "barcode" | "name" | "type" | "category" | "availability" | "holder" | "createdAt" | "updatedAt";
+const COLUMNS: Array<{ key: SortKey; label: string }> = [
+  { key: "barcode", label: "بارکد" }, { key: "name", label: "نام" }, { key: "type", label: "نوع" },
+  { key: "category", label: "دسته" }, { key: "availability", label: "وضعیت" }, { key: "holder", label: "تحویل‌گیرنده / مکان" },
+  { key: "createdAt", label: "تاریخ ایجاد" }, { key: "updatedAt", label: "آخرین تغییر" },
+];
+const sortValue = (a: Asset, k: SortKey): string => {
+  switch (k) {
+    case "barcode": return a.barcode || "";
+    case "name": return a.name || "";
+    case "type": return a.type?.name || "";
+    case "category": return a.category?.name || "";
+    case "availability": return avLabel(a.availability).label;
+    case "holder": return holderLabel(a) || a.location || "";
+    case "createdAt": return a.createdAt || "";
+    case "updatedAt": return a.updatedAt || "";
+  }
+};
+
 export default function AssetsPage() {
   React.useEffect(() => { document.title = pageTitle("دارایی‌ها"); }, []);
 
@@ -67,7 +90,8 @@ export default function AssetsPage() {
   async function load() {
     try {
       setLoading(true);
-      const res = await fetch(`${API}/assets`, { headers: { Authorization: `Bearer ${token}` } });
+      // The API pages at 50 by default; ask for its max so client-side sort/search see everything.
+      const res = await fetch(`${API}/assets?take=500`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       setAssets(Array.isArray(data) ? data : (data?.data || []));
     } catch { setAssets([]); } finally { setLoading(false); }
@@ -79,10 +103,24 @@ export default function AssetsPage() {
     fetch(`${API}/asset-categories`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(d => setAssetCategories(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
-  const filtered = assets.filter(a =>
-    (a.name || "").toLowerCase().includes(query.toLowerCase()) ||
-    (a.barcode || "").toLowerCase().includes(query.toLowerCase())
-  );
+  // Default: latest change first. Clicking a header sorts by it; clicking again flips direction.
+  const [sortK, setSortK] = React.useState<SortKey>("updatedAt");
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
+  function thSort(k: SortKey) {
+    if (sortK === k) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortK(k); setSortDir(k === "createdAt" || k === "updatedAt" ? "desc" : "asc"); }
+  }
+
+  const filtered = React.useMemo(() => {
+    const q = query.toLowerCase();
+    const rows = assets.filter(a => (a.name || "").toLowerCase().includes(q) || (a.barcode || "").toLowerCase().includes(q));
+    const isDate = sortK === "createdAt" || sortK === "updatedAt";
+    return rows.sort((a, b) => {
+      const va = sortValue(a, sortK), vb = sortValue(b, sortK);
+      const cmp = isDate ? va.localeCompare(vb) : va.localeCompare(vb, "fa", { numeric: true });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [assets, query, sortK, sortDir]);
 
   function onAdd() {
     setEditing({ id: "0", name: "", barcode: "", condition: "NEW", availability: "AVAILABLE", barcodeType: "QR" } as any);
@@ -183,15 +221,20 @@ export default function AssetsPage() {
             <table className="table-theme">
               <thead>
                 <tr>
-                  <th>بارکد</th><th>نام</th><th>نوع</th><th>دسته</th><th>وضعیت</th><th>تحویل‌گیرنده / مکان</th><th>اقدامات</th>
+                  {COLUMNS.map(c => (
+                    <th key={c.key} onClick={() => thSort(c.key)} className="cursor-pointer select-none hover:text-theme-primary whitespace-nowrap">
+                      {c.label}{sortK === c.key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                    </th>
+                  ))}
+                  <th>اقدامات</th>
                 </tr>
               </thead>
               {loading ? (
-                <SkeletonTable cols={7} rows={6} />
+                <SkeletonTable cols={9} rows={6} />
               ) : (
                 <tbody>
                   {filtered.length === 0 ? (
-                    <EmptyStateRow icon={Boxes} title="دارایی‌ای یافت نشد" description={query ? "عبارت جستجو را تغییر دهید" : undefined} actionLabel={!query ? "افزودن دارایی" : undefined} onAction={!query ? onAdd : undefined} colSpan={7} />
+                    <EmptyStateRow icon={Boxes} title="دارایی‌ای یافت نشد" description={query ? "عبارت جستجو را تغییر دهید" : undefined} actionLabel={!query ? "افزودن دارایی" : undefined} onAction={!query ? onAdd : undefined} colSpan={9} />
                   ) : filtered.map(a => {
                     const av = avLabel(a.availability);
                     return (
@@ -202,6 +245,8 @@ export default function AssetsPage() {
                         <td><span className="text-theme-secondary text-sm">{a.category?.name || "-"}</span></td>
                         <td><span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${av.cls}`}>{av.label}</span></td>
                         <td><span className="text-theme-muted text-sm">{holderLabel(a) || a.location || "-"}</span></td>
+                        <td><span className="text-theme-muted text-xs whitespace-nowrap" dir="ltr">{faDateTime(a.createdAt)}</span></td>
+                        <td><span className="text-theme-muted text-xs whitespace-nowrap" dir="ltr">{faDateTime(a.updatedAt)}</span></td>
                         <td>
                           <div className="flex gap-2">
                             <button onClick={() => onEdit(a)} className="btn-theme-secondary text-xs py-1 px-2.5 gap-1"><Pencil className="w-3 h-3" />ویرایش</button>
