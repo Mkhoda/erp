@@ -129,8 +129,11 @@ touching any single line.
     - `deficitMinutes > 0` + `deficitToLeaveEnabled` ⇒ converts **only the shortfall amount**
       from balance (`Math.min(deficitMinutes, remaining)`), never inflated to a full day just
       because balance ran low — a 10-minute deficit must never cost a full day of leave.
-13. **Remote work** — a final `REMOTE_WORK` status sets `remoteMinutes = sched.dailyMinutes`
-    (remote work is whole-day only) and `remoteOvertimeMinutes = remoteMinutes ×
+13. **Remote work** — a company remote-work day with no punch OR both punches (a lone
+    check-in stays INCOMPLETE) becomes `REMOTE_WORK`, as does an approved request. Then
+    `remoteMinutes = max(sched.dailyMinutes, workedMinutes if both punches)` — present hours
+    on a remote day count as remote, so regular `overtimeMinutes` and delay/early are zeroed —
+    and `remoteOvertimeMinutes = remoteMinutes ×
     WorkSchedule.remoteOtPercent / 100`. That OT-equivalent is reporting-only: never added to
     `overtimeMinutes`, not subject to the monthly OT cap. Guard engine doesn't set these.
 14. **Upsert** `AttendanceDay` by `(userId, gregDate)` unique constraint — the function is fully

@@ -435,16 +435,16 @@ export class CalcService {
     // are expected to work (just without a punch we can see), so it must not
     // dump worked time into holidayOvertimeMinutes at the 2x multiplier, and
     // must not trigger deficit/absence — we simply have no visibility into
-    // hours worked remotely. Anyone who DOES punch in still earns regular
-    // overtime for hours past the requirement, same as a normal working day,
-    // and gets their real status (PRESENT/LATE/...) rather than a blanket
-    // REMOTE_WORK label over genuine attendance.
+    // hours worked remotely. Someone who also came in (both punches) is still
+    // on a remote-work day: the day stays REMOTE_WORK and their present hours
+    // count as remote time (see remoteMinutes below). A lone check-in still
+    // falls through to INCOMPLETE until the day is complete.
     const holidayWork = (!!holiday && !isRemoteWorkDay) || isWeekend;
     if (override?.forceStatus) {
       status = override.forceStatus;
     } else if (forceLeaveFull) {
       status = forceLeaveFullSick ? AttendanceStatus.SICK_LEAVE : AttendanceStatus.LEAVE;
-    } else if (isRemoteWorkDay && !hasPunch) {
+    } else if (isRemoteWorkDay && (!hasPunch || bothPunches)) {
       status = AttendanceStatus.REMOTE_WORK;
     } else if (holiday && !isRemoteWorkDay) {
       status = holiday === HolidayType.COMPANY ? AttendanceStatus.COMPANY_HOLIDAY : AttendanceStatus.HOLIDAY;
@@ -534,11 +534,19 @@ export class CalcService {
       }
     }
 
-    // Remote work (دورکاری) is whole-day only (approved REMOTE_WORK request, or a
-    // company remote-work day with no punch), so its time is the day's required
-    // hours. The overtime-equivalent share is reported separately — it is NOT
-    // added to overtimeMinutes and does not count against the monthly OT cap.
-    const remoteMinutes = status === AttendanceStatus.REMOTE_WORK ? sched.dailyMinutes : 0;
+    // Remote work (دورکاری): an approved REMOTE_WORK request or a company
+    // remote-work day. Its time is the day's required hours — or, if the person
+    // was also present, their present hours when those are longer (present hours
+    // on a remote day count as remote). Because those hours are remote time, they
+    // don't also earn regular overtime: the overtime-equivalent comes only from
+    // remoteOtPercent, reported separately and never added to overtimeMinutes
+    // (nor counted against the monthly OT cap).
+    const isRemoteStatus = status === AttendanceStatus.REMOTE_WORK;
+    const remoteMinutes = isRemoteStatus ? Math.max(sched.dailyMinutes, bothPunches ? workedMinutes : 0) : 0;
+    if (isRemoteStatus && bothPunches) overtimeMinutes = 0;
+    // Punctuality windows don't apply to remote work, and stray lateness here would
+    // otherwise be charged against the leave balance as tardy minutes.
+    if (isRemoteStatus) { delayMinutes = 0; earlyLeaveMinutes = 0; }
     const remoteOvertimeMinutes = Math.round(remoteMinutes * Math.min(100, Math.max(0, sched.remoteOtPercent)) / 100);
 
     return {
