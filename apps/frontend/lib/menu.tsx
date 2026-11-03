@@ -36,6 +36,8 @@ import {
   Bell,
   Megaphone,
   CalendarRange,
+  ListTodo,
+  NotebookPen,
 } from "lucide-react";
 
 export type Role = 'ADMIN' | 'MANAGER' | 'USER' | 'EXPERT';
@@ -100,6 +102,24 @@ export const MENU: MenuItem[] = [
     title: 'تیکت‌های من',
     page: '/dashboard/tickets/my',
     icon: TicketCheck,
+  },
+
+  // ── عملکرد من (همه کاربران) ───────────────────────────────
+  {
+    id: 'worklog.my',
+    title: 'عملکرد من',
+    page: '/dashboard/work-log/my',
+    icon: ListTodo,
+    isNew: true,
+  },
+
+  // ── گزارش عملکرد کاربران (ADMIN, or managers granted the page) ──
+  {
+    id: 'worklog.reports',
+    title: 'گزارش عملکرد کاربران',
+    page: '/dashboard/work-log/reports',
+    icon: NotebookPen,
+    roles: ['ADMIN', 'MANAGER'],
   },
 
   // ── اطلاعیه‌ها — visible to all ───────────────────────────

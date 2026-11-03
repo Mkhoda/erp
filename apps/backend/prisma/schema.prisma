@@ -3,77 +3,85 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String?   @unique
+  id                       String                   @id @default(cuid())
+  email                    String?                  @unique
   // Phone number used for OTP-based auth. Optional for legacy users; unique when present.
-  phone     String?   @unique
+  phone                    String?                  @unique
   // Password is optional when users sign up via OTP and haven't set a password yet.
-  password  String?
-  firstName String
-  lastName  String
-  role      Role      @default(USER)
+  password                 String?
+  firstName                String
+  lastName                 String
+  role                     Role                     @default(USER)
   // When true, user cannot log in (soft-disable instead of hard delete)
-  disabled    Boolean   @default(false)
+  disabled                 Boolean                  @default(false)
   // Max concurrent active sessions (0 = unlimited). Default 1 = single-session.
-  maxSessions Int       @default(1)
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id])
+  maxSessions              Int                      @default(1)
+  departmentId             String?
+  department               Department?              @relation(fields: [departmentId], references: [id])
   // Many-to-many memberships in departments (additional to primary departmentId)
-  userDepartments UserDepartment[]
-  timesheets Timesheet[]
-  assetAssignments AssetAssignment[]        @relation("AssetAssignmentUser")
-  assignedByAssignments AssetAssignment[]   @relation("AssetAssignmentAssignedBy")
-  assetCostsCreated AssetCost[] @relation("AssetCostCreatedBy")
-  assetsCreated Asset[]
-  aiUsage       AiUsage[]
-  conversations Conversation[]
-  memories      UserMemory[]
-  todos         Todo[]
-  quotas        UserQuota[]
+  userDepartments          UserDepartment[]
+  timesheets               Timesheet[]
+  assetAssignments         AssetAssignment[]        @relation("AssetAssignmentUser")
+  assignedByAssignments    AssetAssignment[]        @relation("AssetAssignmentAssignedBy")
+  assetCostsCreated        AssetCost[]              @relation("AssetCostCreatedBy")
+  assetsCreated            Asset[]
+  aiUsage                  AiUsage[]
+  conversations            Conversation[]
+  memories                 UserMemory[]
+  todos                    Todo[]
+  quotas                   UserQuota[]
   // ── Attendance & Workforce ──
   // Card number used to match imported device punches to this user.
-  attendanceCardNo String? @unique
-  rawAttendance         RawAttendanceRecord[]
-  attendanceDays        AttendanceDay[]
-  attendanceOverrides   AttendanceOverride[]    @relation("AttnOverrideBy")
-  attendanceRule        UserAttendanceRule?
-  shiftAssignments      ShiftAssignment[]
-  leaveRequests         LeaveRequest[]          @relation("LeaveUser")
-  attendanceRequests    AttendanceRequest[]     @relation("AttnReqUser")
-  attendanceNotifications AttendanceNotification[] @relation("AttnNotifUser")
+  attendanceCardNo         String?                  @unique
+  rawAttendance            RawAttendanceRecord[]
+  attendanceDays           AttendanceDay[]
+  attendanceOverrides      AttendanceOverride[]     @relation("AttnOverrideBy")
+  attendanceRule           UserAttendanceRule?
+  shiftAssignments         ShiftAssignment[]
+  leaveRequests            LeaveRequest[]           @relation("LeaveUser")
+  attendanceRequests       AttendanceRequest[]      @relation("AttnReqUser")
+  attendanceNotifications  AttendanceNotification[] @relation("AttnNotifUser")
   // ── Security ──
-  tokenVersion Int      @default(1)
-  sessions     Session[]
-  auditLogs    AuditLog[] @relation("UserAuditLogs")
+  tokenVersion             Int                      @default(1)
+  sessions                 Session[]
+  auditLogs                AuditLog[]               @relation("UserAuditLogs")
   // ── Messaging ──
-  chatMembers   ChatMember[]   @relation("UserChatMemberships")
-  chatMessages  ChatMessage[]  @relation("ChatMessageSender")
-  chatReactions ChatReaction[] @relation("UserChatReactions")
-  chatReads     ChatRead[]     @relation("UserChatReads")
-  presence      UserPresence?  @relation("UserPresenceRecord")
+  chatMembers              ChatMember[]             @relation("UserChatMemberships")
+  chatMessages             ChatMessage[]            @relation("ChatMessageSender")
+  chatReactions            ChatReaction[]           @relation("UserChatReactions")
+  chatReads                ChatRead[]               @relation("UserChatReads")
+  presence                 UserPresence?            @relation("UserPresenceRecord")
   // ── Ticketing ──
-  ticketsRequested   Ticket[]             @relation("TicketRequester")
-  ticketsAssigned    Ticket[]             @relation("TicketAssignee")
-  ticketsRelated     Ticket[]             @relation("TicketRelatedUser")
-  ticketComments     TicketComment[]      @relation("TicketCommentAuthor")
-  ticketAttachments  TicketAttachment[]   @relation("TicketAttachmentUploader")
-  ticketEvents       TicketEvent[]        @relation("TicketEventActor")
-  ticketNotifications TicketNotification[] @relation("TicketNotifUser")
-  managedDeptConfigs TicketDeptManager[]
-  defaultAssigneeConfigs TicketDeptAssignee[]
+  ticketsRequested         Ticket[]                 @relation("TicketRequester")
+  ticketsAssigned          Ticket[]                 @relation("TicketAssignee")
+  ticketsRelated           Ticket[]                 @relation("TicketRelatedUser")
+  ticketComments           TicketComment[]          @relation("TicketCommentAuthor")
+  ticketAttachments        TicketAttachment[]       @relation("TicketAttachmentUploader")
+  ticketEvents             TicketEvent[]            @relation("TicketEventActor")
+  ticketNotifications      TicketNotification[]     @relation("TicketNotifUser")
+  managedDeptConfigs       TicketDeptManager[]
+  defaultAssigneeConfigs   TicketDeptAssignee[]
   // ── Notifications ──
-  notifications          Notification[]          @relation("UserNotifications")
-  announcementAcks       AnnouncementAck[]       @relation("UserAnnouncementAcks")
-  announcementPopupSeens AnnouncementPopupSeen[] @relation("UserPopupSeens")
-  announcementsAuthored  Announcement[]          @relation("AnnouncementAuthor")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  notifications            Notification[]           @relation("UserNotifications")
+  announcementAcks         AnnouncementAck[]        @relation("UserAnnouncementAcks")
+  announcementPopupSeens   AnnouncementPopupSeen[]  @relation("UserPopupSeens")
+  announcementsAuthored    Announcement[]           @relation("AnnouncementAuthor")
+  // ── Work log (ثبت عملکرد) ──
+  workLogCategories        WorkLogCategory[]        @relation("WorkLogCategoryOwner")
+  workLogCategoriesCreated WorkLogCategory[]        @relation("WorkLogCategoryCreator")
+  workTasks                WorkTask[]               @relation("WorkTaskOwner")
+  workTasksCreated         WorkTask[]               @relation("WorkTaskCreator")
+  workTaskCompletions      WorkTaskCompletion[]     @relation("WorkTaskCompletionUser")
+  workTaskEntries          WorkTaskEntry[]          @relation("WorkTaskEntryUser")
+  dailyWorkReports         DailyWorkReport[]        @relation("DailyWorkReportUser")
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
 }
 
 enum Role {
@@ -84,16 +92,16 @@ enum Role {
 }
 
 model Department {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  users     User[]
-  userDepartments UserDepartment[]
+  id               String                  @id @default(cuid())
+  name             String                  @unique
+  users            User[]
+  userDepartments  UserDepartment[]
   assetAssignments AssetAssignment[]
-  pagePermissions PagePermission[]
-  ticketConfig    TicketDepartmentConfig?
-  tickets         Ticket[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  pagePermissions  PagePermission[]
+  ticketConfig     TicketDepartmentConfig?
+  tickets          Ticket[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
 }
 
 model Timesheet {
@@ -139,8 +147,8 @@ enum AssetCostType {
 }
 
 model AssetType {
-  id          String  @id @default(cuid())
-  name        String  @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
   description String?
   assets      Asset[]
   createdAt   DateTime @default(now())
@@ -161,74 +169,74 @@ model AssetCategory {
 }
 
 model Asset {
-  id             String            @id @default(cuid())
-  name           String
-  barcode        String            @unique
-  oldBarcode     String?
-  description    String?
-  typeId         String
-  type           AssetType        @relation(fields: [typeId], references: [id])
-  condition      AssetCondition
-  categoryId     String
-  category       AssetCategory     @relation(fields: [categoryId], references: [id])
-  availability   AssetAvailability @default(AVAILABLE)
-  barcodeType    BarcodeType       @default(QR)
-  serialNumber   String?
-  location       String?
-  purchaseDate   DateTime?
-  cost           Float?
-  consumedAt     DateTime?
-  images         AssetImage[]
-  assignments    AssetAssignment[]
-  maintenances   AssetMaintenance[]
-  costs          AssetCost[]
-  createdById    String?
-  createdBy      User?             @relation(fields: [createdById], references: [id])
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id           String             @id @default(cuid())
+  name         String
+  barcode      String             @unique
+  oldBarcode   String?
+  description  String?
+  typeId       String
+  type         AssetType          @relation(fields: [typeId], references: [id])
+  condition    AssetCondition
+  categoryId   String
+  category     AssetCategory      @relation(fields: [categoryId], references: [id])
+  availability AssetAvailability  @default(AVAILABLE)
+  barcodeType  BarcodeType        @default(QR)
+  serialNumber String?
+  location     String?
+  purchaseDate DateTime?
+  cost         Float?
+  consumedAt   DateTime?
+  images       AssetImage[]
+  assignments  AssetAssignment[]
+  maintenances AssetMaintenance[]
+  costs        AssetCost[]
+  createdById  String?
+  createdBy    User?              @relation(fields: [createdById], references: [id])
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 }
 
 model AssetImage {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   assetId   String
-  asset     Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
   url       String
   caption   String?
   createdAt DateTime @default(now())
 }
 
 model AssetAssignment {
-  id            String     @id @default(cuid())
-  assetId       String
-  asset         Asset      @relation(fields: [assetId], references: [id])
-  userId        String?
-  user          User?      @relation("AssetAssignmentUser", fields: [userId], references: [id])
-  departmentId  String?
-  department    Department? @relation(fields: [departmentId], references: [id])
-  buildingId    String?
-  building      Building?  @relation(fields: [buildingId], references: [id])
-  floorId       String?
-  floor         Floor?     @relation(fields: [floorId], references: [id])
-  roomId        String?
-  room          Room?      @relation(fields: [roomId], references: [id])
-  assignedAt    DateTime   @default(now())
-  returnedAt    DateTime?
-  purpose       String?    @default("استفاده")
-  note          String?
-  assignedById  String?
-  assignedBy    User?      @relation("AssetAssignmentAssignedBy", fields: [assignedById], references: [id])
+  id           String      @id @default(cuid())
+  assetId      String
+  asset        Asset       @relation(fields: [assetId], references: [id])
+  userId       String?
+  user         User?       @relation("AssetAssignmentUser", fields: [userId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  buildingId   String?
+  building     Building?   @relation(fields: [buildingId], references: [id])
+  floorId      String?
+  floor        Floor?      @relation(fields: [floorId], references: [id])
+  roomId       String?
+  room         Room?       @relation(fields: [roomId], references: [id])
+  assignedAt   DateTime    @default(now())
+  returnedAt   DateTime?
+  purpose      String?     @default("استفاده")
+  note         String?
+  assignedById String?
+  assignedBy   User?       @relation("AssetAssignmentAssignedBy", fields: [assignedById], references: [id])
 }
 
 model AssetMaintenance {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   assetId     String
-  asset       Asset    @relation(fields: [assetId], references: [id])
+  asset       Asset     @relation(fields: [assetId], references: [id])
   startDate   DateTime
   endDate     DateTime?
   cost        Float?
   description String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model AssetCost {
@@ -298,16 +306,16 @@ model UserDepartment {
 // Department-based page access control
 // role: '*' = applies to ANY role in that department; or a specific Role value e.g. 'MANAGER'
 model PagePermission {
-  id            String      @id @default(cuid())
-  departmentId  String
-  department    Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  page          String
-  role          String      @default("*")
-  canRead       Boolean     @default(true)
-  canWrite      Boolean     @default(false)
-  canDelete     Boolean     @default(false)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id           String     @id @default(cuid())
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  page         String
+  role         String     @default("*")
+  canRead      Boolean    @default(true)
+  canWrite     Boolean    @default(false)
+  canDelete    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@unique([departmentId, page, role])
   @@index([page])
@@ -337,18 +345,18 @@ model Otp {
 
 // Persistent chat conversations per user
 model Conversation {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  title      String?
-  provider   String
-  model      String?
-  summary        String?  // compact summary replacing older messages
-  rollingContext String?  // auto-updated context after each exchange
-  isArchived     Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  messages   ConversationMessage[]
+  id             String                @id @default(cuid())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id])
+  title          String?
+  provider       String
+  model          String?
+  summary        String? // compact summary replacing older messages
+  rollingContext String? // auto-updated context after each exchange
+  isArchived     Boolean               @default(false)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  messages       ConversationMessage[]
 
   @@index([userId, updatedAt])
 }
@@ -357,10 +365,10 @@ model ConversationMessage {
   id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role           String       // "user" | "assistant"
+  role           String // "user" | "assistant"
   content        String
   latencyMs      Int?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
 }
@@ -381,13 +389,13 @@ model UserMemory {
 // AI provider configurations — managed via admin panel
 model AiProvider {
   id        String   @id @default(cuid())
-  name      String                  // Display name e.g. "OpenAI GPT-4o"
-  type      String                  // "openai" | "anthropic" | "gemini" | "deepseek" | "agnes" | "custom"
-  apiKey    String                  // API key (stored as-is; use env-var or vault in production)
-  apiUrl    String?                 // Custom API base URL (optional, has sensible default)
-  model     String?                 // Model identifier e.g. "gpt-4o"
+  name      String // Display name e.g. "OpenAI GPT-4o"
+  type      String // "openai" | "anthropic" | "gemini" | "deepseek" | "agnes" | "custom"
+  apiKey    String // API key (stored as-is; use env-var or vault in production)
+  apiUrl    String? // Custom API base URL (optional, has sensible default)
+  model     String? // Model identifier e.g. "gpt-4o"
   isActive  Boolean  @default(true)
-  config    Json?                   // Additional provider-specific config
+  config    Json? // Additional provider-specific config
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -397,21 +405,21 @@ model AiProvider {
 
 // AI usage tracking — records each API call for token consumption analytics
 model AiUsage {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  providerType String                  // "openai" | "anthropic" | "gemini" | "deepseek" | "agnes" | "custom"
-  providerName String?                 // Custom display name e.g. "GPT-4o Production"
-  model       String?                  // Model used e.g. "gpt-4o"
-  prompt      String                   // User's input/prompt (truncated)
-  promptTokens   Int    @default(0)
-  completionTokens Int  @default(0)
-  totalTokens     Int   @default(0)
-  latencyMs       Int   @default(0)
-  success         Boolean @default(true)
-  errorMsg        String?
-  rawResponse     String?  // Raw API response for debugging (truncated)
-  createdAt   DateTime @default(now())
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  providerType     String // "openai" | "anthropic" | "gemini" | "deepseek" | "agnes" | "custom"
+  providerName     String? // Custom display name e.g. "GPT-4o Production"
+  model            String? // Model used e.g. "gpt-4o"
+  prompt           String // User's input/prompt (truncated)
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  latencyMs        Int      @default(0)
+  success          Boolean  @default(true)
+  errorMsg         String?
+  rawResponse      String? // Raw API response for debugging (truncated)
+  createdAt        DateTime @default(now())
 
   @@index([userId])
   @@index([providerType])
@@ -423,9 +431,9 @@ model UserQuota {
   id           String     @id @default(cuid())
   userId       String
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  providerId   String     // references a specific configured AiProvider (model)
+  providerId   String // references a specific configured AiProvider (model)
   provider     AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  monthlyLimit Int        // 0 = unlimited
+  monthlyLimit Int // 0 = unlimited
   usedTokens   Int        @default(0)
   periodStart  DateTime
   periodEnd    DateTime
@@ -442,7 +450,7 @@ model DefaultQuota {
   id           String     @id @default(cuid())
   providerId   String     @unique
   provider     AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  monthlyLimit Int        // 0 = unlimited
+  monthlyLimit Int // 0 = unlimited
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -467,8 +475,8 @@ model RequestLog {
   path       String
   statusCode Int?
   userId     String?
-  body       String?     // Truncated request body JSON
-  response   String?     // Truncated response JSON
+  body       String? // Truncated request body JSON
+  response   String? // Truncated response JSON
   latencyMs  Int?
   errorMsg   String?
   ip         String?
@@ -571,44 +579,44 @@ enum AttnNotifChannel {
 
 // ── Integration / Sync settings (one row per external source) ──
 model AttendanceSource {
-  id              String   @id @default(cuid())
-  name            String                            // e.g. "EOSDB Main"
-  driver          String   @default("mssql")        // mssql | mysql | http (extensible)
+  id              String              @id @default(cuid())
+  name            String // e.g. "EOSDB Main"
+  driver          String              @default("mssql") // mssql | mysql | http (extensible)
   host            String
-  port            Int      @default(1433)
+  port            Int                 @default(1433)
   database        String
   username        String
-  password        String                            // encrypted at rest (see crypto.util)
-  tableName       String   @default("dbo.TimeRecords")
-  timeZone        String   @default("Asia/Tehran")
-  syncEnabled     Boolean  @default(false)
-  syncIntervalSec Int      @default(300)
-  batchSize       Int      @default(1000)
+  password        String // encrypted at rest (see crypto.util)
+  tableName       String              @default("dbo.TimeRecords")
+  timeZone        String              @default("Asia/Tehran")
+  syncEnabled     Boolean             @default(false)
+  syncIntervalSec Int                 @default(300)
+  batchSize       Int                 @default(1000)
   initialSyncDate DateTime?
-  initialRecordId Int      @default(0)
-  autoRetry       Boolean  @default(true)
-  retryCount      Int      @default(3)
-  lastRecordId    Int      @default(0)              // cursor: last imported RecordID
+  initialRecordId Int                 @default(0)
+  autoRetry       Boolean             @default(true)
+  retryCount      Int                 @default(3)
+  lastRecordId    Int                 @default(0) // cursor: last imported RecordID
   lastSyncAt      DateTime?
   lastSuccessAt   DateTime?
   lastFailureAt   DateTime?
   lastError       String?
   devices         AttendanceDevice[]
   syncLogs        AttendanceSyncLog[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 }
 
 // ── DeviceCode → friendly name + direction hint + offline detection ──
 model AttendanceDevice {
-  id          String           @id @default(cuid())
-  sourceId    String
-  source      AttendanceSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  deviceCode  String
-  name        String
-  direction   PunchDirection   @default(UNKNOWN)    // IN-only / OUT-only readers
-  lastSeenAt  DateTime?
-  isActive    Boolean          @default(true)
+  id         String           @id @default(cuid())
+  sourceId   String
+  source     AttendanceSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  deviceCode String
+  name       String
+  direction  PunchDirection   @default(UNKNOWN) // IN-only / OUT-only readers
+  lastSeenAt DateTime?
+  isActive   Boolean          @default(true)
 
   @@unique([sourceId, deviceCode])
 }
@@ -619,7 +627,7 @@ model AttendanceSyncLog {
   sourceId     String
   source       AttendanceSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   status       SyncRunStatus
-  trigger      String                                // "scheduled" | "manual"
+  trigger      String // "scheduled" | "manual"
   fromRecordId Int
   toRecordId   Int
   imported     Int              @default(0)
@@ -635,52 +643,52 @@ model AttendanceSyncLog {
 model RawAttendanceRecord {
   id         String   @id @default(cuid())
   sourceId   String
-  recordId   Int                                     // device RecordID
+  recordId   Int // device RecordID
   cardNo     String
-  mDate      String?                                 // raw mDate as received
+  mDate      String? // raw mDate as received
   sDate      String?
   rTime      String?
-  rType      String?                                 // raw RType
+  rType      String? // raw RType
   deviceCode String?
-  punchAt    DateTime                                // normalized, tz-adjusted timestamp
-  userId     String?                                 // resolved from cardNo (null = unmapped)
+  punchAt    DateTime // normalized, tz-adjusted timestamp
+  userId     String? // resolved from cardNo (null = unmapped)
   user       User?    @relation(fields: [userId], references: [id])
   createdAt  DateTime @default(now())
 
-  @@unique([sourceId, recordId])                     // duplicate prevention
+  @@unique([sourceId, recordId]) // duplicate prevention
   @@index([userId, punchAt])
   @@index([cardNo, punchAt])
 }
 
 // ── Layer 2: computed daily attendance ──
 model AttendanceDay {
-  id                String           @id @default(cuid())
-  userId            String
-  user              User             @relation(fields: [userId], references: [id])
-  gregDate          DateTime                          // midnight of the work date
-  jYear             Int
-  jMonth            Int
-  jDay              Int
-  firstCheckIn      DateTime?
-  lastCheckOut      DateTime?
+  id                     String           @id @default(cuid())
+  userId                 String
+  user                   User             @relation(fields: [userId], references: [id])
+  gregDate               DateTime // midnight of the work date
+  jYear                  Int
+  jMonth                 Int
+  jDay                   Int
+  firstCheckIn           DateTime?
+  lastCheckOut           DateTime?
   workedMinutes          Int              @default(0)
-  overtimeMinutes        Int              @default(0)   // اضافه‌کاری روزهای عادی
-  holidayOvertimeMinutes Int              @default(0)   // تعطیل‌کاری (ضریب متفاوت)
+  overtimeMinutes        Int              @default(0) // اضافه‌کاری روزهای عادی
+  holidayOvertimeMinutes Int              @default(0) // تعطیل‌کاری (ضریب متفاوت)
   delayMinutes           Int              @default(0)
   earlyLeaveMinutes      Int              @default(0)
-  deficitMinutes         Int              @default(0)   // shortfall vs required hours (delay+earlyLeave+unworked)
+  deficitMinutes         Int              @default(0) // shortfall vs required hours (delay+earlyLeave+unworked)
   nightMinutes           Int              @default(0)
-  leaveMinutes      Int              @default(0)        // approved annual leave for the day (hourly or full)
-  sickLeaveMinutes  Int              @default(0)        // approved sick leave for the day (hourly or full) — separate balance pool from leaveMinutes
-  autoConvertedLeave Boolean         @default(false)    // leaveMinutes/status here came from automatic deficit→hourly or absence→daily conversion, not an approved request
-  remoteMinutes          Int         @default(0)        // دورکاری: a REMOTE_WORK day counts as the group's dailyMinutes
-  remoteOvertimeMinutes  Int         @default(0)        // remoteMinutes × WorkSchedule.remoteOtPercent — reported on its own, never added to overtimeMinutes
-  status            AttendanceStatus
-  isHolidayWork     Boolean          @default(false)
-  shiftId           String?
-  shift             Shift?           @relation(fields: [shiftId], references: [id])
-  hasOverride       Boolean          @default(false)
-  computedAt        DateTime         @default(now())
+  leaveMinutes           Int              @default(0) // approved annual leave for the day (hourly or full)
+  sickLeaveMinutes       Int              @default(0) // approved sick leave for the day (hourly or full) — separate balance pool from leaveMinutes
+  autoConvertedLeave     Boolean          @default(false) // leaveMinutes/status here came from automatic deficit→hourly or absence→daily conversion, not an approved request
+  remoteMinutes          Int              @default(0) // دورکاری: a REMOTE_WORK day counts as the group's dailyMinutes
+  remoteOvertimeMinutes  Int              @default(0) // remoteMinutes × WorkSchedule.remoteOtPercent — reported on its own, never added to overtimeMinutes
+  status                 AttendanceStatus
+  isHolidayWork          Boolean          @default(false)
+  shiftId                String?
+  shift                  Shift?           @relation(fields: [shiftId], references: [id])
+  hasOverride            Boolean          @default(false)
+  computedAt             DateTime         @default(now())
 
   @@unique([userId, gregDate])
   @@index([jYear, jMonth])
@@ -689,115 +697,115 @@ model AttendanceDay {
 
 // ── Layer 3: audited manual overrides ──
 model AttendanceOverride {
-  id          String            @id @default(cuid())
-  userId      String
-  gregDate    DateTime
-  newCheckIn  DateTime?
-  newCheckOut DateTime?
-  clearCheckIn  Boolean         @default(false)          // explicitly wipe the check-in punch for the day
-  clearCheckOut Boolean         @default(false)          // explicitly wipe the check-out punch for the day
-  forceStatus AttendanceStatus?
-  leaveMinutes Int?                                     // hourly-leave minutes granted for the day
-  isSickLeave Boolean           @default(false)          // this leave (full-day forceStatus=SICK_LEAVE, or hourly leaveMinutes) draws from the sick-leave balance instead of annual
-  attachment  String?                                    // copied from the approved AttendanceRequest (e.g. doctor's note for sick leave) so records/day-detail can show it without joining back to the request
-  reason      String
-  createdById String
-  createdBy   User              @relation("AttnOverrideBy", fields: [createdById], references: [id])
-  requestId   String?                                // links to approved AttendanceRequest
-  createdAt   DateTime          @default(now())
+  id            String            @id @default(cuid())
+  userId        String
+  gregDate      DateTime
+  newCheckIn    DateTime?
+  newCheckOut   DateTime?
+  clearCheckIn  Boolean           @default(false) // explicitly wipe the check-in punch for the day
+  clearCheckOut Boolean           @default(false) // explicitly wipe the check-out punch for the day
+  forceStatus   AttendanceStatus?
+  leaveMinutes  Int? // hourly-leave minutes granted for the day
+  isSickLeave   Boolean           @default(false) // this leave (full-day forceStatus=SICK_LEAVE, or hourly leaveMinutes) draws from the sick-leave balance instead of annual
+  attachment    String? // copied from the approved AttendanceRequest (e.g. doctor's note for sick leave) so records/day-detail can show it without joining back to the request
+  reason        String
+  createdById   String
+  createdBy     User              @relation("AttnOverrideBy", fields: [createdById], references: [id])
+  requestId     String? // links to approved AttendanceRequest
+  createdAt     DateTime          @default(now())
 
   @@index([userId, gregDate])
 }
 
 // ── Global work schedule / rules (default + named schedules) ──
 model WorkSchedule {
-  id             String   @id @default(cuid())
-  name           String   @unique @default("default")
-  isDefault      Boolean  @default(false)
-  startTime      String   @default("08:00")           // "HH:mm"
-  endTime        String   @default("17:00")
-  dailyMinutes   Int      @default(500)                 // required work (8:20)
-  weeklyMinutes  Int      @default(2640)
-  lunchMinutes   Int      @default(0)
+  id                    String               @id @default(cuid())
+  name                  String               @unique @default("default")
+  isDefault             Boolean              @default(false)
+  startTime             String               @default("08:00") // "HH:mm"
+  endTime               String               @default("17:00")
+  dailyMinutes          Int                  @default(500) // required work (8:20)
+  weeklyMinutes         Int                  @default(2640)
+  lunchMinutes          Int                  @default(0)
   // Window-based attendance: arrival allowed in [checkInStart, checkInEnd],
   // departure expected in [checkOutStart, checkOutEnd].
-  checkInStart   String   @default("06:30")
-  checkInEnd     String   @default("09:00")
-  checkOutStart  String   @default("14:50")
-  checkOutEnd    String   @default("17:20")
-  flexEnabled    Boolean  @default(false)
-  flexInStart    String?  @default("07:30")
-  flexInEnd      String?  @default("09:00")
-  graceMinutes   Int      @default(0)
-  workDays       Int[]    @default([6, 0, 1, 2, 3])    // JS getDay(): Sat..Wed (Thu/Fri weekend)
-  otMinThreshold Int      @default(30)
-  otMaxDaily     Int      @default(240)
-  otMaxMonthly   Int      @default(3600)
-  otRounding     Int      @default(15)                 // round OT to nearest N minutes
-  annualLeaveDays Int     @default(26)                 // yearly paid-leave entitlement (days)
-  sickLeaveDays   Int     @default(5)                  // yearly sick-leave entitlement (days) — separate balance pool
-  deficitToLeaveEnabled Boolean @default(true)          // auto-cover daily shortfall from the hourly-leave balance
-  absentToLeaveEnabled  Boolean @default(true)          // auto-convert an ABSENT day to LEAVE when annual balance allows
-  maxDailyLeaveEnabled  Boolean @default(true)          // cap hourly leave granted in a single day
-  maxDailyLeaveMinutes  Int     @default(210) @map("hourlyLeaveCapMinutes") // above this (3:30) the day becomes full LEAVE + worked time → overtime; reuses a pre-existing unused DB column
-  remoteOtPercent       Int     @default(0)             // share (0-100%) of remote-work time reported as overtime-equivalent (AttendanceDay.remoteOvertimeMinutes)
-  userRules      UserAttendanceRule[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  checkInStart          String               @default("06:30")
+  checkInEnd            String               @default("09:00")
+  checkOutStart         String               @default("14:50")
+  checkOutEnd           String               @default("17:20")
+  flexEnabled           Boolean              @default(false)
+  flexInStart           String?              @default("07:30")
+  flexInEnd             String?              @default("09:00")
+  graceMinutes          Int                  @default(0)
+  workDays              Int[]                @default([6, 0, 1, 2, 3]) // JS getDay(): Sat..Wed (Thu/Fri weekend)
+  otMinThreshold        Int                  @default(30)
+  otMaxDaily            Int                  @default(240)
+  otMaxMonthly          Int                  @default(3600)
+  otRounding            Int                  @default(15) // round OT to nearest N minutes
+  annualLeaveDays       Int                  @default(26) // yearly paid-leave entitlement (days)
+  sickLeaveDays         Int                  @default(5) // yearly sick-leave entitlement (days) — separate balance pool
+  deficitToLeaveEnabled Boolean              @default(true) // auto-cover daily shortfall from the hourly-leave balance
+  absentToLeaveEnabled  Boolean              @default(true) // auto-convert an ABSENT day to LEAVE when annual balance allows
+  maxDailyLeaveEnabled  Boolean              @default(true) // cap hourly leave granted in a single day
+  maxDailyLeaveMinutes  Int                  @default(210) @map("hourlyLeaveCapMinutes") // above this (3:30) the day becomes full LEAVE + worked time → overtime; reuses a pre-existing unused DB column
+  remoteOtPercent       Int                  @default(0) // share (0-100%) of remote-work time reported as overtime-equivalent (AttendanceDay.remoteOvertimeMinutes)
+  userRules             UserAttendanceRule[]
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 }
 
 // ── Per-user override of WorkSchedule ──
 // Employee classification — drives whether overtime/lateness are computed.
 enum EmployeeType {
   FULL_TIME // تمام‌وقت: اضافه‌کار، تاخیر و تعجیل محاسبه می‌شود
-  HOURLY    // ساعتی: بدون اضافه‌کار/تاخیر؛ فقط ساعت حضور مهم است
+  HOURLY // ساعتی: بدون اضافه‌کار/تاخیر؛ فقط ساعت حضور مهم است
 }
 
 model UserAttendanceRule {
-  id           String        @id @default(cuid())
-  userId       String        @unique
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scheduleId   String?
-  schedule     WorkSchedule? @relation(fields: [scheduleId], references: [id])
-  employeeType EmployeeType  @default(FULL_TIME)
-  startTime    String?
-  endTime      String?
-  dailyMinutes Int?
+  id            String        @id @default(cuid())
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduleId    String?
+  schedule      WorkSchedule? @relation(fields: [scheduleId], references: [id])
+  employeeType  EmployeeType  @default(FULL_TIME)
+  startTime     String?
+  endTime       String?
+  dailyMinutes  Int?
   checkInStart  String?
   checkInEnd    String?
   checkOutStart String?
   checkOutEnd   String?
-  graceMinutes Int?
-  flexEnabled  Boolean?
-  otAllowed    Boolean       @default(true)
-  otMaxDaily   Int?
-  otMaxMonthly Int?
-  updatedAt    DateTime      @updatedAt
+  graceMinutes  Int?
+  flexEnabled   Boolean?
+  otAllowed     Boolean       @default(true)
+  otMaxDaily    Int?
+  otMaxMonthly  Int?
+  updatedAt     DateTime      @updatedAt
 }
 
 model Shift {
-  id           String            @id @default(cuid())
-  name         String            @unique
-  type         ShiftType
-  startTime    String?                                 // "HH:mm" (NIGHT may cross midnight) — unused for guard rotations
-  endTime      String?
-  breakMinutes Int               @default(0)
-  cycleDays    Int?                                    // rotating / 24-48 patterns
-  pattern      Json?                                   // e.g. ["D","D","N","off"]
+  id                 String             @id @default(cuid())
+  name               String             @unique
+  type               ShiftType
+  startTime          String? // "HH:mm" (NIGHT may cross midnight) — unused for guard rotations
+  endTime            String?
+  breakMinutes       Int                @default(0)
+  cycleDays          Int? // rotating / 24-48 patterns
+  pattern            Json? // e.g. ["D","D","N","off"]
   // ── Guard rotation config (TWENTY_FOUR_TWENTY_FOUR / TWENTY_FOUR_FORTY_EIGHT) ──
   // On-duty days are marked manually per user via ShiftCalendarDay, not derived
   // from cycleDays/pattern. The engine only needs the duty length + two
   // tolerance thresholds: worked >= fullCreditMinutes -> no deficit; worked <
   // absentBelowMinutes -> full ABSENT; in between -> proportional deficit.
-  dutyMinutes         Int?                              // nominal duty length, e.g. 1440 for 24h
-  fullCreditMinutes   Int?                              // worked >= this -> zero deficit
-  absentBelowMinutes  Int?                              // worked < this -> ABSENT (no partial credit)
-  isActive     Boolean           @default(true)
-  assignments  ShiftAssignment[]
-  calendar     ShiftCalendarDay[]
-  days         AttendanceDay[]
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  dutyMinutes        Int? // nominal duty length, e.g. 1440 for 24h
+  fullCreditMinutes  Int? // worked >= this -> zero deficit
+  absentBelowMinutes Int? // worked < this -> ABSENT (no partial credit)
+  isActive           Boolean            @default(true)
+  assignments        ShiftAssignment[]
+  calendar           ShiftCalendarDay[]
+  days               AttendanceDay[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 }
 
 model ShiftAssignment {
@@ -829,12 +837,12 @@ model Holiday {
   title       String
   type        HolidayType
   startDate   DateTime
-  endDate     DateTime                                 // single day → start == end
-  recurring   Boolean     @default(false)              // repeats yearly by jMonth/jDay
+  endDate     DateTime // single day → start == end
+  recurring   Boolean     @default(false) // repeats yearly by jMonth/jDay
   jMonth      Int?
   jDay        Int?
   note        String?
-  scheduleIds String[]    @default([])                 // bound work-schedule (group) ids; empty = all groups
+  scheduleIds String[]    @default([]) // bound work-schedule (group) ids; empty = all groups
   createdAt   DateTime    @default(now())
 
   @@index([startDate, endDate])
@@ -846,10 +854,10 @@ model Holiday {
 model ScheduleOverride {
   id            String   @id @default(cuid())
   title         String?
-  scheduleIds   String[] @default([])   // affected groups; empty = all groups
-  weekdays      Int[]    @default([])    // JS getDay() 0..6; empty = every day in range
-  startDate     DateTime                 // range start (work date, inclusive)
-  endDate       DateTime                 // range end (inclusive)
+  scheduleIds   String[] @default([]) // affected groups; empty = all groups
+  weekdays      Int[]    @default([]) // JS getDay() 0..6; empty = every day in range
+  startDate     DateTime // range start (work date, inclusive)
+  endDate       DateTime // range end (inclusive)
   isOff         Boolean  @default(false) // mark matched days as non-working
   checkInStart  String?
   checkInEnd    String?
@@ -869,7 +877,7 @@ model LeaveRequest {
   kind         LeaveKind
   startDate    DateTime
   endDate      DateTime
-  startTime    String?                                 // for HOURLY
+  startTime    String? // for HOURLY
   endTime      String?
   reason       String?
   attachment   String?
@@ -886,27 +894,27 @@ model LeaveRequest {
 
 // ── Manual correction / explanation workflow ──
 model AttendanceRequest {
-  id           String            @id @default(cuid())
-  userId       String
-  user         User              @relation("AttnReqUser", fields: [userId], references: [id])
-  type         AttnRequestType
-  gregDate     DateTime
-  requestedIn  DateTime?
-  requestedOut DateTime?
-  clearCheckIn  Boolean          @default(false)          // requesting deletion of the check-in punch
-  clearCheckOut Boolean          @default(false)          // requesting deletion of the check-out punch
+  id            String            @id @default(cuid())
+  userId        String
+  user          User              @relation("AttnReqUser", fields: [userId], references: [id])
+  type          AttnRequestType
+  gregDate      DateTime
+  requestedIn   DateTime?
+  requestedOut  DateTime?
+  clearCheckIn  Boolean           @default(false) // requesting deletion of the check-in punch
+  clearCheckOut Boolean           @default(false) // requesting deletion of the check-out punch
   // For leave/mission/remote-work declarations — the status to force on approval.
-  targetStatus AttendanceStatus?
-  leaveMinutes Int?                                     // hourly-leave duration (minutes)
-  isSickLeave  Boolean           @default(false)         // requesting sick leave (SICK_LEAVE status or hourly) — draws from the separate sick-leave balance
-  description  String
-  attachment   String?
-  status       AttnRequestStatus @default(PENDING)
-  managerById  String?
-  hrById       String?
-  decidedAt    DateTime?
-  decisionNote String?
-  createdAt    DateTime          @default(now())
+  targetStatus  AttendanceStatus?
+  leaveMinutes  Int? // hourly-leave duration (minutes)
+  isSickLeave   Boolean           @default(false) // requesting sick leave (SICK_LEAVE status or hourly) — draws from the separate sick-leave balance
+  description   String
+  attachment    String?
+  status        AttnRequestStatus @default(PENDING)
+  managerById   String?
+  hrById        String?
+  decidedAt     DateTime?
+  decisionNote  String?
+  createdAt     DateTime          @default(now())
 
   @@index([userId, gregDate])
   @@index([status])
@@ -1020,14 +1028,14 @@ enum PresenceStatus {
 }
 
 model ChatConversation {
-  id        String       @id @default(cuid())
-  type      ChatConvType @default(DIRECT)
+  id        String        @id @default(cuid())
+  type      ChatConvType  @default(DIRECT)
   name      String?
   avatarUrl String?
   members   ChatMember[]
   messages  ChatMessage[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   @@index([updatedAt])
 }
@@ -1126,10 +1134,10 @@ model UserPresence {
 model SystemSettings {
   id              String   @id @default("singleton")
   // Branding
-  orgName         String?  // display name shown app-wide; falls back to a hardcoded default when empty
+  orgName         String? // display name shown app-wide; falls back to a hardcoded default when empty
   // Bale Safir OTP gateway
-  baleSafirApiKey String?  // api-access-key from Bale Business Panel → Safir
-  baleBotId       String?  // numeric bot ID
+  baleSafirApiKey String? // api-access-key from Bale Business Panel → Safir
+  baleBotId       String? // numeric bot ID
   baleMock        Boolean  @default(false) // skip real SMS in dev/test
   updatedAt       DateTime @updatedAt
   updatedById     String?
@@ -1174,7 +1182,7 @@ enum TicketPriority {
 model TicketSettings {
   id                 String   @id @default("singleton")
   maxFileSizeMb      Int      @default(10)
-  allowedExtensions  String[] @default(["jpg","jpeg","png","gif","pdf","doc","docx","xls","xlsx","zip","txt"])
+  allowedExtensions  String[] @default(["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "zip", "txt"])
   autoCloseAfterDays Int      @default(7)
   allowUserPriority  Boolean  @default(false)
   ticketPrefix       String   @default("TKT")
@@ -1229,17 +1237,17 @@ model TicketDeptAssignee {
 
 // Predefined ticket subjects per department — users MUST pick one, no free text
 model TicketCategory {
-  id           String                 @id @default(cuid())
-  configId     String
-  config       TicketDepartmentConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
-  name         String
-  description  String?
-  isActive     Boolean                @default(true)
-  order        Int                    @default(0)
+  id                    String                 @id @default(cuid())
+  configId              String
+  config                TicketDepartmentConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  name                  String
+  description           String?
+  isActive              Boolean                @default(true)
+  order                 Int                    @default(0)
   // Override department-level SLA for this specific category
   slaFirstResponseHours Int?
   slaResolutionHours    Int?
-  tickets      Ticket[]
+  tickets               Ticket[]
 
   @@unique([configId, name])
   @@index([configId, isActive])
@@ -1255,10 +1263,10 @@ model Ticket {
   categoryId   String
   category     TicketCategory @relation(fields: [categoryId], references: [id])
 
-  requesterId  String
-  requester    User           @relation("TicketRequester", fields: [requesterId], references: [id])
-  assigneeId   String?
-  assignee     User?          @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  requesterId String
+  requester   User    @relation("TicketRequester", fields: [requesterId], references: [id])
+  assigneeId  String?
+  assignee    User?   @relation("TicketAssignee", fields: [assigneeId], references: [id])
 
   status   TicketStatus   @default(OPEN)
   priority TicketPriority @default(MEDIUM)
@@ -1272,17 +1280,17 @@ model Ticket {
 
   // Optional references
   relatedUserId String?
-  relatedUser   User?  @relation("TicketRelatedUser", fields: [relatedUserId], references: [id])
+  relatedUser   User?   @relation("TicketRelatedUser", fields: [relatedUserId], references: [id])
 
   tags      String[]
   ccUserIds String[]
 
   // SLA timestamps
-  dueAt          DateTime?
+  dueAt           DateTime?
   firstResponseAt DateTime?
-  resolvedAt     DateTime?
-  closedAt       DateTime?
-  isOverSla      Boolean   @default(false)
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  isOverSla       Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1303,23 +1311,23 @@ model Ticket {
 
 // Replies AND internal notes in a single table (isInternal flag)
 model TicketComment {
-  id         String    @id @default(cuid())
+  id         String          @id @default(cuid())
   ticketId   String
-  ticket     Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticket     Ticket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   authorId   String
-  author     User      @relation("TicketCommentAuthor", fields: [authorId], references: [id])
-  content    String    @db.Text
-  isInternal Boolean   @default(false)
-  isEdited   Boolean   @default(false)
+  author     User            @relation("TicketCommentAuthor", fields: [authorId], references: [id])
+  content    String          @db.Text
+  isInternal Boolean         @default(false)
+  isEdited   Boolean         @default(false)
   editedAt   DateTime?
-  isDeleted  Boolean   @default(false)
+  isDeleted  Boolean         @default(false)
   replyToId  String?
   replyTo    TicketComment?  @relation("CommentReplies", fields: [replyToId], references: [id])
   replies    TicketComment[] @relation("CommentReplies")
 
   attachments TicketAttachment[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([ticketId, createdAt])
   @@index([ticketId, isInternal])
@@ -1345,15 +1353,15 @@ model TicketAttachment {
 
 // Full activity timeline — every meaningful action becomes an event row
 model TicketEvent {
-  id       String   @id @default(cuid())
-  ticketId String
-  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  actorId  String?
-  actor    User?    @relation("TicketEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation("TicketEventActor", fields: [actorId], references: [id], onDelete: SetNull)
   // CREATED | ASSIGNED | REASSIGNED | TRANSFERRED | STATUS_CHANGED | PRIORITY_CHANGED |
   // COMMENT_ADDED | INTERNAL_NOTE | ATTACHMENT_ADDED | CLOSED | REOPENED | SLA_BREACHED
-  type     String
-  meta     Json?
+  type      String
+  meta      Json?
   createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
@@ -1361,16 +1369,16 @@ model TicketEvent {
 
 // In-app notifications for ticket events
 model TicketNotification {
-  id       String  @id @default(cuid())
-  userId   String
-  user     User    @relation("TicketNotifUser", fields: [userId], references: [id], onDelete: Cascade)
-  ticketId String
-  ticket   Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("TicketNotifUser", fields: [userId], references: [id], onDelete: Cascade)
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   // ASSIGNED | REPLIED | MENTIONED | STATUS_CHANGED | TRANSFERRED | SLA_WARNING | OVER_SLA
-  type     String
-  title    String
-  body     String
-  isRead   Boolean @default(false)
+  type      String
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@index([userId, isRead])
@@ -1442,30 +1450,30 @@ model Notification {
 }
 
 model Announcement {
-  id            String               @id @default(cuid())
+  id            String                  @id @default(cuid())
   title         String
-  body          String               @db.Text
-  type          AnnouncementType     @default(NOTIFICATION)
-  priority      NotificationPriority @default(NORMAL)
-  targetType    AnnouncementTarget   @default(ALL)
+  body          String                  @db.Text
+  type          AnnouncementType        @default(NOTIFICATION)
+  priority      NotificationPriority    @default(NORMAL)
+  targetType    AnnouncementTarget      @default(ALL)
   targetDeptIds String[]
   targetRoles   String[]
   targetUserIds String[]
-  isSticky      Boolean              @default(false)
-  isPinned      Boolean              @default(false)
-  isPublished   Boolean              @default(false)
+  isSticky      Boolean                 @default(false)
+  isPinned      Boolean                 @default(false)
+  isPublished   Boolean                 @default(false)
   publishAt     DateTime?
   expireAt      DateTime?
-  showOnce      Boolean              @default(false)
-  showUntilAck  Boolean              @default(false)
+  showOnce      Boolean                 @default(false)
+  showUntilAck  Boolean                 @default(false)
   // Files attached to the announcement: [{ url, name, size, mimeType }]
   attachments   Json?
   authorId      String
-  author        User                 @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  author        User                    @relation("AnnouncementAuthor", fields: [authorId], references: [id])
   acks          AnnouncementAck[]
   popupSeens    AnnouncementPopupSeen[]
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
 
   @@index([isPublished, type])
 }
@@ -1503,21 +1511,133 @@ model TicketSlaMetric {
   slaResolutionHours    Int
 
   // Elapsed durations in minutes (null until the event happens)
-  minutesToFirstResponse  Int?
+  minutesToFirstResponse   Int?
   minutesToFirstAssignment Int?
-  minutesToResolution     Int?
-  minutesToClose          Int?
+  minutesToResolution      Int?
+  minutesToClose           Int?
 
   // Business-hours breakdown
-  businessMinutesTotal  Int @default(0)
-  waitingUserMinutes    Int @default(0)
-  waitingDeptMinutes    Int @default(0)
+  businessMinutesTotal Int @default(0)
+  waitingUserMinutes   Int @default(0)
+  waitingDeptMinutes   Int @default(0)
 
   // SLA breach tracking
-  firstResponseDueAt DateTime?
-  resolutionDueAt    DateTime?
-  firstResponseBreached Boolean @default(false)
-  resolutionBreached    Boolean @default(false)
+  firstResponseDueAt    DateTime?
+  resolutionDueAt       DateTime?
+  firstResponseBreached Boolean   @default(false)
+  resolutionBreached    Boolean   @default(false)
 
   updatedAt DateTime @updatedAt
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Work log (ثبت عملکرد شخصی): per-user daily task time + daily report.
+// Categories/tasks are global (userId null), assigned to one user by an
+// admin (isAdminDefined), or personal (created by the user themselves).
+// Dates are work-date labels (UTC midnight of the Tehran day), same
+// convention as AttendanceDay.gregDate.
+// ══════════════════════════════════════════════════════════════════════
+
+model WorkLogCategory {
+  id             String     @id @default(cuid())
+  name           String
+  color          String?
+  userId         String? // null = عمومی (every user); else that user's category
+  user           User?      @relation("WorkLogCategoryOwner", fields: [userId], references: [id], onDelete: Cascade)
+  createdById    String? // null = system default
+  createdBy      User?      @relation("WorkLogCategoryCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  isAdminDefined Boolean    @default(false) // admin/system defined: the user can use it but not edit/delete it
+  archived       Boolean    @default(false) // soft delete — keeps history of tasks/entries intact
+  sortOrder      Int        @default(0)
+  tasks          WorkTask[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([userId, archived])
+}
+
+model WorkTask {
+  id               String               @id @default(cuid())
+  title            String
+  description      String?
+  categoryId       String?
+  category         WorkLogCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  userId           String? // null = global task for every user
+  user             User?                @relation("WorkTaskOwner", fields: [userId], references: [id], onDelete: Cascade)
+  createdById      String?
+  createdBy        User?                @relation("WorkTaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  isAdminDefined   Boolean              @default(false)
+  recurring        Boolean              @default(false) // ongoing (e.g. ثبت عملکرد روزانه): time is logged repeatedly, never marked done
+  startDate        DateTime // work date the task was defined
+  deadline         DateTime? // work date it is due (admin-assigned tasks)
+  estimatedMinutes Int?
+  archived         Boolean              @default(false)
+  entries          WorkTaskEntry[]
+  completions      WorkTaskCompletion[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([userId, archived])
+}
+
+// Done-state is per user, so one global task can be completed by each user independently.
+model WorkTaskCompletion {
+  id     String   @id @default(cuid())
+  taskId String
+  task   WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User     @relation("WorkTaskCompletionUser", fields: [userId], references: [id], onDelete: Cascade)
+  doneAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+}
+
+// Time spent on a task on one work day. A task can collect entries over many days.
+model WorkTaskEntry {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("WorkTaskEntryUser", fields: [userId], references: [id], onDelete: Cascade)
+  gregDate  DateTime
+  jYear     Int
+  jMonth    Int
+  jDay      Int
+  minutes   Int
+  note      String?
+  isLate    Boolean  @default(false) // first saved after the day's deadline (see WorkLogSettings.lateGraceMinutes)
+  lateDays  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, gregDate])
+  @@index([taskId])
+}
+
+model DailyWorkReport {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation("DailyWorkReportUser", fields: [userId], references: [id], onDelete: Cascade)
+  gregDate    DateTime
+  jYear       Int
+  jMonth      Int
+  jDay        Int
+  content     String
+  submittedAt DateTime  @default(now()) // first submission — lateness is judged on this, edits don't reset it
+  isLate      Boolean   @default(false)
+  lateDays    Int       @default(0)
+  editedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, gregDate])
+  @@index([jYear, jMonth])
+}
+
+model WorkLogSettings {
+  id                      String   @id @default("singleton")
+  lateGraceMinutes        Int      @default(0) // minutes after the work day's midnight before an entry/report counts as late (0 = midnight)
+  capByAttendance         Boolean  @default(true) // block logging more time than the day's attendance shows
+  requireOnNonWorkingDays Boolean  @default(false) // also require a report on weekends/holidays nobody worked
+  updatedAt               DateTime @updatedAt
 }

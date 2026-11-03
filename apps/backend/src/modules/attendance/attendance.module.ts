@@ -62,6 +62,6 @@ import { GuardShiftsController } from './guard-shifts/guard-shifts.controller';
     HolidaysService,
     GuardShiftsService,
   ],
-  exports: [SourcesService, SyncService, RecomputeService],
+  exports: [SourcesService, SyncService, RecomputeService, CalcService],
 })
 export class AttendanceModule {}

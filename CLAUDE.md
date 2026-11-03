@@ -34,6 +34,7 @@ docker-compose.prod.yml     ← production stack
 - **messaging/** — Socket.IO gateway + REST: conversations, messages, reactions, presence, file upload, admin settings
 - **attendance/** — Full workforce management: raw punches, computed days, requests/approvals, work schedules, holidays, overrides
 - **todos/** — Per-user todo list (dashboard widget)
+- **work-log/** — ثبت عملکرد: categories/tasks (global, admin-assigned per user with deadline, or personal), per-user completion, daily time entries capped by attendance worked time, daily report with late flag; only the current Jalali month is writable. `WorkLogSettings` singleton (late grace, cap toggle)
 - **ai-settings/** / **chat-history/** / **quota/** — AI chat integration
 - **request-logs/** / **system-logs** — Audit/log infrastructure
 
@@ -70,6 +71,8 @@ docker-compose.prod.yml     ← production stack
 | `/dashboard/attendance/work-rules` | Work schedule + holidays editor | Admin |
 | `/dashboard/attendance/settings` | Attendance system settings | Admin |
 | `/dashboard/attendance/sync` | Sync monitor | Admin |
+| `/dashboard/work-log/my` | My daily tasks, time and work report | All |
+| `/dashboard/work-log/reports` | Users' work reports, catalog (categories/tasks), settings | Restricted (ADMIN/MANAGER) |
 | `/dashboard/security/sessions` | Session management | Admin |
 | `/dashboard/settings` | System settings (5 tabs) | Admin |
 | `/dashboard/access` | Page permission editor | Admin |

@@ -10,6 +10,7 @@ const BASE_PAGES = [
   '/dashboard/messaging',
   '/dashboard/attendance/my',
   '/dashboard/tickets/my',
+  '/dashboard/work-log/my',
 ];
 
 @Injectable()

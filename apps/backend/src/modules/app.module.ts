@@ -19,6 +19,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { WorkLogModule } from './work-log/work-log.module';
 import { SystemInfoModule } from './system-info/system-info.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
@@ -47,6 +48,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     MessagingModule,
     TicketsModule,
     NotificationsModule,
+    WorkLogModule,
     SystemInfoModule,
   ],
   controllers: [ReportsController],

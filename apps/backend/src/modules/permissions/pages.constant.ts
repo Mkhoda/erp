@@ -54,6 +54,10 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/settings',            label: 'تنظیمات سامانه',        adminOnly: true },
   { page: '/dashboard/messaging',           label: 'پیام‌رسانی' },
 
+  // ── Work log (ثبت عملکرد) ──
+  { page: '/dashboard/work-log/my',          label: 'عملکرد من' },
+  { page: '/dashboard/work-log/reports',     label: 'گزارش عملکرد کاربران' },
+
   // ── Notification Center ──
   { page: '/dashboard/notifications',                  label: 'مرکز اعلان‌ها' },
   { page: '/dashboard/notifications/announcements',    label: 'مدیریت اطلاعیه‌ها', adminOnly: true },
