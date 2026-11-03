@@ -168,15 +168,22 @@ export class WorkLogService {
     const j = toJalaliParts(date);
     const { start: monthStart, endExcl: monthEnd } = jalaliMonthRange(j.jYear, j.jMonth);
 
-    const [attendance, categories, tasks, totals, onDate, entries, report, completions, monthAtt, monthReports, monthLogged, cap, used] = await Promise.all([
+    const [attendance, categories, tasks, totals, onDate, entries, report, completions, monthAtt, monthReports, monthLogged, cap, used, catalog] = await Promise.all([
       this.prisma.attendanceDay.findUnique({ where: { userId_gregDate: { userId, gregDate: date } } }),
       this.prisma.workLogCategory.findMany({
         where: { archived: false, ...this.visibleTo(userId) },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
       this.prisma.workTask.findMany({
-        // Live tasks, plus archived ones that still carry time on this date (so history stays readable).
-        where: { AND: [this.visibleTo(userId), { OR: [{ archived: false }, { entries: { some: { userId, gregDate: date } } }] }] },
+        // The user's own list: their personal + admin-assigned tasks, global tasks with a deadline
+        // (meant for everyone), and global catalog tasks they adopted — plus any task (even
+        // archived or not adopted) that still carries their time on this date, so history stays readable.
+        where: {
+          OR: [
+            { archived: false, OR: [{ userId }, { userId: null, deadline: { not: null } }, { userId: null, adoptions: { some: { userId } } }] },
+            { entries: { some: { userId, gregDate: date } } },
+          ],
+        },
         include: { category: { select: { id: true, name: true, color: true } }, createdBy: { select: { firstName: true, lastName: true } } },
         orderBy: [{ deadline: 'asc' }, { createdAt: 'desc' }],
       }),
@@ -194,6 +201,12 @@ export class WorkLogService {
       this.prisma.workTaskEntry.groupBy({ by: ['gregDate'], where: { userId, gregDate: { gte: monthStart, lt: monthEnd } }, _sum: { minutes: true } }),
       this.capacity(userId, date, settings.capByAttendance),
       this.usedMinutes(userId, date),
+      // Global catalog the user can add to their list (edit mode).
+      this.prisma.workTask.findMany({
+        where: { userId: null, deadline: null, archived: false },
+        include: { category: { select: { id: true, name: true, color: true } }, adoptions: { where: { userId }, select: { id: true } } },
+        orderBy: [{ category: { sortOrder: 'asc' } }, { title: 'asc' }],
+      }),
     ]);
 
     const totalMap = new Map(totals.map((t) => [t.taskId, t._sum.minutes ?? 0]));
@@ -209,6 +222,12 @@ export class WorkLogService {
         doneAt: doneMap.get(t.id) ?? null,
         overdue: !!t.deadline && !doneMap.has(t.id) && !t.recurring && t.deadline.getTime() < today.getTime(),
       }));
+    const inList = new Set(taskRows.filter((t) => !t.done).map((t) => t.id));
+    const globalCatalog = catalog.map((t) => ({
+      id: t.id, title: t.title, description: t.description, recurring: t.recurring, category: t.category,
+      // in-list: already on the board · finished: adopted then ended (re-adding reopens it) · available
+      state: inList.has(t.id) ? 'IN_LIST' : t.adoptions.length && doneMap.has(t.id) ? 'FINISHED' : 'AVAILABLE',
+    }));
 
     const attMap = new Map(monthAtt.map((a) => [a.gregDate.getTime(), a]));
     const repMap = new Map(monthReports.map((r) => [r.gregDate.getTime(), r]));
@@ -243,6 +262,7 @@ export class WorkLogService {
       },
       categories: categories.map((c) => ({ ...c, scope: c.userId == null ? 'GLOBAL' : c.isAdminDefined ? 'ASSIGNED' : 'PERSONAL', editable: c.userId === userId && !c.isAdminDefined })),
       tasks: taskRows,
+      globalCatalog,
       entries,
       report,
       days,
@@ -320,14 +340,26 @@ export class WorkLogService {
     return { ok: true };
   }
 
+  // done=true: a one-off task is completed, a recurring one is "تموم شد" (the user no longer has
+  // it — it leaves the daily list, its logged time stays). done=false reopens it.
   async setDone(userId: string, taskId: string, done: boolean) {
-    const t = await this.visibleTask(userId, taskId);
-    if (t.recurring) throw new BadRequestException('وظیفه‌ی مستمر تیک انجام ندارد');
+    await this.visibleTask(userId, taskId);
     if (done) {
       await this.prisma.workTaskCompletion.upsert({ where: { taskId_userId: { taskId, userId } }, create: { taskId, userId }, update: {} });
     } else {
       await this.prisma.workTaskCompletion.deleteMany({ where: { taskId, userId } });
     }
+    return { ok: true };
+  }
+
+  // Add a global catalog task to the user's own daily list (also reopens it if it was finished).
+  async adoptTask(userId: string, taskId: string) {
+    const t = await this.prisma.workTask.findFirst({ where: { id: taskId, userId: null, archived: false } });
+    if (!t) throw new NotFoundException('وظیفه‌ی عمومی یافت نشد');
+    await this.prisma.$transaction([
+      this.prisma.workTaskAdoption.upsert({ where: { taskId_userId: { taskId, userId } }, create: { taskId, userId }, update: {} }),
+      this.prisma.workTaskCompletion.deleteMany({ where: { taskId, userId } }),
+    ]);
     return { ok: true };
   }
 

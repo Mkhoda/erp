@@ -32,6 +32,8 @@ export class MyWorkLogController {
   removeTask(@Req() req: any, @Param('id') id: string) { return this.service.removeTask(uid(req), id); }
   @Post('tasks/:id/done')
   setDone(@Req() req: any, @Param('id') id: string, @Body() body: { done: boolean }) { return this.service.setDone(uid(req), id, !!body?.done); }
+  @Post('tasks/:id/adopt')
+  adopt(@Req() req: any, @Param('id') id: string) { return this.service.adoptTask(uid(req), id); }
 
   @Post('entries')
   createEntry(@Req() req: any, @Body() body: any) { return this.service.createEntry(uid(req), body); }

@@ -2,7 +2,7 @@
 import React from "react";
 import {
   ListTodo, ChevronRight, ChevronLeft, Loader2, Plus, Pencil, Trash2, Clock, CheckCircle2, Circle,
-  AlertTriangle, Lock, Save, FolderCog, Repeat, CalendarClock, X,
+  AlertTriangle, Lock, Save, FolderCog, Repeat, CalendarClock, X, ListChecks, Flag, RotateCcw,
 } from "lucide-react";
 import { pageTitle } from "../../../../lib/branding";
 import { readError } from "../../../../lib/http";
@@ -37,6 +37,8 @@ export default function MyWorkLogPage() {
   const [editEntry, setEditEntry] = React.useState<any>(null);
   const [taskModal, setTaskModal] = React.useState<any>(null);
   const [catModal, setCatModal] = React.useState(false);
+  // Edit mode: add global tasks to my list / finish (تموم شد) tasks I no longer have.
+  const [editMode, setEditMode] = React.useState(false);
   const [catForm, setCatForm] = React.useState<{ id?: string; name: string; color: string }>({ name: "", color: "#3b82f6" });
 
   const load = React.useCallback(async (d?: string) => {
@@ -102,6 +104,12 @@ export default function MyWorkLogPage() {
       ? await call(`/work-log/me/tasks/${taskModal.id}`, "PATCH", body, "وظیفه ویرایش شد")
       : await call("/work-log/me/tasks", "POST", body, "وظیفه تعریف شد");
     if (ok) setTaskModal(null);
+  }
+
+  // "تموم شد": the task leaves my daily list (one-off: completed; recurring: I no longer do it).
+  async function finishTask(t: any) {
+    if (!(await confirm("تموم شد", `وظیفه‌ی «${t.title}» از فهرست شما خارج شود؟ زمان‌های ثبت‌شده‌ی آن باقی می‌ماند و بعداً می‌توانید آن را برگردانید.`, "warning"))) return;
+    await call(`/work-log/me/tasks/${t.id}/done`, "POST", { done: true }, "از فهرست شما خارج شد");
   }
 
   async function removeTask(t: any) {
@@ -207,17 +215,41 @@ export default function MyWorkLogPage() {
             <div className="lg:col-span-3 bg-theme-card border border-theme rounded-xl overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 border-b border-theme">
                 <div className="flex bg-theme-secondary border border-theme p-0.5 rounded-lg text-xs">
-                  {([["open", "باز"], ["done", "انجام‌شده"], ["all", "همه"]] as const).map(([k, l]) => (
+                  {([["open", "فهرست من"], ["done", "انجام‌شده / تمام‌شده"], ["all", "همه"]] as const).map(([k, l]) => (
                     <button key={k} onClick={() => setTaskFilter(k)} className={`px-3 py-1 rounded-md ${taskFilter === k ? "bg-theme-card shadow text-theme-primary" : "text-theme-muted"}`}>{l}</button>
                   ))}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setCatModal(true)} className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-theme text-theme-primary"><FolderCog className="w-3.5 h-3.5" /> دسته‌ها</button>
+                  <button onClick={() => setEditMode(v => !v)} className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border ${editMode ? "bg-amber-500 border-amber-500 text-white" : "border-theme text-theme-primary"}`}>
+                    <ListChecks className="w-3.5 h-3.5" /> {editMode ? "پایان ویرایش" : "ویرایش فهرست"}
+                  </button>
+                  {editMode && <button onClick={() => setCatModal(true)} className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-theme text-theme-primary"><FolderCog className="w-3.5 h-3.5" /> دسته‌ها</button>}
                   <button onClick={() => setTaskModal({ title: "", description: "", categoryId: "", recurring: false, estimateH: "" })} className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><Plus className="w-3.5 h-3.5" /> وظیفه جدید</button>
                 </div>
               </div>
+              {editMode && (
+                <div className="px-3 py-2.5 border-b border-theme bg-amber-500/5">
+                  <div className="text-xs font-semibold text-theme-secondary mb-1.5">افزودن از وظایف عمومی به فهرست من</div>
+                  {(b.globalCatalog as any[]).length === 0 ? (
+                    <div className="text-xs text-theme-muted">وظیفه‌ی عمومی تعریف نشده</div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(b.globalCatalog as any[]).map(c => (
+                        <button key={c.id} disabled={c.state === "IN_LIST"} onClick={() => call(`/work-log/me/tasks/${c.id}/adopt`, "POST", undefined, "به فهرست شما اضافه شد")}
+                          title={c.description || ""}
+                          className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${c.state === "IN_LIST" ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300 cursor-default" : "border-theme text-theme-primary hover:bg-theme-hover"}`}>
+                          <span className="w-2 h-2 rounded-full" style={{ background: c.category?.color || "#94a3b8" }} />
+                          {c.state === "IN_LIST" ? <CheckCircle2 className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                          {c.title}{c.state === "FINISHED" ? " (افزودن دوباره)" : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-theme-muted mt-1.5">وظایف فهرست شما هر روز نمایش داده می‌شوند، چه زمانی برایشان ثبت کنید چه نکنید. برای حذف یک وظیفه از فهرست، «تموم شد» را بزنید؛ زمان‌های قبلی آن باقی می‌ماند.</p>
+                </div>
+              )}
               <div className="divide-y divide-theme/50">
-                {groups.length === 0 && <div className="py-10 text-center text-sm text-theme-muted">وظیفه‌ای وجود ندارد</div>}
+                {groups.length === 0 && <div className="py-10 text-center text-sm text-theme-muted">{taskFilter === "open" ? "فهرست شما خالی است — از «ویرایش فهرست» وظیفه اضافه کنید" : "وظیفه‌ای وجود ندارد"}</div>}
                 {groups.map(g => (
                   <div key={g.cat?.id || "_none"}>
                     <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 text-xs font-semibold text-theme-secondary">
@@ -240,7 +272,7 @@ export default function MyWorkLogPage() {
                               {t.scope === "GLOBAL" && <span className="px-1.5 rounded bg-slate-500/10 text-slate-600 dark:text-slate-300">عمومی</span>}
                               {t.scope === "ASSIGNED" && <span className="px-1.5 rounded bg-violet-500/10 text-violet-600">از طرف مدیر{t.createdBy ? `: ${t.createdBy.firstName} ${t.createdBy.lastName}` : ""}</span>}
                               {t.deadline && <span className={`flex items-center gap-0.5 px-1.5 rounded ${t.overdue ? "bg-red-500/10 text-red-600" : "bg-blue-500/10 text-blue-600"}`}><CalendarClock className="w-3 h-3" /> مهلت {faDate(t.deadline)}{t.overdue ? " (گذشته)" : ""}</span>}
-                              {t.done && t.doneAt && <span className="text-green-600">انجام: {faDateTime(t.doneAt)}</span>}
+                              {t.done && t.doneAt && <span className="text-green-600">{t.recurring ? "تمام‌شده" : "انجام"}: {faDateTime(t.doneAt)}</span>}
                               <span className="text-theme-muted">کل: <span dir="ltr">{fmtMin(t.totalMinutes)}</span>{t.estimatedMinutes ? <> از <span dir="ltr">{fmtMin(t.estimatedMinutes)}</span></> : null}</span>
                               {t.minutesOnDate > 0 && <span className="text-blue-600">امروز: <span dir="ltr">{fmtMin(t.minutesOnDate)}</span></span>}
                             </div>
@@ -250,9 +282,15 @@ export default function MyWorkLogPage() {
                             {editable && !t.archived && (
                               <button onClick={() => { setLogFor(logFor === t.id ? null : t.id); setLogForm({ h: "", m: "", note: "" }); }} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg text-blue-600 hover:bg-blue-500/10"><Clock className="w-3.5 h-3.5" /> ثبت زمان</button>
                             )}
-                            {t.editable && <>
+                            {editMode && !t.done && !t.archived && (
+                              <button onClick={() => finishTask(t)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"><Flag className="w-3.5 h-3.5" /> تموم شد</button>
+                            )}
+                            {t.done && (
+                              <button onClick={() => call(`/work-log/me/tasks/${t.id}/done`, "POST", { done: false })} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg text-theme-muted hover:bg-theme-hover"><RotateCcw className="w-3.5 h-3.5" /> برگرداندن</button>
+                            )}
+                            {editMode && t.editable && <>
                               <button onClick={() => setTaskModal({ ...t, categoryId: t.categoryId || "", estimateH: t.estimatedMinutes ? String(+(t.estimatedMinutes / 60).toFixed(2)) : "" })} title="ویرایش" className="p-1 rounded text-theme-muted hover:text-blue-600"><Pencil className="w-3.5 h-3.5" /></button>
-                              <button onClick={() => removeTask(t)} title="حذف" className="p-1 rounded text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => removeTask(t)} title="حذف کامل" className="p-1 rounded text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                             </>}
                           </div>
                         </div>

@@ -78,6 +78,7 @@ model User {
   workTasks                WorkTask[]               @relation("WorkTaskOwner")
   workTasksCreated         WorkTask[]               @relation("WorkTaskCreator")
   workTaskCompletions      WorkTaskCompletion[]     @relation("WorkTaskCompletionUser")
+  workTaskAdoptions        WorkTaskAdoption[]       @relation("WorkTaskAdoptionUser")
   workTaskEntries          WorkTaskEntry[]          @relation("WorkTaskEntryUser")
   dailyWorkReports         DailyWorkReport[]        @relation("DailyWorkReportUser")
   pagePermissions          UserPagePermission[]     @relation("UserPagePermissionUser")
@@ -1581,6 +1582,7 @@ model WorkTask {
   archived         Boolean              @default(false)
   entries          WorkTaskEntry[]
   completions      WorkTaskCompletion[]
+  adoptions        WorkTaskAdoption[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -1595,6 +1597,19 @@ model WorkTaskCompletion {
   userId String
   user   User     @relation("WorkTaskCompletionUser", fields: [userId], references: [id], onDelete: Cascade)
   doneAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+}
+
+// A user opting a global (catalog) task into their own daily list. Global tasks without a
+// deadline appear only for users who adopted them; finishing ("تموم شد") is a WorkTaskCompletion.
+model WorkTaskAdoption {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("WorkTaskAdoptionUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
   @@unique([taskId, userId])
 }
