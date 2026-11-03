@@ -9,5 +9,6 @@ import { WorkLogService } from './work-log.service';
   imports: [AttendanceModule, NotificationsModule],
   controllers: [MyWorkLogController, AdminWorkLogController],
   providers: [WorkLogService, PrismaService],
+  exports: [WorkLogService],
 })
 export class WorkLogModule {}

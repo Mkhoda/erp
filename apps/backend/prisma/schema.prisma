@@ -80,6 +80,8 @@ model User {
   workTaskCompletions      WorkTaskCompletion[]     @relation("WorkTaskCompletionUser")
   workTaskEntries          WorkTaskEntry[]          @relation("WorkTaskEntryUser")
   dailyWorkReports         DailyWorkReport[]        @relation("DailyWorkReportUser")
+  pagePermissions          UserPagePermission[]     @relation("UserPagePermissionUser")
+  pagePermissionsGranted   UserPagePermission[]     @relation("UserPagePermissionGrantor")
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 }
@@ -314,6 +316,7 @@ model PagePermission {
   canRead      Boolean    @default(true)
   canWrite     Boolean    @default(false)
   canDelete    Boolean    @default(false)
+  canCreate    Boolean    @default(false) // separate "ثبت" flag for pages whose API tells create from edit (e.g. attendance records)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -1640,4 +1643,24 @@ model WorkLogSettings {
   capByAttendance         Boolean  @default(true) // block logging more time than the day's attendance shows
   requireOnNonWorkingDays Boolean  @default(false) // also require a report on weekends/holidays nobody worked
   updatedAt               DateTime @updatedAt
+}
+
+// Per-person page grant, in addition to department/role PagePermission rows. Grants
+// only ADD access (OR-ed with the department result) — they never revoke it.
+model UserPagePermission {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("UserPagePermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  page        String
+  canRead     Boolean  @default(true)
+  canCreate   Boolean  @default(false)
+  canWrite    Boolean  @default(false)
+  canDelete   Boolean  @default(false)
+  grantedById String?
+  grantedBy   User?    @relation("UserPagePermissionGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, page])
+  @@index([page])
 }

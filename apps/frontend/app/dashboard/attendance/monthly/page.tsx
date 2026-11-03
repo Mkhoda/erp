@@ -128,7 +128,7 @@ export default function AttendanceMonthlyReportPage() {
 
   React.useEffect(() => {
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
-    fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
+    fetch(`${API}/users/brief`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
     fetch(`${API}/attendance/records/periods`, { headers: h }).then(r => r.ok ? r.json() : []).then(p => setPeriods(Array.isArray(p) ? p : [])).catch(() => {});
     // eslint-disable-next-line
   }, []);

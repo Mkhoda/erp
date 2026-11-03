@@ -20,6 +20,7 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WorkLogModule } from './work-log/work-log.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { SystemInfoModule } from './system-info/system-info.module';
 import { LoggingInterceptor } from '../common/logging.interceptor';
 
@@ -49,6 +50,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
     TicketsModule,
     NotificationsModule,
     WorkLogModule,
+    AnalyticsModule,
     SystemInfoModule,
   ],
   controllers: [ReportsController],

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { KNOWN_PAGES } from './pages.constant';
+import { ALL_FLAGS, NO_FLAGS, PageFlags, resolvePagePermissions } from './page-perms.util';
 
 /** Pages that ALL authenticated users can access, regardless of department or role. */
 const BASE_PAGES = [
@@ -76,16 +77,17 @@ export class PermissionsService {
   }
 
   /** Upsert a permission row. role defaults to '*' (all roles). Only the flags sent are changed. */
-  upsert(departmentId: string, page: string, role: string = '*', data: { canRead?: boolean; canWrite?: boolean; canDelete?: boolean }) {
+  upsert(departmentId: string, page: string, role: string = '*', data: { canRead?: boolean; canCreate?: boolean; canWrite?: boolean; canDelete?: boolean }) {
     const flags = {
       ...(data.canRead !== undefined ? { canRead: data.canRead } : {}),
       ...(data.canWrite !== undefined ? { canWrite: data.canWrite } : {}),
       ...(data.canDelete !== undefined ? { canDelete: data.canDelete } : {}),
+      ...(data.canCreate !== undefined ? { canCreate: data.canCreate } : {}),
     };
     return this.prisma.pagePermission.upsert({
       where: { departmentId_page_role: { departmentId, page, role } },
       update: flags,
-      create: { departmentId, page, role, canRead: true, canWrite: false, canDelete: false, ...flags },
+      create: { departmentId, page, role, canRead: true, canCreate: false, canWrite: false, canDelete: false, ...flags },
     });
   }
 
@@ -113,7 +115,7 @@ export class PermissionsService {
     if (user?.role === 'ADMIN') {
       return {
         departments: [],
-        permissions: KNOWN_PAGES.map(p => ({ page: p.page, canRead: true, canWrite: true, role: '*' })),
+        permissions: KNOWN_PAGES.map(p => ({ page: p.page, ...ALL_FLAGS, role: '*' })),
         menuPages: KNOWN_PAGES.map(p => p.page),
       };
     }
@@ -130,64 +132,67 @@ export class PermissionsService {
       return { departments: depts, permissions, menuPages };
     }
 
-    // ── Non-admin: compute from user's own departments ─────────────────────────
-    const deptIds = new Set<string>();
-    const memberships = await this.prisma.userDepartment.findMany({ where: { userId: user?.userId ?? user?.id } });
-    memberships.forEach(m => deptIds.add(m.departmentId));
+    // ── Non-admin: department/role rows + per-person grants (same resolver as the guards) ──
+    const uid = user?.userId ?? user?.id;
+    const [effective, dbUser, memberships] = await Promise.all([
+      resolvePagePermissions(this.prisma, user ?? {}),
+      this.prisma.user.findUnique({ where: { id: uid }, select: { departmentId: true } }),
+      this.prisma.userDepartment.findMany({ where: { userId: uid }, select: { departmentId: true } }),
+    ]);
+    const deptIds = new Set<string>(memberships.map(m => m.departmentId));
+    if (dbUser?.departmentId) deptIds.add(dbUser.departmentId);
+    const depts = deptIds.size ? await this.prisma.department.findMany({ where: { id: { in: [...deptIds] } } }) : [];
 
-    if (deptIds.size === 0) {
-      // No departments → still return base pages so the user can see AI workspace, profile, etc.
-      const baseVisible = activePaths
-        ? BASE_PAGES.filter(p => activePaths.has(p))
-        : BASE_PAGES;
-      return {
-        departments: [],
-        permissions: baseVisible.map(p => ({ page: p, canRead: true, canWrite: false })),
-        menuPages: baseVisible,
-      };
+    const permissions: Array<{ page: string } & PageFlags> = [];
+    for (const [page, f] of effective) {
+      if (activePaths && !activePaths.has(page)) continue;
+      permissions.push({ page, ...f });
     }
-
-    const deptArray = Array.from(deptIds);
-    const perms = await this.prisma.pagePermission.findMany({
-      where: { departmentId: { in: deptArray }, role: { in: ['*', user?.role ?? ''] } },
-    });
-    const depts = await this.prisma.department.findMany({ where: { id: { in: deptArray } } });
-
-    // Merge by page: wildcard (*) sets base value; role-specific rows override it.
-    // This ensures an admin can revoke access for a specific role even if a * row grants it.
-    const wildcardMap = new Map<string, { canRead: boolean; canWrite: boolean }>();
-    const specificMap = new Map<string, { canRead: boolean; canWrite: boolean }>();
-    for (const p of perms) {
-      if (activePaths && !activePaths.has(p.page)) continue;
-      if (p.role === '*') {
-        wildcardMap.set(p.page, { canRead: p.canRead, canWrite: p.canWrite });
-      } else {
-        // OR across multiple role-specific rows (e.g., user belongs to 2 depts)
-        const cur = specificMap.get(p.page);
-        if (!cur) specificMap.set(p.page, { canRead: p.canRead, canWrite: p.canWrite });
-        else { cur.canRead = cur.canRead || p.canRead; cur.canWrite = cur.canWrite || p.canWrite; }
-      }
-    }
-    // Apply: wildcard first, then specific overrides
-    const pageMap = new Map<string, { canRead: boolean; canWrite: boolean }>();
-    for (const [page, v] of wildcardMap) pageMap.set(page, { ...v });
-    for (const [page, v] of specificMap) pageMap.set(page, { ...v });
-
-    const permissions = Array.from(pageMap.entries()).map(([page, v]) => ({ page, canRead: v.canRead, canWrite: v.canWrite }));
-    const menuPages = permissions.filter(p => p.canRead).map(p => p.page);
-
-    // Always include base pages (AI, profile, etc.) even if user has no dept-level permission
-    const baseVisible = activePaths
-      ? BASE_PAGES.filter(p => activePaths.has(p))
-      : BASE_PAGES;
-    const mergedMenuPages = Array.from(new Set([...menuPages, ...baseVisible]));
-    const mergedPermissions = [...permissions];
+    // Base pages (profile, my attendance, …) are always visible.
+    const baseVisible = activePaths ? BASE_PAGES.filter(p => activePaths.has(p)) : BASE_PAGES;
     for (const bp of baseVisible) {
-      if (!mergedPermissions.find(p => p.page === bp)) {
-        mergedPermissions.push({ page: bp, canRead: true, canWrite: false });
-      }
+      const cur = permissions.find(p => p.page === bp);
+      if (!cur) permissions.push({ page: bp, ...NO_FLAGS, canRead: true });
+      else cur.canRead = true;
     }
+    const menuPages = permissions.filter(p => p.canRead).map(p => p.page);
+    return { departments: depts, permissions, menuPages };
+  }
 
-    return { departments: depts, permissions: mergedPermissions, menuPages: mergedMenuPages };
+  /** The current user's flags on one page — drives which actions a page shows (view/create/edit/delete). */
+  async myPageFlags(user: any, page: string): Promise<PageFlags> {
+    if (user?.role === 'ADMIN') return { ...ALL_FLAGS };
+    if (BASE_PAGES.includes(page)) return { ...NO_FLAGS, canRead: true };
+    const perms = await resolvePagePermissions(this.prisma, user ?? {}, [page]);
+    return perms.get(page) ?? { ...NO_FLAGS };
+  }
+
+  // ── Per-person grants (UserPagePermission) ─────────────────────────────────
+
+  listUserGrants(userId?: string) {
+    return this.prisma.userPagePermission.findMany({
+      where: userId ? { userId } : {},
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, role: true, department: { select: { name: true } } } },
+        grantedBy: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: [{ userId: 'asc' }, { page: 'asc' }],
+    });
+  }
+
+  /** Create or update one person's grant; viewing is implied by any action flag. */
+  async upsertUserGrant(grantedById: string, dto: { userId: string; page: string } & Partial<PageFlags>) {
+    const flags: Partial<PageFlags> = {};
+    for (const k of ['canRead', 'canCreate', 'canWrite', 'canDelete'] as const) if (dto[k] !== undefined) flags[k] = !!dto[k];
+    if (flags.canCreate || flags.canWrite || flags.canDelete) flags.canRead = true;
+    return this.prisma.userPagePermission.upsert({
+      where: { userId_page: { userId: dto.userId, page: dto.page } },
+      update: { ...flags, grantedById },
+      create: { userId: dto.userId, page: dto.page, canRead: true, canCreate: false, canWrite: false, canDelete: false, ...flags, grantedById },
+    });
+  }
+
+  removeUserGrant(userId: string, page: string) {
+    return this.prisma.userPagePermission.deleteMany({ where: { userId, page } });
   }
 }

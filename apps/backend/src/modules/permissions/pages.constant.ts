@@ -54,6 +54,9 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/settings',            label: 'تنظیمات سامانه',        adminOnly: true },
   { page: '/dashboard/messaging',           label: 'پیام‌رسانی' },
 
+  // ── Admin metrics dashboard — ADMIN by default, grantable per department/role or per person ──
+  { page: '/dashboard/analytics',            label: 'داشبورد مدیریتی' },
+
   // ── Work log (ثبت عملکرد) ──
   { page: '/dashboard/work-log/my',          label: 'عملکرد من' },
   { page: '/dashboard/work-log/reports',     label: 'گزارش عملکرد کاربران' },

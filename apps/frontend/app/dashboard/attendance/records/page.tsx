@@ -9,6 +9,7 @@ import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
 import DayDetailModal from "../../../components/attendance/DayDetailModal";
 import Link from "next/link";
+import { usePagePerms } from "../../../../lib/permissions";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -183,12 +184,12 @@ export default function AttendanceRecordsPage() {
   }, [jYear, jMonth, jDay]);
   React.useEffect(() => { if (showUnmapped) loadUnmapped(); else setUnmapped([]); }, [showUnmapped, loadUnmapped]);
 
-  // Manual check-in/out entry (POST /attendance/overrides) is ADMIN/MANAGER-only server-side.
-  const [role, setRole] = React.useState<string | null>(null);
+  // Separate page flags (/dashboard/access): "ثبت" → manual entry page, "ویرایش" → edit in the
+  // day-detail modal. The API enforces both; this only decides what is offered.
+  const perms = usePagePerms("/dashboard/attendance/records");
   React.useEffect(() => {
-    fetch(`${API}/auth/me`, { headers: h }).then(r => r.ok ? r.json() : null).then(d => setRole(d?.role ?? null)).catch(() => {});
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
-    fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
+    fetch(`${API}/users/brief`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
     fetch(`${API}/attendance/records/periods`, { headers: h }).then(r => r.ok ? r.json() : []).then(p => setPeriods(Array.isArray(p) ? p : [])).catch(() => {});
     // eslint-disable-next-line
   }, []);
@@ -334,7 +335,7 @@ export default function AttendanceRecordsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link href="/dashboard/attendance" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> داشبورد</Link>
-          {(role === "ADMIN" || role === "MANAGER") && (
+          {perms?.canCreate && (
             <Link href={`/dashboard/attendance/records/new${userId ? `?userId=${userId}` : ""}`} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white">
               <Plus className="w-4 h-4" /> ثبت ورود/خروج
             </Link>
@@ -548,7 +549,7 @@ export default function AttendanceRecordsPage() {
         open={!!detail}
         onClose={() => setDetail(null)}
         detail={detail}
-        allowOverride
+        allowOverride={!!perms?.canWrite}
         ov={ov}
         setOv={setOv}
         onSaveOverride={saveOverride}

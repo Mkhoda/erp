@@ -27,7 +27,7 @@ export default function WorkLogReportsPage() {
 
   React.useEffect(() => {
     fetch(`${API}/auth/me`, { headers: h }).then(r => r.ok ? r.json() : null).then(d => setRole(d?.role ?? null)).catch(() => {});
-    fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(u => setUsers(Array.isArray(u) ? u : [])).catch(() => {});
+    fetch(`${API}/users/brief`, { headers: h }).then(r => r.ok ? r.json() : []).then(u => setUsers(Array.isArray(u) ? u : [])).catch(() => {});
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(d => setDepartments(Array.isArray(d) ? d : [])).catch(() => {});
   }, [h]);
 

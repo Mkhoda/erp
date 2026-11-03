@@ -44,10 +44,10 @@ export class MyWorkLogController {
   saveReport(@Req() req: any, @Body() body: any) { return this.service.saveReport(uid(req), body); }
 }
 
-// Admin / manager review + catalog management. Managers are scoped to their departments
-// inside the service; global (all-users) items and settings are ADMIN-only.
+// Review + catalog management for anyone who can see the page (department/role or per-person
+// grant). Non-admins are scoped to their own departments inside the service; global
+// (all-users) items and settings are ADMIN-only.
 @UseGuards(JwtAuthGuard, RolesGuard, PagePermissionGuard)
-@Roles('ADMIN', 'MANAGER')
 @Page('/dashboard/work-log/reports')
 @Controller('work-log/admin')
 export class AdminWorkLogController {

@@ -113,13 +113,21 @@ export const MENU: MenuItem[] = [
     isNew: true,
   },
 
-  // ── گزارش عملکرد کاربران (ADMIN, or managers granted the page) ──
+  // ── گزارش عملکرد کاربران — visible to whoever is granted the page ──
   {
     id: 'worklog.reports',
     title: 'گزارش عملکرد کاربران',
     page: '/dashboard/work-log/reports',
     icon: NotebookPen,
-    roles: ['ADMIN', 'MANAGER'],
+  },
+
+  // ── داشبورد مدیریتی — ADMIN, or anyone granted the page (department or per person) ──
+  {
+    id: 'analytics',
+    title: 'داشبورد مدیریتی',
+    page: '/dashboard/analytics',
+    icon: PieChart,
+    isNew: true,
   },
 
   // ── اطلاعیه‌ها — visible to all ───────────────────────────

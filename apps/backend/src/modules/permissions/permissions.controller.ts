@@ -44,6 +44,34 @@ export class PermissionsController {
     return this.service.menuForUser(user, departmentId);
   }
 
+  // ── The caller's own flags on one page (view/create/edit/delete) ───────────
+  @Get('my')
+  my(@Req() req: any, @Query('page') page: string) {
+    return this.service.myPageFlags(req.user, page);
+  }
+
+  // ── Per-person grants (in addition to department/role rows) — ADMIN only ───
+  @Get('users')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  listUserGrants(@Query('userId') userId?: string) {
+    return this.service.listUserGrants(userId);
+  }
+
+  @Post('users')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  upsertUserGrant(@Req() req: any, @Body() body: { userId: string; page: string; canRead?: boolean; canCreate?: boolean; canWrite?: boolean; canDelete?: boolean }) {
+    return this.service.upsertUserGrant(req.user.userId ?? req.user.id, body);
+  }
+
+  @Delete('users/:userId')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  removeUserGrant(@Param('userId') userId: string, @Query('page') page: string) {
+    return this.service.removeUserGrant(userId, page);
+  }
+
   // ── All permission rows with dept info — admin management UI ───────────────
   @Get('all')
   @UseGuards(RolesGuard)
@@ -64,9 +92,9 @@ export class PermissionsController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
-  upsert(@Body() body: { departmentId: string; page: string; role?: string; canRead?: boolean; canWrite?: boolean; canDelete?: boolean }) {
-    const { departmentId, page, role = '*', canRead, canWrite, canDelete } = body;
-    return this.service.upsert(departmentId, page, role, { canRead, canWrite, canDelete });
+  upsert(@Body() body: { departmentId: string; page: string; role?: string; canRead?: boolean; canCreate?: boolean; canWrite?: boolean; canDelete?: boolean }) {
+    const { departmentId, page, role = '*', canRead, canCreate, canWrite, canDelete } = body;
+    return this.service.upsert(departmentId, page, role, { canRead, canCreate, canWrite, canDelete });
   }
 
   // ── Sync defaults: upsert canRead=true rows for all pages × all depts ──────

@@ -4,15 +4,16 @@ import { pageTitle } from "../../../lib/branding";
 import {
   Lock, ShieldCheck, Building2, Check, X, RefreshCw, ChevronDown, Eye, Pencil, Trash2,
   Boxes, Users, BarChart3, Fingerprint, MapPin, Navigation,
-  LayoutDashboard, MessageSquare, User,
+  LayoutDashboard, MessageSquare, User, PlusCircle, ListTodo, PieChart, Layers, UserCheck,
 } from "lucide-react";
+import SearchSelect from "../../components/ui/SearchSelect";
 import { useToast } from "../../components/ui/Toast";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 type Dept = { id: string; name: string };
 type KnownPage = { page: string; label: string };
-type PermRow = { page: string; role: string; canRead: boolean; canWrite: boolean; canDelete: boolean };
+type PermRow = { page: string; role: string; canRead: boolean; canCreate?: boolean; canWrite: boolean; canDelete: boolean };
 
 const ADMIN_LOCKED = [
   "/dashboard/ai-settings",
@@ -28,6 +29,9 @@ const UNIVERSAL_PAGES = [
   "/dashboard/chat",
   "/dashboard/profile",
   "/dashboard/attendance/my",
+  "/dashboard/work-log/my",
+  "/dashboard/tickets/my",
+  "/dashboard/messaging",
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -42,33 +46,40 @@ const ROLE_COLORS: Record<string, string> = {
   USER: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
 };
 
-type Flags = { canRead: boolean; canWrite: boolean; canDelete: boolean };
+type Flags = { canRead: boolean; canCreate: boolean; canWrite: boolean; canDelete: boolean };
 type Matrix = Record<string, Record<CRole, Flags>>;
 
-const NONE: Flags = { canRead: false, canWrite: false, canDelete: false };
-const ALL: Flags = { canRead: true, canWrite: true, canDelete: true };
+const NONE: Flags = { canRead: false, canCreate: false, canWrite: false, canDelete: false };
 const emptyRow = (): Record<CRole, Flags> => ({ MANAGER: { ...NONE }, EXPERT: { ...NONE }, USER: { ...NONE } });
 
-// Pages whose API enforces add/edit and delete separately (PageAccessGuard on the backend)
-const ACTION_PAGES = new Set([
-  "/dashboard/assets",
-  "/dashboard/assets/types",
-  "/dashboard/assets/categories",
-  "/dashboard/assets/assignments",
-]);
+// Pages whose API enforces actions separately (PageAccessGuard on the backend), and which
+// actions each one distinguishes. Every other page is a single view on/off switch.
+const PAGE_ACTIONS: Record<string, (keyof Flags)[]> = {
+  "/dashboard/assets":             ["canRead", "canWrite", "canDelete"],
+  "/dashboard/assets/types":       ["canRead", "canWrite", "canDelete"],
+  "/dashboard/assets/categories":  ["canRead", "canWrite", "canDelete"],
+  "/dashboard/assets/assignments": ["canRead", "canWrite", "canDelete"],
+  "/dashboard/attendance/records": ["canRead", "canCreate", "canWrite"],
+};
+const actionsOf = (page: string): (keyof Flags)[] => PAGE_ACTIONS[page] ?? ["canRead"];
+const isActionPage = (page: string) => actionsOf(page).length > 1;
 
-const ACTIONS: { key: keyof Flags; label: string; icon: React.ElementType; on: string }[] = [
-  { key: "canRead",   label: "مشاهده",       icon: Eye,    on: "bg-emerald-500 border-emerald-400 text-white hover:bg-emerald-600" },
-  { key: "canWrite",  label: "ثبت و ویرایش", icon: Pencil, on: "bg-blue-500 border-blue-400 text-white hover:bg-blue-600" },
-  { key: "canDelete", label: "حذف",          icon: Trash2, on: "bg-red-500 border-red-400 text-white hover:bg-red-600" },
-];
+const ACTION_META: Record<keyof Flags, { label: string; icon: React.ElementType; on: string }> = {
+  canRead:   { label: "مشاهده", icon: Eye,        on: "bg-emerald-500 border-emerald-400 text-white hover:bg-emerald-600" },
+  canCreate: { label: "ثبت",    icon: PlusCircle, on: "bg-violet-500 border-violet-400 text-white hover:bg-violet-600" },
+  canWrite:  { label: "ویرایش", icon: Pencil,     on: "bg-blue-500 border-blue-400 text-white hover:bg-blue-600" },
+  canDelete: { label: "حذف",    icon: Trash2,     on: "bg-red-500 border-red-400 text-white hover:bg-red-600" },
+};
+// Pages without a separate create flag use canWrite for both adding and editing.
+const actionLabel = (page: string, key: keyof Flags) =>
+  key === "canWrite" && !actionsOf(page).includes("canCreate") ? "ثبت و ویرایش" : ACTION_META[key].label;
 
-/** Whether a role is fully granted on a page (every action on action pages, view otherwise) */
-const isFull = (page: string, f: Flags) => ACTION_PAGES.has(page) ? f.canRead && f.canWrite && f.canDelete : f.canRead;
+/** Whether a role/person is fully granted on a page (every action the page has) */
+const isFull = (page: string, f: Flags) => actionsOf(page).every(k => f[k]);
 
-/** Flags that grant/revoke a whole page for a role */
+/** Flags that grant/revoke a whole page */
 const fullFlags = (page: string, on: boolean): Partial<Flags> =>
-  ACTION_PAGES.has(page) ? (on ? ALL : NONE) : { canRead: on };
+  Object.fromEntries(actionsOf(page).map(k => [k, on]));
 
 type PageGroup = { id: string; title: string; icon: React.ElementType; pages: string[] };
 type Section = { id: string; title: string; groups: PageGroup[] };
@@ -107,6 +118,7 @@ const SECTIONS: Section[] = [
     id: "analysis",
     title: "تحلیل",
     groups: [
+      { id: "analytics", title: "داشبورد مدیریتی", icon: PieChart, pages: ["/dashboard/analytics"] },
       { id: "reports", title: "گزارش‌ها", icon: BarChart3, pages: ["/dashboard/reports"] },
     ],
   },
@@ -121,6 +133,7 @@ const SECTIONS: Section[] = [
         pages: [
           "/dashboard/attendance",
           "/dashboard/attendance/records",
+          "/dashboard/attendance/monthly",
           "/dashboard/attendance/calendar",
           "/dashboard/attendance/requests",
           "/dashboard/attendance/approvals",
@@ -129,6 +142,13 @@ const SECTIONS: Section[] = [
           "/dashboard/attendance/reports",
         ],
       },
+    ],
+  },
+  {
+    id: "worklog",
+    title: "عملکرد",
+    groups: [
+      { id: "worklog", title: "ثبت عملکرد", icon: ListTodo, pages: ["/dashboard/work-log/reports"] },
     ],
   },
 ];
@@ -147,6 +167,7 @@ const UNIVERSAL_DISPLAY = [
   { page: "/dashboard/chat",              label: "گفتگو با AI",       icon: MessageSquare },
   { page: "/dashboard/profile",           label: "پروفایل",           icon: User },
   { page: "/dashboard/attendance/my",     label: "حضور من",           icon: Fingerprint },
+  { page: "/dashboard/work-log/my",       label: "عملکرد من",         icon: ListTodo },
 ];
 
 export default function AccessPage() {
@@ -166,6 +187,8 @@ export default function AccessPage() {
     () => new Set(SECTIONS.flatMap(s => s.groups.map(g => g.id)))
   );
   const deptRef = React.useRef<HTMLDivElement>(null);
+  // "dept" = department/role matrix; "person" = per-person grants (added on top of the department result).
+  const [mode, setMode] = React.useState<"dept" | "person">("dept");
 
   React.useEffect(() => {
     const h = (e: MouseEvent) => { if (!deptRef.current?.contains(e.target as Node)) setDeptOpen(false); };
@@ -204,7 +227,7 @@ export default function AccessPage() {
     if (!res.ok) return;
     const rows: PermRow[] = await res.json();
     const m: Matrix = {};
-    const flagsOf = (r: PermRow): Flags => ({ canRead: r.canRead, canWrite: !!r.canWrite, canDelete: !!r.canDelete });
+    const flagsOf = (r: PermRow): Flags => ({ canRead: r.canRead, canCreate: !!r.canCreate, canWrite: !!r.canWrite, canDelete: !!r.canDelete });
     for (const p of pagesRef.current) m[p.page] = emptyRow();
     const wildcardValues: Record<string, Flags> = {};
     for (const r of rows) {
@@ -274,6 +297,16 @@ export default function AccessPage() {
     finally { setSaving(null); }
   }
 
+  // Any configurable page not placed in SECTIONS still gets a row, so a newly added page is
+  // never silently unmanageable from this screen.
+  const allSections = React.useMemo(() => {
+    const placed = new Set(SECTIONS.flatMap(sec => sec.groups.flatMap(g => g.pages)));
+    const rest = pages.map(p => p.page).filter(p => !placed.has(p));
+    return rest.length
+      ? [...SECTIONS, { id: "other", title: "سایر صفحات", groups: [{ id: "other", title: "سایر صفحات", icon: Layers, pages: rest }] }]
+      : SECTIONS;
+  }, [pages]);
+
   const pageMap = React.useMemo(() => {
     const m = new Map<string, string>();
     pages.forEach(p => m.set(p.page, p.label));
@@ -308,6 +341,18 @@ export default function AccessPage() {
         </button>
       </div>
 
+      {/* Mode switch */}
+      <div className="flex bg-theme-secondary border border-theme p-1 rounded-xl w-fit">
+        {([["dept", "بر اساس بخش و نقش", Building2], ["person", "دسترسی اختصاصی افراد", UserCheck]] as const).map(([k, l, I]) => (
+          <button key={k} onClick={() => setMode(k)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${mode === k ? "bg-theme-card shadow text-theme-primary" : "text-theme-muted"}`}>
+            <I className="w-3.5 h-3.5" /> {l}
+          </button>
+        ))}
+      </div>
+
+      {mode === "person" ? (
+        <PersonAccess sections={allSections} pageMap={pageMap} authH={authH} />
+      ) : (<>
       {/* Department selector */}
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-theme bg-theme-card">
         <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
@@ -384,7 +429,7 @@ export default function AccessPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {SECTIONS.map(section => {
+          {allSections.map(section => {
             const resolvedGroups = section.groups.map(group => ({
               ...group,
               resolvedPages: group.pages
@@ -489,10 +534,10 @@ export default function AccessPage() {
                                         const on = cur[role].canRead;
                                         const key = `${page}|${role}|canRead`;
                                         const isSaving = saving === key || saving === allKey || saving === groupKey;
-                                        if (ACTION_PAGES.has(page)) return (
+                                        if (isActionPage(page)) return (
                                           <td key={role} className="px-3 py-2.5 text-center">
                                             <div className="inline-flex items-center gap-1">
-                                              {ACTIONS.map(a => {
+                                              {actionsOf(page).map(k => ({ key: k, ...ACTION_META[k], label: actionLabel(page, k) })).map(a => {
                                                 const aOn = cur[role][a.key];
                                                 const aSaving = saving === `${page}|${role}|${a.key}` || saving === allKey || saving === groupKey;
                                                 return (
@@ -578,6 +623,8 @@ export default function AccessPage() {
         </div>
       )}
 
+      </>)}
+
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 px-4 py-2.5 rounded-xl border border-theme bg-theme-secondary/30">
         <span className="flex items-center gap-1.5 text-xs text-theme-muted">
@@ -588,13 +635,149 @@ export default function AccessPage() {
           <span className="w-4 h-4 rounded bg-theme-secondary border border-theme flex items-center justify-center"><X className="w-2.5 h-2.5" /></span>
           بدون دسترسی — از منوی کاربر پنهان می‌شود
         </span>
-        {ACTIONS.map(a => (
+        {(Object.keys(ACTION_META) as (keyof Flags)[]).map(k => ({ key: k, ...ACTION_META[k] })).map(a => (
           <span key={a.key} className="flex items-center gap-1.5 text-xs text-theme-muted">
             <span className={`w-4 h-4 rounded flex items-center justify-center ${a.on}`}><a.icon className="w-2.5 h-2.5" /></span>
-            {a.label} (صفحات دارایی)
+            {a.label}
           </span>
         ))}
         <span className="text-xs text-theme-muted mr-auto">مدیر ارشد (ADMIN) همیشه به تمام صفحات دسترسی دارد</span>
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════ Per-person grants (UserPagePermission) ═════════════════════
+// A grant here only ADDS to what the person's department/role already allows — it never
+// takes access away. Removing every flag on a page deletes the grant row.
+type Grant = { userId: string; page: string } & Flags & { user?: { firstName: string; lastName: string; department?: { name: string } | null } };
+
+function PersonAccess({ sections, pageMap, authH }: { sections: Section[]; pageMap: Map<string, string>; authH: Record<string, string> }) {
+  const toast = useToast();
+  const [users, setUsers] = React.useState<any[]>([]);
+  const [userId, setUserId] = React.useState("");
+  const [all, setAll] = React.useState<Grant[]>([]);
+  const [saving, setSaving] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetch(`${API}/users/brief`, { headers: authH }).then(r => r.ok ? r.json() : []).then(u => setUsers(Array.isArray(u) ? u : [])).catch(() => {});
+    // eslint-disable-next-line
+  }, []);
+
+  const loadAll = React.useCallback(async () => {
+    const r = await fetch(`${API}/permissions/users`, { headers: authH });
+    setAll(r.ok ? await r.json() : []);
+    // eslint-disable-next-line
+  }, []);
+  React.useEffect(() => { loadAll(); }, [loadAll]);
+
+  // ADMIN already has everything, so admins aren't offered here.
+  const personOptions = users.filter(u => u.role !== "ADMIN").map(u => ({
+    id: u.id, name: `${u.firstName} ${u.lastName}${u.department?.name ? ` — ${u.department.name}` : ""}`,
+    search: `${u.firstName} ${u.lastName} ${u.phone || ""} ${u.attendanceCardNo || ""}`,
+  }));
+  const grantOf = (page: string): Flags => {
+    const g = all.find(x => x.userId === userId && x.page === page);
+    return g ? { canRead: g.canRead, canCreate: !!g.canCreate, canWrite: !!g.canWrite, canDelete: !!g.canDelete } : { ...NONE };
+  };
+
+  async function save(page: string, next: Flags) {
+    setSaving(page);
+    try {
+      const empty = !next.canRead && !next.canCreate && !next.canWrite && !next.canDelete;
+      const res = empty
+        ? await fetch(`${API}/permissions/users/${userId}?page=${encodeURIComponent(page)}`, { method: "DELETE", headers: authH })
+        : await fetch(`${API}/permissions/users`, { method: "POST", headers: { "Content-Type": "application/json", ...authH }, body: JSON.stringify({ userId, page, ...next }) });
+      if (!res.ok) throw new Error();
+      await loadAll();
+    } catch { toast.error("خطا در ذخیره"); }
+    finally { setSaving(null); }
+  }
+
+  function toggle(page: string, k: keyof Flags) {
+    const cur = grantOf(page);
+    const next: Flags = { ...cur, [k]: !cur[k] };
+    if (k !== "canRead" && next[k]) next.canRead = true;            // any action implies view
+    if (k === "canRead" && !next.canRead) Object.assign(next, NONE);  // no view ⇒ nothing
+    save(page, next);
+  }
+
+  const byUser = React.useMemo(() => {
+    const m = new Map<string, Grant[]>();
+    for (const g of all) { const a = m.get(g.userId) || []; a.push(g); m.set(g.userId, a); }
+    return [...m.entries()];
+  }, [all]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl border border-theme bg-theme-card">
+        <UserCheck className="w-4 h-4 text-blue-500 shrink-0" />
+        <span className="text-sm font-medium text-theme-primary">شخص:</span>
+        <div className="w-80 max-w-full"><SearchSelect options={personOptions} value={userId} onChange={setUserId} searchKey="search" placeholder="جستجوی کاربر (نام/موبایل/کارت)" /></div>
+        <span className="text-xs text-theme-muted mr-auto">این دسترسی‌ها به دسترسی بخش و نقش شخص اضافه می‌شوند و چیزی را از او نمی‌گیرند.</span>
+      </div>
+
+      {userId ? (
+        <div className="space-y-3">
+          {sections.map(section => {
+            const rows = section.groups.flatMap(g => g.pages).filter(p => pageMap.has(p));
+            if (!rows.length) return null;
+            return (
+              <div key={section.id} className="rounded-xl border border-theme overflow-hidden bg-theme-card">
+                <div className="px-4 py-2 bg-theme-secondary/40 border-b border-theme text-xs font-bold text-theme-muted">{section.title}</div>
+                <div className="divide-y divide-theme">
+                  {rows.map(page => {
+                    const f = grantOf(page);
+                    const busy = saving === page;
+                    return (
+                      <div key={page} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                        <span className="flex-1 text-sm text-theme-primary">{pageMap.get(page)}</span>
+                        <div className="inline-flex items-center gap-1">
+                          {actionsOf(page).map(k => {
+                            const m = ACTION_META[k]; const on = f[k];
+                            return (
+                              <button key={k} onClick={() => toggle(page, k)} disabled={!!saving} title={`${actionLabel(page, k)}: ${on ? "دارد" : "ندارد"}`}
+                                className={`inline-flex items-center gap-1 h-7 px-2 rounded-md border text-[11px] transition-all ${busy ? "opacity-60 cursor-wait" : on ? m.on : "bg-theme-secondary border-theme text-theme-muted hover:border-slate-400"}`}>
+                                <m.icon className="w-3.5 h-3.5" /> {actionLabel(page, k)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-theme bg-theme-card py-10 text-center text-sm text-theme-muted">یک کاربر انتخاب کنید تا دسترسی‌های اختصاصی او را تنظیم کنید.</div>
+      )}
+
+      {/* Every per-person grant, for an at-a-glance audit */}
+      <div className="rounded-xl border border-theme overflow-hidden bg-theme-card">
+        <div className="px-4 py-2.5 border-b border-theme text-sm font-semibold text-theme-primary">همه دسترسی‌های اختصاصی ({all.length.toLocaleString("fa-IR")})</div>
+        {byUser.length === 0 ? (
+          <div className="py-6 text-center text-xs text-theme-muted">هنوز دسترسی اختصاصی ثبت نشده</div>
+        ) : (
+          <ul className="divide-y divide-theme">
+            {byUser.map(([uid, gs]) => (
+              <li key={uid} className="px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm">
+                <button onClick={() => setUserId(uid)} className="font-medium text-blue-600 hover:underline">{gs[0].user ? `${gs[0].user.firstName} ${gs[0].user.lastName}` : uid}</button>
+                {gs[0].user?.department?.name && <span className="text-xs text-theme-muted">({gs[0].user.department.name})</span>}
+                <span className="flex flex-wrap gap-1">
+                  {gs.map(g => (
+                    <span key={g.page} className="text-[11px] px-2 py-0.5 rounded-full bg-theme-secondary border border-theme text-theme-secondary">
+                      {pageMap.get(g.page) || g.page}
+                      {isActionPage(g.page) && `: ${actionsOf(g.page).filter(k => g[k]).map(k => actionLabel(g.page, k)).join("، ")}`}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

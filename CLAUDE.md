@@ -34,6 +34,7 @@ docker-compose.prod.yml     ← production stack
 - **messaging/** — Socket.IO gateway + REST: conversations, messages, reactions, presence, file upload, admin settings
 - **attendance/** — Full workforce management: raw punches, computed days, requests/approvals, work schedules, holidays, overrides
 - **todos/** — Per-user todo list (dashboard widget)
+- **analytics/** — read-only org-wide aggregates for `/dashboard/analytics`, gated by `@PageAccess` on that page
 - **work-log/** — ثبت عملکرد: categories/tasks (global, admin-assigned per user with deadline, or personal), per-user completion, daily time entries capped by attendance worked time, daily report with late flag; only the current Jalali month is writable. `WorkLogSettings` singleton (late grace, cap toggle)
 - **ai-settings/** / **chat-history/** / **quota/** — AI chat integration
 - **request-logs/** / **system-logs** — Audit/log infrastructure
@@ -72,7 +73,8 @@ docker-compose.prod.yml     ← production stack
 | `/dashboard/attendance/settings` | Attendance system settings | Admin |
 | `/dashboard/attendance/sync` | Sync monitor | Admin |
 | `/dashboard/work-log/my` | My daily tasks, time and work report | All |
-| `/dashboard/work-log/reports` | Users' work reports, catalog (categories/tasks), settings | Restricted (ADMIN/MANAGER) |
+| `/dashboard/work-log/reports` | Users' work reports, catalog (categories/tasks), settings | Restricted |
+| `/dashboard/analytics` | Admin metrics dashboard (tabs: overview, attendance, assets, work log, tickets, system) | ADMIN; grantable per dept/role or per person |
 | `/dashboard/security/sessions` | Session management | Admin |
 | `/dashboard/settings` | System settings (5 tabs) | Admin |
 | `/dashboard/access` | Page permission editor | Admin |
@@ -142,7 +144,7 @@ If the new page replaces old standalone pages (e.g., `/dashboard/settings` absor
 - `JwtAuthGuard`, `RolesGuard`, `PagePermissionGuard`
 - `@Roles()`, `@Page()`
 - Managers are dept-scoped (see only their dept's users/assets)
-- Permissions: dept-based, OR-merged across user's departments, `canRead`/`canWrite` per role
+- Permissions: `resolvePagePermissions()` (`permissions/page-perms.util.ts`) is the single resolver for both guards and the menu — department rows (primary dept + memberships; per dept a role-specific row overrides `*`; OR-ed across depts) plus per-person `UserPagePermission` grants OR-ed on top (grants only add). Flags: `canRead`/`canCreate`/`canWrite`/`canDelete`; `canCreate` is only used by endpoints that opt in with `@PageAccess({ action: 'create' })` (e.g. `POST /attendance/manual-entry`), otherwise POST/PATCH map to write. Frontend: `usePagePerms(page)` (`lib/permissions.ts`) decides which actions a page offers; which actions a page exposes in /dashboard/access is `PAGE_ACTIONS` there. People pickers outside /dashboard/users use `GET /users/brief`.
 
 ### JWT Payload (since 2026-07)
 ```typescript

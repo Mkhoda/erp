@@ -7,6 +7,7 @@ import SearchSelect from "../../../../components/ui/SearchSelect";
 import JalaliDatePicker from "../../../../components/ui/JalaliDatePicker";
 import TimeSelect from "../../../../components/ui/TimeSelect";
 import { useToast } from "../../../../components/ui/Toast";
+import { usePagePerms } from "../../../../../lib/permissions";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -21,9 +22,9 @@ const todayTehran = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Teh
 type Form = { inTime: string; outTime: string; clearCheckIn: boolean; clearCheckOut: boolean; status: string; leaveHours: string; isSickLeave: boolean; attachment: string; reason: string };
 const EMPTY: Form = { inTime: "", outTime: "", clearCheckIn: false, clearCheckOut: false, status: "", leaveHours: "", isSickLeave: false, attachment: "", reason: "" };
 
-// Manual entry of a day's check-in/check-out (and optional status/leave) by an
-// admin/manager. Writes an AttendanceOverride through the same endpoint as the
-// records page's day-detail edit, so the engine recomputes the day immediately.
+// Manual entry of a day's check-in/check-out (and optional status/leave). Writes an
+// AttendanceOverride (POST /attendance/manual-entry — same mechanics as the day-detail
+// edit, but gated by the page's "ثبت" flag), so the engine recomputes the day immediately.
 export default function NewAttendanceRecordPage() {
   React.useEffect(() => { document.title = pageTitle("ثبت دستی ورود و خروج"); }, []);
   const toast = useToast();
@@ -39,6 +40,8 @@ export default function NewAttendanceRecordPage() {
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const [error, setError] = React.useState("");
+  // Manual entry needs the records page's separate "ثبت" flag (POST /attendance/manual-entry).
+  const perms = usePagePerms("/dashboard/attendance/records");
 
   // ?userId=&date= prefill (read after mount so server and client render the same first frame).
   React.useEffect(() => {
@@ -48,7 +51,7 @@ export default function NewAttendanceRecordPage() {
   }, []);
 
   React.useEffect(() => {
-    fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(u => setUsers(Array.isArray(u) ? u : [])).catch(() => {});
+    fetch(`${API}/users/brief`, { headers: h }).then(r => r.ok ? r.json() : []).then(u => setUsers(Array.isArray(u) ? u : [])).catch(() => {});
     // eslint-disable-next-line
   }, []);
 
@@ -105,7 +108,7 @@ export default function NewAttendanceRecordPage() {
     if (sick && !f.attachment) { setError("برای مرخصی استعلاجی، بارگذاری تصویر برگه مرخصی (گواهی پزشک) الزامی است"); return; }
     setSaving(true);
     try {
-      const res = await fetch(`${API}/attendance/overrides`, {
+      const res = await fetch(`${API}/attendance/manual-entry`, {
         method: "POST", headers: h,
         body: JSON.stringify({
           userId, date,
@@ -149,6 +152,11 @@ export default function NewAttendanceRecordPage() {
         <Link href="/dashboard/attendance/records" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> کارکرد روزانه</Link>
       </div>
 
+      {perms && !perms.canCreate ? (
+        <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-sm text-amber-700 dark:text-amber-300">
+          <AlertCircle className="w-4 h-4 shrink-0" /> شما مجوز ثبت دستی ورود و خروج را ندارید. این دسترسی از صفحه «دسترسی صفحات» (گزینه‌ی «ثبت» برای کارکرد روزانه) داده می‌شود.
+        </div>
+      ) : (<>
       {/* Who + when */}
       <div className="bg-theme-card border border-theme rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -257,6 +265,7 @@ export default function NewAttendanceRecordPage() {
           </div>
         )}
       </div>
+      </>)}
     </div>
   );
 }

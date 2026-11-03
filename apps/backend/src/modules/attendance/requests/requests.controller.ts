@@ -4,6 +4,7 @@ import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { Page } from '../../permissions/page.decorator';
 import { PagePermissionGuard } from '../../permissions/page.guard';
+import { PageAccess, PageAccessGuard } from '../../permissions/page-access.guard';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RequestsService } from './requests.service';
 import { resolveDeptScope } from '../scope.util';
@@ -42,12 +43,20 @@ export class RequestsController {
     return this.requests.decide(id, body.decision, req.user.userId, body.note);
   }
 
-  // Direct admin edit of a user's check-in/out (used from the records page).
+  // Editing a day from the records page's detail modal — needs the page's "ویرایش" flag.
   @Post('overrides')
-  @Page('/dashboard/attendance/records')
-  @UseGuards(PagePermissionGuard)
-  @Roles('ADMIN', 'MANAGER')
+  @PageAccess({ pages: ['/dashboard/attendance/records'], action: 'write' })
+  @UseGuards(PageAccessGuard)
   override(@Req() req: any, @Body() body: any) {
     return this.requests.adminOverride(req.user.userId, body);
+  }
+
+  // Manual check-in/out entry (records/new page) — needs the page's separate "ثبت" flag.
+  // Same override mechanics as editing; only the permission differs.
+  @Post('manual-entry')
+  @PageAccess({ pages: ['/dashboard/attendance/records'], action: 'create' })
+  @UseGuards(PageAccessGuard)
+  manualEntry(@Req() req: any, @Body() body: any) {
+    return this.requests.adminOverride(req.user.userId, { ...body, reason: body?.reason || 'ثبت دستی توسط مدیر' });
   }
 }
