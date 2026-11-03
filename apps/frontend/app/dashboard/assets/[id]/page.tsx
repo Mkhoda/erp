@@ -236,6 +236,7 @@ export default function AssetDetailPage() {
                   ['وضعیت فیزیکی', COND_FA[asset.condition] || asset.condition],
                   ['دسته‌بندی', asset.category?.name],
                   ['نوع', asset.type?.name],
+                  ['تعلق', asset.owner?.name],
                   ['شماره سریال', asset.serialNumber],
                   ['مکان', asset.location],
                   ['تاریخ خرید', faDate(asset.purchaseDate)],

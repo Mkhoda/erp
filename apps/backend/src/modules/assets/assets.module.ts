@@ -11,9 +11,10 @@ import { BuildingsController } from './buildings.controller';
 import { FloorsController } from './floors.controller';
 import { RoomsController } from './rooms.controller';
 import { AssetTypesController } from './types.controller';
+import { AssetOwnersController } from './owners.controller';
 
 @Module({
-  controllers: [AssetsController, AssetCategoriesController, AssetAssignmentsController, AssetsReportController, UploadController, BuildingsController, FloorsController, RoomsController, AssetTypesController],
+  controllers: [AssetsController, AssetCategoriesController, AssetAssignmentsController, AssetsReportController, UploadController, BuildingsController, FloorsController, RoomsController, AssetTypesController, AssetOwnersController],
   providers: [AssetsService, AssetCategoriesService, PrismaService],
 })
 export class AssetsModule {}

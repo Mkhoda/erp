@@ -181,6 +181,8 @@ model Asset {
   condition    AssetCondition
   categoryId   String
   category     AssetCategory      @relation(fields: [categoryId], references: [id])
+  ownerId      String? // تعلق: the organization/company the asset belongs to
+  owner        AssetOwner?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   availability AssetAvailability  @default(AVAILABLE)
   barcodeType  BarcodeType        @default(QR)
   serialNumber String?
@@ -196,6 +198,8 @@ model Asset {
   createdBy    User?              @relation(fields: [createdById], references: [id])
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
+
+  @@index([ownerId])
 }
 
 model AssetImage {
@@ -1663,4 +1667,15 @@ model UserPagePermission {
 
   @@unique([userId, page])
   @@index([page])
+}
+
+// تعلق — organizations/companies an asset can belong to (managed from the assets page).
+model AssetOwner {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  assets      Asset[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
