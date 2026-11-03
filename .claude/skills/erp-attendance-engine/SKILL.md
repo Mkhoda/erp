@@ -129,7 +129,11 @@ touching any single line.
     - `deficitMinutes > 0` + `deficitToLeaveEnabled` ⇒ converts **only the shortfall amount**
       from balance (`Math.min(deficitMinutes, remaining)`), never inflated to a full day just
       because balance ran low — a 10-minute deficit must never cost a full day of leave.
-13. **Upsert** `AttendanceDay` by `(userId, gregDate)` unique constraint — the function is fully
+13. **Remote work** — a final `REMOTE_WORK` status sets `remoteMinutes = sched.dailyMinutes`
+    (remote work is whole-day only) and `remoteOvertimeMinutes = remoteMinutes ×
+    WorkSchedule.remoteOtPercent / 100`. That OT-equivalent is reporting-only: never added to
+    `overtimeMinutes`, not subject to the monthly OT cap. Guard engine doesn't set these.
+14. **Upsert** `AttendanceDay` by `(userId, gregDate)` unique constraint — the function is fully
     idempotent; it never reads or mutates `RawAttendanceRecord`, so re-running it any number of
     times on the same inputs reproduces the same row.
 

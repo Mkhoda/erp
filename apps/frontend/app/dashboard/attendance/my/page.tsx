@@ -372,7 +372,7 @@ export default function MyAttendancePage() {
       )}
 
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
           <Sum label="روزها" value={faNum(summary.days)} />
           <Sum label="کارکرد" value={fmtMin(summary.workedMinutes)} />
           <Sum label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" />
@@ -383,6 +383,8 @@ export default function MyAttendancePage() {
           <Sum label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" />
           <Sum label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" />
           <Sum label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" />
+          <Sum label={`دورکاری (${faNum(summary.remoteDays || 0)} روز)`} value={fmtMin(summary.remoteMinutes || 0)} cls="text-cyan-600" />
+          <Sum label="اضافه‌کار دورکاری" value={fmtMin(summary.remoteOvertimeMinutes || 0)} cls="text-cyan-700" />
         </div>
       )}
 

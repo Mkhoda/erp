@@ -81,7 +81,7 @@ export class RecordsService {
     const [agg, byStatus, byDate, hourlyAgg] = await Promise.all([
       this.prisma.attendanceDay.aggregate({
         where,
-        _sum: { workedMinutes: true, overtimeMinutes: true, holidayOvertimeMinutes: true, delayMinutes: true, earlyLeaveMinutes: true, deficitMinutes: true, nightMinutes: true },
+        _sum: { workedMinutes: true, overtimeMinutes: true, holidayOvertimeMinutes: true, delayMinutes: true, earlyLeaveMinutes: true, deficitMinutes: true, nightMinutes: true, remoteMinutes: true, remoteOvertimeMinutes: true },
         _count: true,
       }),
       this.prisma.attendanceDay.groupBy({ by: ['status'], where, _count: true }),
@@ -107,6 +107,9 @@ export class RecordsService {
       earlyLeaveMinutes: agg._sum.earlyLeaveMinutes ?? 0,
       deficitMinutes: agg._sum.deficitMinutes ?? 0,
       nightMinutes: agg._sum.nightMinutes ?? 0,
+      remoteMinutes: agg._sum.remoteMinutes ?? 0,
+      remoteOvertimeMinutes: agg._sum.remoteOvertimeMinutes ?? 0,
+      remoteDays: statusCounts['REMOTE_WORK'] ?? 0,
       hourlyLeaveMinutes: hourlyAgg._sum.leaveMinutes ?? 0,
       leaveDays: statusCounts['LEAVE'] ?? 0,
       statusCounts,
@@ -150,7 +153,7 @@ export class RecordsService {
       this.prisma.attendanceDay.groupBy({
         by: ['userId', 'jYear', 'jMonth'],
         where,
-        _sum: { workedMinutes: true, overtimeMinutes: true, holidayOvertimeMinutes: true, delayMinutes: true, earlyLeaveMinutes: true, deficitMinutes: true, nightMinutes: true },
+        _sum: { workedMinutes: true, overtimeMinutes: true, holidayOvertimeMinutes: true, delayMinutes: true, earlyLeaveMinutes: true, deficitMinutes: true, nightMinutes: true, remoteMinutes: true, remoteOvertimeMinutes: true },
         _count: true,
       }),
       // Hourly leave = leaveMinutes on non-full-leave days (same convention as summary()/leaveBalance()).
@@ -193,6 +196,8 @@ export class RecordsService {
         overtimeMinutes: r._sum.overtimeMinutes ?? 0,
         holidayOvertimeMinutes: r._sum.holidayOvertimeMinutes ?? 0,
         nightMinutes: r._sum.nightMinutes ?? 0,
+        remoteMinutes: r._sum.remoteMinutes ?? 0,
+        remoteOvertimeMinutes: r._sum.remoteOvertimeMinutes ?? 0,
       };
     });
 

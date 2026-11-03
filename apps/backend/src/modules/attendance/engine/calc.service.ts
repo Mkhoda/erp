@@ -46,6 +46,9 @@ export interface EffectiveSchedule {
   // leave of any size is always treated as partial (no cap).
   maxDailyLeaveEnabled: boolean;
   maxDailyLeaveMinutes: number;
+  // Share (0-100) of a remote-work day's time reported as overtime-equivalent
+  // (remoteOvertimeMinutes) — shown on its own, never added to overtimeMinutes.
+  remoteOtPercent: number;
 }
 
 // Hardcoded fallback matching the WorkSchedule schema defaults — used when no
@@ -74,6 +77,7 @@ const DEFAULTS: EffectiveSchedule = {
   absentToLeaveEnabled: true,
   maxDailyLeaveEnabled: true,
   maxDailyLeaveMinutes: 210,   // 3:30
+  remoteOtPercent: 0,
 };
 
 @Injectable()
@@ -116,6 +120,7 @@ export class CalcService {
       s.absentToLeaveEnabled = base.absentToLeaveEnabled;
       s.maxDailyLeaveEnabled = base.maxDailyLeaveEnabled;
       s.maxDailyLeaveMinutes = base.maxDailyLeaveMinutes;
+      s.remoteOtPercent = base.remoteOtPercent;
     }
     if (rule) {
       s.employeeType = rule.employeeType as 'FULL_TIME' | 'HOURLY';
@@ -529,9 +534,16 @@ export class CalcService {
       }
     }
 
+    // Remote work (دورکاری) is whole-day only (approved REMOTE_WORK request, or a
+    // company remote-work day with no punch), so its time is the day's required
+    // hours. The overtime-equivalent share is reported separately — it is NOT
+    // added to overtimeMinutes and does not count against the monthly OT cap.
+    const remoteMinutes = status === AttendanceStatus.REMOTE_WORK ? sched.dailyMinutes : 0;
+    const remoteOvertimeMinutes = Math.round(remoteMinutes * Math.min(100, Math.max(0, sched.remoteOtPercent)) / 100);
+
     return {
       jYear, jMonth, jDay,
-      firstCheckIn: firstIn, lastCheckOut: lastOut,
+      firstCheckIn: firstIn, lastCheckOut: lastOut, remoteMinutes, remoteOvertimeMinutes,
       workedMinutes, overtimeMinutes, holidayOvertimeMinutes,
       delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes, sickLeaveMinutes,
       autoConvertedLeave, status, isHolidayWork, hasOverride: !!override,

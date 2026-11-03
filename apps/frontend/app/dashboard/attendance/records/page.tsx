@@ -3,7 +3,7 @@ import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
   FileSpreadsheet, FileText, Loader2, Clock, Fingerprint, ArrowLeft, Eye, ScrollText, Filter,
-  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon, ChevronDown, X, Plus,
+  CalendarDays, AlarmClock, LogOut, TrendingDown, Hourglass, CalendarCheck, TrendingUp, CalendarOff, Moon, ChevronDown, X, Plus, House,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
@@ -37,7 +37,8 @@ function liveStatus(r: any): string {
 // leave = leaveMinutes on non-full-leave days) so the modal total matches
 // the card.
 type MetricKey = "distinctDays" | "workedMinutes" | "delayMinutes" | "earlyLeaveMinutes" | "deficitMinutes"
-  | "hourlyLeaveMinutes" | "leaveDays" | "overtimeMinutes" | "holidayOvertimeMinutes" | "nightMinutes";
+  | "hourlyLeaveMinutes" | "leaveDays" | "overtimeMinutes" | "holidayOvertimeMinutes" | "nightMinutes"
+  | "remoteMinutes" | "remoteOvertimeMinutes";
 const METRICS: Record<MetricKey, { label: string; valueLabel: string; matches: (r: any) => boolean; value: (r: any) => number; unit: "min" | "day" }> = {
   distinctDays: { label: "روزهای دارای داده", valueLabel: "کارکرد", matches: () => true, value: (r) => r.workedMinutes || 0, unit: "min" },
   workedMinutes: { label: "کارکرد", valueLabel: "کارکرد", matches: (r) => (r.workedMinutes || 0) > 0, value: (r) => r.workedMinutes || 0, unit: "min" },
@@ -49,6 +50,8 @@ const METRICS: Record<MetricKey, { label: string; valueLabel: string; matches: (
   overtimeMinutes: { label: "اضافه‌کار عادی", valueLabel: "اضافه‌کار", matches: (r) => (r.overtimeMinutes || 0) > 0, value: (r) => r.overtimeMinutes || 0, unit: "min" },
   holidayOvertimeMinutes: { label: "تعطیل‌کاری", valueLabel: "تعطیل‌کاری", matches: (r) => (r.holidayOvertimeMinutes || 0) > 0, value: (r) => r.holidayOvertimeMinutes || 0, unit: "min" },
   nightMinutes: { label: "شب‌کاری", valueLabel: "شب‌کاری", matches: (r) => (r.nightMinutes || 0) > 0, value: (r) => r.nightMinutes || 0, unit: "min" },
+  remoteMinutes: { label: "دورکاری", valueLabel: "دورکاری", matches: (r) => (r.remoteMinutes || 0) > 0, value: (r) => r.remoteMinutes || 0, unit: "min" },
+  remoteOvertimeMinutes: { label: "اضافه‌کار دورکاری", valueLabel: "اضافه‌کار دورکاری", matches: (r) => (r.remoteOvertimeMinutes || 0) > 0, value: (r) => r.remoteOvertimeMinutes || 0, unit: "min" },
 };
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 const fmtDH = (days: number) => { const d = Math.floor(days); const h = Math.round((days - d) * 8); return h > 0 ? `${faNum(d)} روز و ${faNum(h)} ساعت` : `${faNum(d)} روز`; };
@@ -401,7 +404,7 @@ export default function AttendanceRecordsPage() {
 
       {/* Summary — click a card (or its icon) to see which days/hours make up that total */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
           <SumCard label="روزهای دارای داده" value={faNum(summary.distinctDays ?? summary.days)} icon={CalendarDays} iconCls="bg-sky-500/10 text-sky-600" onClick={() => setBreakdown("distinctDays")} />
           <SumCard label="کارکرد" value={fmtMin(summary.workedMinutes)} icon={Fingerprint} iconCls="bg-emerald-500/10 text-emerald-600" onClick={() => setBreakdown("workedMinutes")} />
           <SumCard label="تاخیر" value={fmtMin(summary.delayMinutes)} cls="text-amber-600" icon={AlarmClock} iconCls="bg-amber-500/10 text-amber-600" onClick={() => setBreakdown("delayMinutes")} />
@@ -412,6 +415,9 @@ export default function AttendanceRecordsPage() {
           <SumCard label="اضافه‌کار عادی" value={fmtMin(summary.overtimeMinutes)} cls="text-violet-600" icon={TrendingUp} iconCls="bg-violet-500/10 text-violet-600" onClick={() => setBreakdown("overtimeMinutes")} />
           <SumCard label="تعطیل‌کاری" value={fmtMin(summary.holidayOvertimeMinutes)} cls="text-rose-600" icon={CalendarOff} iconCls="bg-rose-500/10 text-rose-600" onClick={() => setBreakdown("holidayOvertimeMinutes")} />
           <SumCard label="شب‌کاری" value={fmtMin(summary.nightMinutes)} cls="text-slate-600" icon={Moon} iconCls="bg-slate-500/10 text-slate-600" onClick={() => setBreakdown("nightMinutes")} />
+          {/* Remote-work OT-equivalent is informational only — never part of اضافه‌کار عادی above. */}
+          <SumCard label={`دورکاری (${faNum(summary.remoteDays || 0)} روز)`} value={fmtMin(summary.remoteMinutes || 0)} cls="text-cyan-600" icon={House} iconCls="bg-cyan-500/10 text-cyan-600" onClick={() => setBreakdown("remoteMinutes")} />
+          <SumCard label="اضافه‌کار دورکاری" value={fmtMin(summary.remoteOvertimeMinutes || 0)} cls="text-cyan-700" icon={TrendingUp} iconCls="bg-cyan-500/10 text-cyan-700" onClick={() => setBreakdown("remoteOvertimeMinutes")} />
         </div>
       )}
 
@@ -618,6 +624,7 @@ function RulesPanel({ rules: r }: { rules: any }) {
       items: [
         `نوع استخدام: ${r.employeeType === "HOURLY" ? "ساعتی (فقط حضور، بدون تاخیر/اضافه‌کار)" : "تمام‌وقت"}`,
         `مرخصی استحقاقی سالانه: ${faNum(r.annualLeaveDays)} روز`,
+        `دورکاری: هر روز دورکاری معادل ${fmtMin(r.dailyMinutes)} حساب می‌شود${r.remoteOtPercent > 0 ? `؛ ${faNum(r.remoteOtPercent)}٪ آن به‌عنوان اضافه‌کار دورکاری (جدا از اضافه‌کار عادی) نمایش داده می‌شود` : ""}`,
       ],
     },
   ];

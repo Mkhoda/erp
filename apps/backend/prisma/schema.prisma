@@ -673,6 +673,8 @@ model AttendanceDay {
   leaveMinutes      Int              @default(0)        // approved annual leave for the day (hourly or full)
   sickLeaveMinutes  Int              @default(0)        // approved sick leave for the day (hourly or full) — separate balance pool from leaveMinutes
   autoConvertedLeave Boolean         @default(false)    // leaveMinutes/status here came from automatic deficit→hourly or absence→daily conversion, not an approved request
+  remoteMinutes          Int         @default(0)        // دورکاری: a REMOTE_WORK day counts as the group's dailyMinutes
+  remoteOvertimeMinutes  Int         @default(0)        // remoteMinutes × WorkSchedule.remoteOtPercent — reported on its own, never added to overtimeMinutes
   status            AttendanceStatus
   isHolidayWork     Boolean          @default(false)
   shiftId           String?
@@ -738,6 +740,7 @@ model WorkSchedule {
   absentToLeaveEnabled  Boolean @default(true)          // auto-convert an ABSENT day to LEAVE when annual balance allows
   maxDailyLeaveEnabled  Boolean @default(true)          // cap hourly leave granted in a single day
   maxDailyLeaveMinutes  Int     @default(210) @map("hourlyLeaveCapMinutes") // above this (3:30) the day becomes full LEAVE + worked time → overtime; reuses a pre-existing unused DB column
+  remoteOtPercent       Int     @default(0)             // share (0-100%) of remote-work time reported as overtime-equivalent (AttendanceDay.remoteOvertimeMinutes)
   userRules      UserAttendanceRule[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

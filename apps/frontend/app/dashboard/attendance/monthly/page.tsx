@@ -190,6 +190,8 @@ export default function AttendanceMonthlyReportPage() {
     { key: "overtime", label: "اضافه‌کار عادی", cls: "text-violet-600", render: r => r.overtimeMinutes ? <span dir="ltr">{fmtMin(r.overtimeMinutes)}</span> : "—" },
     { key: "holidayOt", label: "تعطیل‌کاری", cls: "text-rose-600", render: r => r.holidayOvertimeMinutes ? <span dir="ltr">{fmtMin(r.holidayOvertimeMinutes)}</span> : "—" },
     { key: "night", label: "شب‌کاری", cls: "text-slate-600", render: r => r.nightMinutes ? <span dir="ltr">{fmtMin(r.nightMinutes)}</span> : "—" },
+    { key: "remote", label: "دورکاری", cls: "text-cyan-600", render: r => r.remoteMinutes ? <span dir="ltr">{fmtMin(r.remoteMinutes)}</span> : "—" },
+    { key: "remoteOt", label: "اضافه‌کار دورکاری", cls: "text-cyan-700", render: r => r.remoteOvertimeMinutes ? <span dir="ltr">{fmtMin(r.remoteOvertimeMinutes)}</span> : "—" },
   ];
 
   return (
