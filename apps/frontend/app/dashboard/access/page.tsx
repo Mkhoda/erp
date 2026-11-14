@@ -4,7 +4,7 @@ import { pageTitle } from "../../../lib/branding";
 import {
   Lock, ShieldCheck, Building2, Check, X, RefreshCw, ChevronDown, Eye, Pencil, Trash2,
   Boxes, Users, BarChart3, Fingerprint, MapPin, Navigation,
-  LayoutDashboard, MessageSquare, User, PlusCircle, ListTodo, PieChart, Layers, UserCheck,
+  LayoutDashboard, MessageSquare, User, Globe, Biohazard, PlusCircle, ListTodo, PieChart, Layers, UserCheck,
 } from "lucide-react";
 import SearchSelect from "../../components/ui/SearchSelect";
 import { useToast } from "../../components/ui/Toast";
@@ -32,6 +32,8 @@ const UNIVERSAL_PAGES = [
   "/dashboard/work-log/my",
   "/dashboard/tickets/my",
   "/dashboard/messaging",
+  "/dashboard/worldmonitor",
+  "/dashboard/biosecurity",
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -168,6 +170,8 @@ const UNIVERSAL_DISPLAY = [
   { page: "/dashboard/profile",           label: "پروفایل",           icon: User },
   { page: "/dashboard/attendance/my",     label: "حضور من",           icon: Fingerprint },
   { page: "/dashboard/work-log/my",       label: "عملکرد من",         icon: ListTodo },
+  { page: "/dashboard/worldmonitor",      label: "پایش جهانی",        icon: Globe },
+  { page: "/dashboard/biosecurity",       label: "پایش امنیت زیستی",  icon: Biohazard },
 ];
 
 export default function AccessPage() {

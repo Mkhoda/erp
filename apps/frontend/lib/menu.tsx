@@ -37,6 +37,7 @@ import {
   Megaphone,
   CalendarRange,
   ListTodo,
+  Biohazard,
   NotebookPen,
 } from "lucide-react";
 
@@ -94,6 +95,15 @@ export const MENU: MenuItem[] = [
     title: 'پایش جهانی',
     page: '/dashboard/worldmonitor',
     icon: Globe,
+  },
+
+  // ── پایش امنیت زیستی — visible to all ─────────────────────
+  {
+    id: 'biosecurity',
+    title: 'پایش امنیت زیستی',
+    page: '/dashboard/biosecurity',
+    icon: Biohazard,
+    isNew: true,
   },
 
   // ── تیکت‌های من — visible to all ──────────────────────────

@@ -53,6 +53,8 @@ docker-compose.prod.yml     ← production stack
 | `/dashboard/profile` | User profile (incl. password change, "security" tab) | All |
 | `/dashboard/chat` | AI chat | All |
 | `/dashboard/messaging` | Real-time internal messaging | All |
+| `/dashboard/worldmonitor` | World Monitor (opens worldmonitor.app in a new tab) | All |
+| `/dashboard/biosecurity` | Biosecurity monitor (opens http://ai.arzesh.net:8095 in a new tab — HTTP-only, can't be embedded) | All |
 | `/dashboard/assets` | Asset list | Restricted |
 | `/dashboard/assets/[id]` | Asset detail | Restricted |
 | `/dashboard/assets/types` | Asset types | Restricted |

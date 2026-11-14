@@ -18,6 +18,8 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard',                    label: 'نمای کلی' },
   { page: '/dashboard/chat',               label: 'گفتگو با AI' },
   { page: '/dashboard/profile',            label: 'پروفایل' },
+  { page: '/dashboard/worldmonitor',       label: 'پایش جهانی' },
+  { page: '/dashboard/biosecurity',        label: 'پایش امنیت زیستی' },
 
   // ── ERP pages (restricted by dept + role) ──
   { page: '/dashboard/assets',             label: 'دارایی‌ها' },

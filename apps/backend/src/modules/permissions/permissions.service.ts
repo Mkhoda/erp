@@ -12,6 +12,8 @@ const BASE_PAGES = [
   '/dashboard/attendance/my',
   '/dashboard/tickets/my',
   '/dashboard/work-log/my',
+  '/dashboard/worldmonitor',
+  '/dashboard/biosecurity',
 ];
 
 @Injectable()
