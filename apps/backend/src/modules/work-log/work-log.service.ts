@@ -6,6 +6,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { parseWorkDate } from '../attendance/scope.util';
 import { dayOfWeek, jalaliMonthRange, tehranMidnightInstant, toJalaliParts, workDateOf } from '../attendance/engine/jalali.util';
 
+const MAX_PERSONAL_CATEGORIES = 5;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_RANGE_DAYS = 62;
 const USER_BRIEF = { id: true, firstName: true, lastName: true, attendanceCardNo: true, department: { select: { id: true, name: true } } } as const;
@@ -172,7 +174,8 @@ export class WorkLogService {
       this.prisma.attendanceDay.findUnique({ where: { userId_gregDate: { userId, gregDate: date } } }),
       this.prisma.workLogCategory.findMany({
         where: { archived: false, ...this.visibleTo(userId) },
-        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        // Global categories first in their fixed priority, then the user's own in the order they set.
+        orderBy: [{ userId: { sort: 'asc', nulls: 'first' } }, { sortOrder: 'asc' }, { name: 'asc' }],
       }),
       this.prisma.workTask.findMany({
         // The user's own list: their personal + admin-assigned tasks, global tasks with a deadline
@@ -269,11 +272,24 @@ export class WorkLogService {
     };
   }
 
-  // Categories (personal)
+  // Categories (personal). A user may keep at most MAX_PERSONAL_CATEGORIES of their own on top of
+  // the global ones; admins aren't limited (they create through the admin endpoints).
   async createCategory(userId: string, dto: any) {
     const name = String(dto.name || '').trim();
     if (!name) throw new BadRequestException('نام دسته را وارد کنید');
-    return this.prisma.workLogCategory.create({ data: { name, color: dto.color || null, userId, createdById: userId, isAdminDefined: false } });
+    const own = await this.prisma.workLogCategory.findMany({ where: { userId, isAdminDefined: false, archived: false }, select: { sortOrder: true } });
+    if (own.length >= MAX_PERSONAL_CATEGORIES) throw new BadRequestException(`حداکثر ${MAX_PERSONAL_CATEGORIES} دسته‌ی شخصی می‌توانید داشته باشید`);
+    const sortOrder = own.reduce((m, c) => Math.max(m, c.sortOrder), 0) + 1;
+    return this.prisma.workLogCategory.create({ data: { name, color: dto.color || null, userId, createdById: userId, isAdminDefined: false, sortOrder } });
+  }
+
+  /** Display order of the user's own categories: `ids` top to bottom. */
+  async reorderCategories(userId: string, ids: string[]) {
+    if (!Array.isArray(ids)) throw new BadRequestException('ترتیب نامعتبر است');
+    const own = await this.prisma.workLogCategory.findMany({ where: { id: { in: ids }, userId, isAdminDefined: false }, select: { id: true } });
+    const allowed = new Set(own.map((c) => c.id));
+    await this.prisma.$transaction(ids.filter((id) => allowed.has(id)).map((id, i) => this.prisma.workLogCategory.update({ where: { id }, data: { sortOrder: i + 1 } })));
+    return { ok: true };
   }
 
   async updateCategory(userId: string, id: string, dto: any) {
@@ -294,8 +310,9 @@ export class WorkLogService {
     return { ok: true };
   }
 
-  private async assertUsableCategory(userId: string | null, categoryId?: string | null) {
-    if (!categoryId) return null;
+  private async assertUsableCategory(userId: string | null, categoryId?: string | null): Promise<string> {
+    // Every task must belong to a category — no uncategorized work.
+    if (!categoryId) throw new BadRequestException('انتخاب دسته‌بندی برای وظیفه الزامی است');
     const c = await this.prisma.workLogCategory.findFirst({
       where: { id: categoryId, archived: false, ...(userId ? this.visibleTo(userId) : { userId: null }) },
     });
@@ -673,6 +690,61 @@ export class WorkLogService {
     await this.assertCanManage(actor, t);
     await this.prisma.workTask.update({ where: { id }, data: { archived: true } });
     return { ok: true };
+  }
+
+  /**
+   * One person's work-log report over a Jalali period — month (1..12), quarter (1..4),
+   * half (1..2) or year — for the admin "per-person dashboard" and its printable PDF.
+   */
+  async userReport(actor: Actor, q: any) {
+    if (!q.userId) throw new BadRequestException('کاربر را انتخاب کنید');
+    await this.assertUserInScope(actor, q.userId);
+    const today = workDateOf(new Date());
+    const tj = toJalaliParts(today);
+    const jYear = +q.jYear || tj.jYear;
+    const period = ['month', 'quarter', 'half', 'year'].includes(q.period) ? q.period : 'month';
+    const span = { month: 1, quarter: 3, half: 6, year: 12 }[period as 'month'];
+    const maxIndex = 12 / span;
+    const defIndex = Math.ceil(tj.jMonth / span);
+    const index = Math.min(Math.max(+q.index || defIndex, 1), maxIndex);
+    const firstMonth = (index - 1) * span + 1;
+    const from = jalaliMonthRange(jYear, firstMonth).start;
+    const endExcl = jalaliMonthRange(jYear, firstMonth + span - 1).endExcl;
+    const to = new Date(Math.min(endExcl.getTime() - DAY_MS, today.getTime()));
+
+    const [user, entries, reports] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: q.userId }, select: USER_BRIEF }),
+      to < from ? [] : this.prisma.workTaskEntry.findMany({
+        where: { userId: q.userId, gregDate: { gte: from, lte: to } },
+        include: { task: { select: { id: true, title: true, recurring: true, category: { select: { id: true, name: true, color: true } } } } },
+        orderBy: [{ gregDate: 'asc' }, { createdAt: 'asc' }],
+      }),
+      to < from ? [] : this.prisma.dailyWorkReport.findMany({ where: { userId: q.userId, gregDate: { gte: from, lte: to } }, orderBy: { gregDate: 'asc' } }),
+    ]);
+    const days = to < from ? { rows: [], summary: null } : await this.adminDays(actor, { from: isoDate(from), to: isoDate(to), userId: q.userId });
+
+    const byCategory = new Map<string, { name: string; color: string | null; minutes: number; entries: number }>();
+    const byTask = new Map<string, { title: string; category: string; minutes: number; entries: number; days: Set<string> }>();
+    for (const e of entries) {
+      const c = e.task.category;
+      const ck = c?.id || '_none';
+      const cc = byCategory.get(ck) ?? { name: c?.name || 'بدون دسته', color: c?.color ?? null, minutes: 0, entries: 0 };
+      cc.minutes += e.minutes; cc.entries++;
+      byCategory.set(ck, cc);
+      const tt = byTask.get(e.taskId) ?? { title: e.task.title, category: c?.name || 'بدون دسته', minutes: 0, entries: 0, days: new Set<string>() };
+      tt.minutes += e.minutes; tt.entries++; tt.days.add(isoDate(e.gregDate));
+      byTask.set(e.taskId, tt);
+    }
+
+    return {
+      user, jYear, period, index, from: isoDate(from), to: isoDate(to),
+      summary: days.summary,
+      daily: days.rows.map((r: any) => ({ date: r.date, jDay: r.jDay, jMonth: r.jMonth, loggedMinutes: r.loggedMinutes, workedMinutes: r.attendance?.workedMinutes ?? 0, state: r.state, status: r.attendance?.status ?? null })),
+      byCategory: [...byCategory.values()].sort((a, b) => b.minutes - a.minutes),
+      byTask: [...byTask.values()].map(({ days: d, ...t }) => ({ ...t, days: d.size })).sort((a, b) => b.minutes - a.minutes),
+      entries: entries.map((e) => ({ id: e.id, date: isoDate(e.gregDate), task: e.task.title, category: e.task.category?.name || 'بدون دسته', color: e.task.category?.color ?? null, minutes: e.minutes, note: e.note, isLate: e.isLate, lateDays: e.lateDays })),
+      reports: reports.map((r) => ({ date: isoDate(r.gregDate), content: r.content, submittedAt: r.submittedAt, isLate: r.isLate, lateDays: r.lateDays, editedAt: r.editedAt })),
+    };
   }
 
   private jalaliLabel(d: Date) {

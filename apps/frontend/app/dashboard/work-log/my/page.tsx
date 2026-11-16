@@ -2,7 +2,7 @@
 import React from "react";
 import {
   ListTodo, ChevronRight, ChevronLeft, Loader2, Plus, Pencil, Trash2, Clock, CheckCircle2, Circle,
-  AlertTriangle, Lock, Save, FolderCog, Repeat, CalendarClock, X, ListChecks, Flag, RotateCcw,
+  AlertTriangle, Lock, Save, FolderCog, Repeat, CalendarClock, X, ListChecks, Flag, RotateCcw, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { pageTitle } from "../../../../lib/branding";
 import { readError } from "../../../../lib/http";
@@ -96,6 +96,7 @@ export default function MyWorkLogPage() {
 
   async function saveTask() {
     if (!taskModal?.title?.trim()) { toast.warning("عنوان وظیفه را وارد کنید"); return; }
+    if (!taskModal.categoryId) { toast.warning("دسته‌بندی وظیفه را انتخاب کنید"); return; }
     const body = {
       title: taskModal.title, description: taskModal.description || "", categoryId: taskModal.categoryId || null,
       recurring: !!taskModal.recurring, estimatedMinutes: taskModal.estimateH ? Math.round(+taskModal.estimateH * 60) : null,
@@ -125,6 +126,16 @@ export default function MyWorkLogPage() {
     if (ok) setCatForm({ name: "", color: "#3b82f6" });
   }
 
+  // The user's own categories (max 5), in their display order; reorder with the arrows.
+  const ownCats = ((board?.categories || []) as any[]).filter((c: any) => c.editable);
+  async function moveCategory(id: string, dir: -1 | 1) {
+    const ids = ownCats.map((c: any) => c.id);
+    const i = ids.indexOf(id), j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    await call("/work-log/me/categories-order", "PUT", { ids });
+  }
+
   async function removeCategory(c: any) {
     if (!(await confirm("حذف دسته", `دسته‌ی «${c.name}» حذف شود؟ وظایف آن بدون دسته می‌مانند.`))) return;
     await call(`/work-log/me/categories/${c.id}`, "DELETE", undefined, "دسته حذف شد");
@@ -146,7 +157,9 @@ export default function MyWorkLogPage() {
       if (!map.has(key)) map.set(key, { cat: t.category, tasks: [] });
       map.get(key)!.tasks.push(t);
     }
-    return [...map.values()].sort((a, c) => (a.cat ? 0 : 1) - (c.cat ? 0 : 1));
+    const order = new Map((b.categories as any[]).map((c: any, i: number) => [c.id, i]));
+    const rank = (g: { cat: any }) => (g.cat ? order.get(g.cat.id) ?? 999 : 1000);
+    return [...map.values()].sort((a, c) => rank(a) - rank(c));
   }, [b, taskFilter]);
 
   return (
@@ -224,7 +237,7 @@ export default function MyWorkLogPage() {
                     <ListChecks className="w-3.5 h-3.5" /> {editMode ? "پایان ویرایش" : "ویرایش فهرست"}
                   </button>
                   {editMode && <button onClick={() => setCatModal(true)} className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-theme text-theme-primary"><FolderCog className="w-3.5 h-3.5" /> دسته‌ها</button>}
-                  <button onClick={() => setTaskModal({ title: "", description: "", categoryId: "", recurring: false, estimateH: "" })} className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><Plus className="w-3.5 h-3.5" /> وظیفه جدید</button>
+                  <button onClick={() => setTaskModal({ title: "", description: "", categoryId: b.categories?.[0]?.id || "", recurring: false, estimateH: "" })} className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><Plus className="w-3.5 h-3.5" /> وظیفه جدید</button>
                 </div>
               </div>
               {editMode && (
@@ -392,7 +405,7 @@ export default function MyWorkLogPage() {
               <div>
                 <label className="block mb-1 text-sm text-theme-secondary">دسته</label>
                 <select value={taskModal.categoryId} onChange={e => setTaskModal((s: any) => ({ ...s, categoryId: e.target.value }))} className="input-theme text-sm">
-                  <option value="">بدون دسته</option>
+                  {!taskModal.categoryId && <option value="">انتخاب دسته… (الزامی)</option>}
                   {(b?.categories || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.scope === "GLOBAL" ? " (عمومی)" : ""}</option>)}
                 </select>
               </div>
@@ -413,14 +426,21 @@ export default function MyWorkLogPage() {
           <div className="flex items-center gap-2">
             <input type="color" value={catForm.color} onChange={e => setCatForm(s => ({ ...s, color: e.target.value }))} className="w-10 h-9 rounded border border-theme bg-transparent" />
             <input placeholder="نام دسته‌ی شخصی" value={catForm.name} onChange={e => setCatForm(s => ({ ...s, name: e.target.value }))} className="input-theme text-sm flex-1" />
-            <button onClick={saveCategory} className="btn-theme-primary text-sm">{catForm.id ? "ذخیره" : "افزودن"}</button>
+            <button onClick={saveCategory} disabled={!catForm.id && ownCats.length >= 5} title={!catForm.id && ownCats.length >= 5 ? "حداکثر ۵ دسته‌ی شخصی" : ""} className="btn-theme-primary text-sm disabled:opacity-50">{catForm.id ? "ذخیره" : "افزودن"}</button>
             {catForm.id && <button onClick={() => setCatForm({ name: "", color: "#3b82f6" })} className="p-2 text-theme-muted"><X className="w-4 h-4" /></button>}
           </div>
+          <p className="text-[11px] text-theme-muted">
+            دسته‌های عمومی همیشه اول و به همین ترتیب نمایش داده می‌شوند. دسته‌های شخصی شما ({ownCats.length.toLocaleString("fa-IR")} از ۵) بعد از آن‌ها و به ترتیبی که با فلش‌ها مشخص می‌کنید می‌آیند.
+          </p>
           <ul className="divide-y divide-theme/50 border border-theme rounded-lg">
             {(b?.categories || []).map((c: any) => (
               <li key={c.id} className="flex items-center gap-2 px-3 py-2 text-sm">
                 <span className="w-3 h-3 rounded-full" style={{ background: c.color || "#94a3b8" }} />
                 <span className="flex-1 text-theme-primary">{c.name}</span>
+                {c.editable && <>
+                  <button onClick={() => moveCategory(c.id, -1)} disabled={ownCats[0]?.id === c.id} title="بالاتر" className="p-1 text-theme-muted hover:text-blue-600 disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => moveCategory(c.id, 1)} disabled={ownCats[ownCats.length - 1]?.id === c.id} title="پایین‌تر" className="p-1 text-theme-muted hover:text-blue-600 disabled:opacity-30"><ArrowDown className="w-3.5 h-3.5" /></button>
+                </>}
                 {c.editable ? <>
                   <button onClick={() => setCatForm({ id: c.id, name: c.name, color: c.color || "#3b82f6" })} className="p-1 text-theme-muted hover:text-blue-600"><Pencil className="w-3.5 h-3.5" /></button>
                   <button onClick={() => removeCategory(c)} className="p-1 text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>

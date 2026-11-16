@@ -23,6 +23,8 @@ export class MyWorkLogController {
   updateCategory(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.updateCategory(uid(req), id, body); }
   @Delete('categories/:id')
   removeCategory(@Req() req: any, @Param('id') id: string) { return this.service.removeCategory(uid(req), id); }
+  @Put('categories-order')
+  reorderCategories(@Req() req: any, @Body() body: { ids: string[] }) { return this.service.reorderCategories(uid(req), body?.ids); }
 
   @Post('tasks')
   createTask(@Req() req: any, @Body() body: any) { return this.service.createTask(uid(req), body); }
@@ -60,6 +62,10 @@ export class AdminWorkLogController {
 
   @Get('day')
   day(@Req() req: any, @Query('userId') userId: string, @Query('date') date: string) { return this.service.adminDay(req.user, userId, date); }
+
+  // One person's report for a month / quarter / half-year / year (dashboard + printable PDF).
+  @Get('user-report')
+  userReport(@Req() req: any, @Query() q: any) { return this.service.userReport(req.user, q); }
 
   @Get('catalog')
   catalog(@Req() req: any, @Query() q: any) { return this.service.adminCatalog(req.user, q); }

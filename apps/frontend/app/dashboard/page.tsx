@@ -5,11 +5,9 @@ import { motion } from "framer-motion";
 import { pageTitle } from "../../lib/branding";
 import { readError } from "../../lib/http";
 import {
-  Sparkles, Send, ArrowLeft,
-  Boxes, Users, Handshake, Building, BarChart3,
-  MessageSquare, Plus, Activity, ArrowUpRight,
-  Loader2, AlertCircle, Brain, Check, Trash2, ChevronLeft, ChevronRight,
-  CalendarDays, Zap, Fingerprint, Bell, Ticket,
+  ArrowLeft, Boxes, Users, Handshake, Building, BarChart3, Plus, Activity, ArrowUpRight,
+  Loader2, Check, Trash2, ChevronLeft, ChevronRight, CalendarDays, Fingerprint, Bell, Ticket,
+  ListTodo, PieChart, Trophy,
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -280,9 +278,6 @@ function LeaveCard({ leave }: { leave: any }) {
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Stats = { totalUsers: number; totalDepartments: number; unreadNotifications: number; myOpenTickets: number };
-type Message = { id: string; role: "user" | "assistant"; content: string; error?: boolean };
-type Provider = { id: string; name: string; type: string; model: string | null };
-type RecentConvo = { id: string; title: string | null; provider: string; updatedAt: string; messages: Array<{ content: string; role: string }> };
 
 const statColor: Record<string, string> = {
   blue:   "text-blue-600 dark:text-blue-400",
@@ -305,21 +300,25 @@ const ROLE_CLS: Record<string, string> = {
 };
 
 // ── Main Page ──────────────────────────────────────────────────────────────
+const STATUS_FA: Record<string, string> = { PRESENT: "حاضر", LATE: "تاخیر", EARLY_LEAVE: "تعجیل", ABSENT: "غیبت", INCOMPLETE: "ناقص", LEAVE: "مرخصی", SICK_LEAVE: "استعلاجی", MISSION: "ماموریت", REMOTE_WORK: "دورکاری", HOLIDAY: "تعطیل", COMPANY_HOLIDAY: "تعطیل شرکت", WEEKEND: "آخر هفته", OFF_DUTY: "استراحت (شیفت)" };
+const REPORT_STATE: Record<string, { label: string; cls: string }> = {
+  SUBMITTED: { label: "گزارش امروز ثبت شده", cls: "text-green-600" },
+  LATE: { label: "گزارش با تأخیر ثبت شده", cls: "text-amber-600" },
+  MISSING: { label: "گزارش ثبت نشده", cls: "text-red-600" },
+  PENDING: { label: "گزارش امروز هنوز ثبت نشده", cls: "text-blue-600" },
+  NOT_REQUIRED: { label: "امروز گزارش الزامی نیست", cls: "text-theme-muted" },
+};
+const faClock = (iso?: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tehran" }) : "—";
+
 export default function WorkspacePage() {
   const [me, setMe] = React.useState<any>(null);
   const [stats, setStats] = React.useState<Stats>({ totalUsers:0, totalDepartments:0, unreadNotifications:0, myOpenTickets:0 });
   const [statsLoading, setStatsLoading] = React.useState(true);
-  const [allProviders, setAllProviders] = React.useState<Provider[]>([]);
-  const [provider, setProvider] = React.useState<Provider | null>(null);
-  const [recentConvos, setRecentConvos] = React.useState<RecentConvo[]>([]);
-  const [messages, setMessages] = React.useState<Message[]>([]);
-  // Server-side conversation backing this widget, so the assistant keeps context
-  // across messages and the thread can be continued on the full chat page.
-  const [convId, setConvId] = React.useState<string | null>(null);
-  const [inputValue, setInputValue] = React.useState("");
-  const [sending, setSending] = React.useState(false);
   const [leave, setLeave] = React.useState<any>(null);
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  // Today at a glance: my attendance + work log (one call), and — for whoever can see the
+  // management dashboard — an organisation snapshot.
+  const [board, setBoard] = React.useState<any>(null);
+  const [org, setOrg] = React.useState<any>(null);
   const todayStr = React.useMemo(() => todayJalaliStr(), []);
 
   React.useEffect(() => { document.title = pageTitle("فضای کاری"); }, []);
@@ -334,12 +333,10 @@ export default function WorkspacePage() {
       fetch(`${API}/auth/me`,       { headers: h }).then(r => r.ok ? r.json() : null),
       fetch(`${API}/users`,         { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/departments`,   { headers: h }).then(r => r.ok ? r.json() : []),
-      fetch(`${API}/ai-settings/providers/active`, { headers: h }).then(r => r.ok ? r.json() : []),
-      fetch(`${API}/chat-history/conversations/recent?limit=4`, { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/attendance/me/leave-balance?jYear=${currentJYear()}`, { headers: h }).then(r => r.ok ? r.json() : null),
       fetch(`${API}/notifications/unread-count`, { headers: h }).then(r => r.ok ? r.json() : { count: 0 }),
       fetch(`${API}/tickets/my?status=OPEN&limit=1`, { headers: h }).then(r => r.ok ? r.json() : { total: 0 }),
-    ]).then(([meData, users, depts, providers, recent, lb, notifCount, myTickets]) => {
+    ]).then(([meData, users, depts, lb, notifCount, myTickets]) => {
       setMe(meData);
       setLeave(lb);
       setStats({
@@ -348,50 +345,11 @@ export default function WorkspacePage() {
         unreadNotifications:  notifCount?.count ?? 0,
         myOpenTickets:        myTickets?.total ?? 0,
       });
-      if (Array.isArray(recent)) setRecentConvos(recent);
-      if (Array.isArray(providers) && providers.length > 0) {
-        setAllProviders(providers);
-        setProvider(providers[0]);
-        setMessages([{ id: "welcome", role: "assistant", content: `سلام! می‌توانم با **${providers[0].name}** به شما کمک کنم. چه می‌خواهید؟` }]);
-      } else {
-        setMessages([{ id: "welcome", role: "assistant", content: "هیچ مدل هوش مصنوعی فعالی پیکربندی نشده است." }]);
-      }
     }).catch(console.error).finally(() => setStatsLoading(false));
+    fetch(`${API}/work-log/me/board`, { headers: h }).then(r => r.ok ? r.json() : null).then(setBoard).catch(() => {});
+    // 403 for people without the management dashboard — the card simply stays hidden.
+    fetch(`${API}/analytics/overview`, { headers: h }).then(r => r.ok ? r.json() : null).then(setOrg).catch(() => {});
   }, [token]);
-
-  React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, sending]);
-
-  const sendMessage = async (text?: string) => {
-    const content = (text ?? inputValue).trim();
-    if (!content || sending) return;
-    if (!provider) { window.location.href = "/dashboard/ai-settings"; return; }
-    setInputValue("");
-    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user" as const, content }]);
-    setSending(true);
-    try {
-      const hj = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-      let id = convId;
-      if (!id) {
-        const cr = await fetch(`${API}/chat-history/conversations`, { method: "POST", headers: hj, body: JSON.stringify({ provider: provider.id, model: provider.model }) });
-        if (!cr.ok) throw new Error();
-        id = (await cr.json()).id as string;
-        setConvId(id);
-      }
-      const res = await fetch(`${API}/chat-history/conversations/${id}/send`, {
-        method: "POST", headers: hj,
-        body: JSON.stringify({ content, safeMode: true, providerId: provider.id }),
-      });
-      if (!res.ok) {
-        const msg = await readError(res, "خطا در ارسال پیام");
-        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `⚠️ ${msg}`, error: true }]);
-        return;
-      }
-      const data = await res.json();
-      setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: data.content || "پاسخی دریافت نشد.", error: !data.success }]);
-    } catch {
-      setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: "خطا در اتصال.", error: true }]);
-    } finally { setSending(false); }
-  };
 
   const role = me?.role;
   const isAdminOrManager = role === "ADMIN" || role === "MANAGER";
@@ -401,18 +359,25 @@ export default function WorkspacePage() {
     { title: "اعلان‌های خوانده‌نشده", value: stats.unreadNotifications, icon: Bell,     color: "blue",   href: "/dashboard/notifications" },
     { title: "کاربران سیستم",          value: stats.totalUsers,           icon: Users,    color: "green",  href: "/dashboard/users",         show: isAdminOrManager },
     { title: "تیکت‌های باز من",        value: stats.myOpenTickets,        icon: Ticket,   color: "amber",  href: "/dashboard/tickets/my" },
-    { title: "دپارتمان‌ها",            value: stats.totalDepartments,     icon: Building, color: "purple", href: "/dashboard/departments",    show: isAdminOrManager },
+    { title: "دپارتمان‌ها",            value: stats.totalDepartments,     icon: Building, color: "purple", href: "/dashboard/departments",    show: role === "ADMIN" },
   ].filter(s => !("show" in s) || s.show || statsLoading);
 
   const quickActions = [
-    isPrivileged && { title: "دارایی جدید",    href: "/dashboard/assets",              icon: Boxes,        color: "from-blue-500 to-blue-600" },
-    isPrivileged && { title: "واگذاری جدید",   href: "/dashboard/assets/assignments",  icon: Handshake,    color: "from-green-500 to-green-600" },
-    role === "ADMIN" && { title: "کاربر جدید", href: "/dashboard/users",               icon: Users,        color: "from-purple-500 to-purple-600" },
-    { title: "گفتگو با AI",                    href: "/dashboard/chat",                icon: MessageSquare, color: "from-violet-500 to-purple-600" },
+    { title: "عملکرد من",                      href: "/dashboard/work-log/my",          icon: ListTodo,     color: "from-violet-500 to-purple-600" },
     { title: "حضور من",                        href: "/dashboard/attendance/my",        icon: Fingerprint,  color: "from-cyan-500 to-teal-600" },
+    { title: "تیکت جدید",                      href: "/dashboard/tickets/new",          icon: Ticket,       color: "from-amber-500 to-orange-600" },
+    isPrivileged && { title: "دارایی‌ها",      href: "/dashboard/assets",               icon: Boxes,        color: "from-blue-500 to-blue-600" },
+    isPrivileged && { title: "واگذاری جدید",   href: "/dashboard/assets/assignments",   icon: Handshake,    color: "from-green-500 to-green-600" },
+    role === "ADMIN" && { title: "کاربر جدید", href: "/dashboard/users",                icon: Users,        color: "from-purple-500 to-purple-600" },
   ].filter(Boolean) as Array<{ title: string; href: string; icon: any; color: string }>;
 
-  const totalMsgs = recentConvos.reduce((s, c) => s + (c.messages?.length || 0), 0);
+  // My open tasks for today's card: overdue first, then by deadline.
+  const openTasks = ((board?.tasks || []) as any[]).filter(t => !t.done && !t.archived)
+    .sort((a, b) => Number(b.overdue) - Number(a.overdue) || String(a.deadline || "9").localeCompare(String(b.deadline || "9")))
+    .slice(0, 6);
+  const att = board?.attendance;
+  const rs = board ? REPORT_STATE[board.state] : null;
+  const wl = org?.workLogToday;
 
   return (
     <div className="flex gap-4 h-[calc(100vh-88px)]" dir="rtl">
@@ -445,7 +410,7 @@ export default function WorkspacePage() {
           </div>
         </motion.div>
 
-        {/* ── Stat cards (2×2 grid for better visual weight) ── */}
+        {/* ── Stat cards ── */}
         {statCards.length > 0 && (
           <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.25, delay:0.05 }}
             className={`grid gap-3 ${statCards.length <= 2 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-4"}`}>
@@ -469,112 +434,88 @@ export default function WorkspacePage() {
           </motion.div>
         )}
 
-        {/* ── Leave balance ── */}
-        {leave && (
-          <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.25, delay:0.1 }}>
-            <LeaveCard leave={leave} />
+        {/* ── My day: attendance + work log ── */}
+        {board && (
+          <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.25, delay:0.08 }}
+            className="card-theme p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-theme-primary text-sm flex items-center gap-1.5"><CalendarDays className="w-4 h-4 text-blue-500" /> امروز من</h2>
+              <Link href="/dashboard/work-log/my" className="text-blue-600 dark:text-blue-400 text-xs hover:underline flex items-center gap-1">عملکرد من <ArrowLeft className="w-3 h-3" /></Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+              <div className="bg-theme-secondary/50 rounded-xl px-3 py-2">
+                <div className="text-[11px] text-theme-muted">حضور</div>
+                <div className="font-semibold text-theme-primary">{att ? (att.firstCheckIn && !att.lastCheckOut ? "در حال کار" : STATUS_FA[att.status] || att.status) : "ثبت نشده"}</div>
+              </div>
+              <div className="bg-theme-secondary/50 rounded-xl px-3 py-2">
+                <div className="text-[11px] text-theme-muted">ورود / خروج</div>
+                <div className="font-semibold text-theme-primary" dir="ltr">{faClock(att?.firstCheckIn)} — {faClock(att?.lastCheckOut)}</div>
+              </div>
+              <div className="bg-theme-secondary/50 rounded-xl px-3 py-2">
+                <div className="text-[11px] text-theme-muted">زمان ثبت‌شده امروز</div>
+                <div className="font-semibold text-theme-primary" dir="ltr">{fmtMin(board.capacity?.used || 0)}{board.capacity?.allowed != null ? ` / ${fmtMin(board.capacity.allowed)}` : ""}</div>
+              </div>
+              <div className="bg-theme-secondary/50 rounded-xl px-3 py-2">
+                <div className="text-[11px] text-theme-muted">گزارش کار روزانه</div>
+                <div className={`font-semibold text-xs mt-0.5 ${rs?.cls || ""}`}>{rs?.label}</div>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-theme-muted mb-1.5">وظایف باز من</div>
+              {openTasks.length === 0 ? (
+                <div className="text-xs text-theme-muted">وظیفه‌ی بازی ندارید</div>
+              ) : (
+                <ul className="space-y-1">
+                  {openTasks.map(t => (
+                    <li key={t.id} className="flex items-center gap-2 text-sm">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.category?.color || "#94a3b8" }} />
+                      <span className="flex-1 truncate text-theme-primary">{t.title}</span>
+                      {t.deadline && <span className={`text-[11px] ${t.overdue ? "text-red-600" : "text-theme-muted"}`}>مهلت {new Date(t.deadline).toLocaleDateString("fa-IR", { timeZone: "UTC" })}{t.overdue ? " (گذشته)" : ""}</span>}
+                      {t.minutesOnDate > 0 && <span className="text-[11px] text-blue-600" dir="ltr">{fmtMin(t.minutesOnDate)}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </motion.div>
         )}
 
-        {/* ── AI mini-chat ── */}
-        <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.25, delay:0.15 }}
-          className="flex flex-col flex-1 min-h-0 overflow-hidden card-theme" style={{ minHeight: 280 }}>
-
-          <div className="flex justify-between items-center px-4 py-3 border-theme border-b shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="flex justify-center items-center bg-ai-gradient shadow rounded-lg w-7 h-7 shrink-0">
-                <Sparkles className="w-3.5 h-3.5 text-white" />
-              </div>
-              {allProviders.length > 1 ? (
-                <select value={provider?.id || ""}
-                  onChange={e => { const p = allProviders.find(x => x.id === e.target.value); if (p) { setProvider(p); setMessages(prev => [...prev, { id: `switch-${Date.now()}`, role: "assistant", content: `مدل تغییر یافت به **${p.name}** — ادامه همین گفتگو.` }]); } }}
-                  className="bg-transparent text-theme-primary text-sm font-semibold outline-none border-none cursor-pointer">
-                  {allProviders.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              ) : (
-                <div>
-                  <div className="font-semibold text-theme-primary text-sm">{provider ? provider.name : "دستیار هوشمند"}</div>
-                  {provider && <div className="flex items-center gap-1 text-green-500 text-xs"><span className="inline-block bg-green-500 rounded-full w-1.5 h-1.5" />{provider.model || provider.type}</div>}
-                </div>
-              )}
+        {/* ── Organisation snapshot (management dashboard access only) ── */}
+        {org && (
+          <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.25, delay:0.1 }}
+            className="card-theme p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-theme-primary text-sm flex items-center gap-1.5"><Activity className="w-4 h-4 text-violet-500" /> وضعیت امروز سازمان</h2>
+              <Link href="/dashboard/analytics" className="text-blue-600 dark:text-blue-400 text-xs hover:underline flex items-center gap-1">داشبورد مدیریتی <ArrowLeft className="w-3 h-3" /></Link>
             </div>
-            <Link href={convId ? `/dashboard/chat?id=${convId}` : "/dashboard/chat"} className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 text-xs hover:underline shrink-0">
-              {convId ? "ادامه در چت کامل" : "چت کامل"} <ArrowLeft className="w-3 h-3" />
-            </Link>
-          </div>
-
-          <div className="flex-1 space-y-3 px-4 py-4 overflow-y-auto">
-            {messages.map(msg => (
-              <div key={msg.id} className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                {msg.role === "assistant" && (
-                  <div className="flex justify-center items-center bg-ai-gradient shadow mt-0.5 rounded-full w-7 h-7 shrink-0">
-                    <Sparkles className="w-3.5 h-3.5 text-white" />
-                  </div>
-                )}
-                <div className={`max-w-[80%] px-4 py-2.5 text-sm leading-relaxed ${msg.role === "user" ? "chat-bubble-user" : msg.error ? "chat-bubble-assistant border border-red-200 dark:border-red-800" : "chat-bubble-assistant"}`}>
-                  {msg.error && <AlertCircle className="inline w-3.5 h-3.5 text-red-500 me-1" />}
-                  <span dangerouslySetInnerHTML={{ __html: msg.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+              {[
+                { l: "حاضر امروز", v: faNum(org.attendanceToday?.present || 0) },
+                { l: "غایب", v: faNum(org.attendanceToday?.statuses?.ABSENT || 0) },
+                { l: "گزارش عملکرد ثبت‌شده", v: wl?.required ? `${faNum(Math.round(((wl.submitted + wl.late) / wl.required) * 100))}٪` : "—" },
+                { l: "تیکت‌های باز", v: `${faNum(org.tickets?.open || 0)}${org.tickets?.overdue ? ` (${faNum(org.tickets.overdue)} دیرکرد)` : ""}` },
+                { l: "درخواست حضور در انتظار", v: faNum(org.attendanceRequestsPending || 0) },
+              ].map(x => (
+                <div key={x.l} className="bg-theme-secondary/50 rounded-xl px-3 py-2">
+                  <div className="text-[11px] text-theme-muted">{x.l}</div>
+                  <div className="font-semibold text-theme-primary">{x.v}</div>
                 </div>
-                {msg.role === "user" && (
-                  <div className="flex justify-center items-center bg-theme-secondary mt-0.5 border border-theme rounded-full w-7 h-7 font-bold text-theme-secondary text-xs shrink-0">
-                    {(me?.firstName?.[0] || "م").toUpperCase()}
-                  </div>
-                )}
-              </div>
-            ))}
-            {sending && (
-              <div className="flex items-start gap-2.5">
-                <div className="flex justify-center items-center bg-ai-gradient shadow rounded-full w-7 h-7 shrink-0"><Sparkles className="w-3.5 h-3.5 text-white" /></div>
-                <div className="flex items-center gap-2 px-4 py-3 chat-bubble-assistant">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
-                  <span className="text-xs text-theme-muted">در حال پاسخ...</span>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div className="px-4 pb-4 pt-2 shrink-0">
-            <div className="flex items-center gap-2 px-3 py-2 chat-input-container">
-              <input value={inputValue} onChange={e => setInputValue(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); } }}
-                disabled={sending || !provider}
-                placeholder={!provider ? "مدل AI پیکربندی نشده..." : "پیام بنویس..."}
-                className="flex-1 bg-transparent outline-none text-theme-primary placeholder:text-theme-muted text-sm text-right disabled:opacity-50" />
-              <button onClick={() => sendMessage()} disabled={!inputValue.trim() || sending || !provider}
-                className="flex justify-center items-center bg-ai-gradient hover:opacity-90 disabled:opacity-40 shadow rounded-xl w-8 h-8 text-white transition-opacity disabled:cursor-not-allowed">
-                {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              </button>
+              ))}
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
+
+        {/* ── Leave balance ── */}
+        {leave && (
+          <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.25, delay:0.12 }}>
+            <LeaveCard leave={leave} />
+          </motion.div>
+        )}
       </div>
 
       {/* ═══ RIGHT PANEL ═══ */}
       <motion.div initial={{ opacity:0, x:12 }} animate={{ opacity:1, x:0 }} transition={{ duration:0.25, delay:0.12 }}
         className="hidden lg:flex flex-col gap-3 w-72 overflow-y-auto pb-2 shrink-0">
-
-        {/* AI usage summary */}
-        {recentConvos.length > 0 && (
-          <div className="card-theme p-4">
-            <h3 className="text-xs font-bold text-theme-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5" /> مصرف AI
-            </h3>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div className="bg-theme-secondary rounded-xl p-3 text-center">
-                <div className="text-2xl font-bold text-violet-600">{faNum(recentConvos.length)}</div>
-                <div className="text-[11px] text-theme-muted mt-0.5">گفتگو اخیر</div>
-              </div>
-              <div className="bg-theme-secondary rounded-xl p-3 text-center">
-                <div className="text-2xl font-bold text-blue-600">{faNum(totalMsgs)}</div>
-                <div className="text-[11px] text-theme-muted mt-0.5">پیام تبادل‌شده</div>
-              </div>
-            </div>
-            <Link href="/dashboard/chat" className="flex items-center justify-center gap-1 text-blue-500 text-xs hover:underline">
-              مشاهده همه گفتگوها <ArrowLeft className="w-3 h-3" />
-            </Link>
-          </div>
-        )}
 
         {/* Persian Calendar */}
         <PersianCalendar />
@@ -600,44 +541,15 @@ export default function WorkspacePage() {
         {/* Personal TODO */}
         {token && <TodoWidget token={token} />}
 
-        {/* Recent conversations */}
-        <div className="card-theme p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-theme-muted text-xs uppercase tracking-wider">گفتگوهای اخیر</h3>
-            <Link href="/dashboard/chat" className="text-blue-500 text-[10px] hover:underline flex items-center gap-0.5">همه <ArrowLeft className="w-2.5 h-2.5" /></Link>
-          </div>
-          {recentConvos.length === 0 ? (
-            <div className="flex flex-col items-center py-4 text-center">
-              <MessageSquare className="w-6 h-6 text-theme-muted/30 mb-1" />
-              <p className="text-theme-muted text-xs">هنوز گفتگویی ندارید</p>
-              <Link href="/dashboard/chat" className="btn-primary text-xs px-3 py-1.5 mt-2 flex items-center gap-1"><Plus className="w-3 h-3" /> شروع گفتگو</Link>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {recentConvos.map(c => (
-                <Link key={c.id} href={`/dashboard/chat?id=${c.id}`}
-                  className="flex items-start gap-2 p-2 rounded-xl hover:bg-theme-hover transition-colors group">
-                  <MessageSquare className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-theme-secondary text-xs font-medium truncate">{c.title || "گفتگوی جدید"}</div>
-                    <div className="text-theme-muted text-[10px] truncate">{c.messages[0]?.content?.substring(0, 40) || "..."}</div>
-                  </div>
-                  <ArrowUpRight className="w-3 h-3 text-theme-muted opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" />
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Quick links */}
         {isAdminOrManager && (
           <div className="card-theme p-4">
             <h3 className="mb-3 font-bold text-theme-muted text-xs uppercase tracking-wider">دسترسی سریع</h3>
             <div className="space-y-1">
               {[
-                { icon: Brain,     label: "حافظه AI",   href: "/dashboard/chat",    color: "text-purple-500" },
-                { icon: BarChart3, label: "گزارش‌ها",    href: "/dashboard/reports", color: "text-blue-500" },
-                { icon: Boxes,     label: "دارایی‌ها",   href: "/dashboard/assets",  color: "text-green-500" },
+                { icon: PieChart,  label: "داشبورد مدیریتی", href: "/dashboard/analytics",        color: "text-violet-500" },
+                { icon: Trophy,    label: "امتیاز عملکرد",   href: "/dashboard/performance",      color: "text-amber-500" },
+                { icon: Boxes,     label: "دارایی‌ها",        href: "/dashboard/assets",           color: "text-green-500" },
               ].map(item => (
                 <Link key={item.label} href={item.href}
                   className="flex items-center gap-2.5 hover:bg-theme-hover px-3 py-2 rounded-xl transition-colors">

@@ -334,7 +334,7 @@ export default function AttendanceRecordsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/dashboard/attendance" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> داشبورد</Link>
+          <Link href="/dashboard/analytics" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> داشبورد مدیریتی</Link>
           {perms?.canCreate && (
             <Link href={`/dashboard/attendance/records/new${userId ? `?userId=${userId}` : ""}`} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white">
               <Plus className="w-4 h-4" /> ثبت ورود/خروج

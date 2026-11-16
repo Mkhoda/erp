@@ -121,7 +121,7 @@ const SECTIONS: Section[] = [
     title: "تحلیل",
     groups: [
       { id: "analytics", title: "داشبورد مدیریتی", icon: PieChart, pages: ["/dashboard/analytics"] },
-      { id: "reports", title: "گزارش‌ها", icon: BarChart3, pages: ["/dashboard/reports"] },
+      { id: "performance", title: "امتیاز عملکرد", icon: PieChart, pages: ["/dashboard/performance"] },
     ],
   },
   {
@@ -133,7 +133,6 @@ const SECTIONS: Section[] = [
         title: "حضور و غیاب",
         icon: Fingerprint,
         pages: [
-          "/dashboard/attendance",
           "/dashboard/attendance/records",
           "/dashboard/attendance/monthly",
           "/dashboard/attendance/calendar",

@@ -205,7 +205,7 @@ export default function AttendanceMonthlyReportPage() {
             <p className="text-sm text-theme-muted">{faNum(grouped.length)} نفر — {faNum(rows.length)} رکورد ماهانه</p>
           </div>
         </div>
-        <Link href="/dashboard/attendance" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> داشبورد</Link>
+        <Link href="/dashboard/analytics" className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ArrowLeft className="w-4 h-4" /> داشبورد مدیریتی</Link>
       </div>
 
       {/* Filters */}

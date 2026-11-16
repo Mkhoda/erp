@@ -38,6 +38,8 @@ import {
   CalendarRange,
   ListTodo,
   Biohazard,
+  Trophy,
+  FolderTree,
   NotebookPen,
 } from "lucide-react";
 
@@ -55,98 +57,56 @@ export type MenuItem = {
   isNew?: boolean;
 };
 
+// Order = sidebar order. A `section` starts a new labelled block; items after it belong to it
+// until the next section. Visibility: a leaf shows when its page is in the user's allowed pages
+// (and its `roles`, if any, match); a group shows when its role matches or any child is allowed.
 export const MENU: MenuItem[] = [
-  // ── فضای کاری — always visible ────────────────────────────
+  { id: 'workspace', title: 'فضای کاری', page: '/dashboard', icon: LayoutDashboard },
+
+  // ── شخصی (همه کاربران) ───────────────────────────────────
+  { id: 'attendance.my', title: 'حضور من', page: '/dashboard/attendance/my', icon: Fingerprint, section: 'شخصی' },
+  { id: 'worklog.my', title: 'عملکرد من', page: '/dashboard/work-log/my', icon: ListTodo },
+  { id: 'tickets.my', title: 'تیکت‌های من', page: '/dashboard/tickets/my', icon: TicketCheck },
+  { id: 'ai.chat', title: 'گفتگو با AI', page: '/dashboard/chat', icon: MessageSquare },
+
+  // ── ارتباطات ─────────────────────────────────────────────
+  { id: 'messaging', title: 'پیام‌رسانی', page: '/dashboard/messaging', icon: MessageCircle, section: 'ارتباطات' },
+  { id: 'announcements', title: 'اطلاعیه‌ها', page: '/dashboard/announcements', icon: Megaphone },
   {
-    id: 'workspace',
-    title: 'فضای کاری',
-    page: '/dashboard',
-    icon: LayoutDashboard,
+    id: 'notifications',
+    title: 'اعلان‌ها',
+    icon: Bell,
+    children: [
+      { id: 'notifications.center',        title: 'مرکز اعلان‌ها',    page: '/dashboard/notifications',               icon: Bell },
+      { id: 'notifications.announcements', title: 'مدیریت اطلاعیه‌ها', page: '/dashboard/notifications/announcements', icon: Megaphone, roles: ['ADMIN'] as Role[] },
+      { id: 'notifications.dashboard',     title: 'آمار اعلان‌ها',     page: '/dashboard/notifications/dashboard',     icon: BarChart3, roles: ['ADMIN'] as Role[] },
+    ],
   },
 
-  // ── گفتگو با AI ───────────────────────────────────────────
-  {
-    id: 'ai.chat',
-    title: 'گفتگو با AI',
-    page: '/dashboard/chat',
-    icon: MessageSquare,
-    isNew: true,
-  },
+  // ── پایش و تحلیل ──────────────────────────────────────────
+  { id: 'analytics', title: 'داشبورد مدیریتی', page: '/dashboard/analytics', icon: PieChart, section: 'پایش و تحلیل' },
+  { id: 'performance', title: 'امتیاز عملکرد', page: '/dashboard/performance', icon: Trophy },
+  { id: 'worldmonitor', title: 'پایش جهانی', page: '/dashboard/worldmonitor', icon: Globe },
+  { id: 'biosecurity', title: 'پایش امنیت زیستی', page: '/dashboard/biosecurity', icon: Biohazard },
 
-  // ── پیام‌رسانی داخلی ─────────────────────────────────────
+  // ── منابع انسانی ──────────────────────────────────────────
   {
-    id: 'messaging',
-    title: 'پیام‌رسانی',
-    page: '/dashboard/messaging',
-    icon: MessageCircle,
-  },
-
-  // ── حضور من (همه کاربران) ─────────────────────────────────
-  {
-    id: 'attendance.my',
-    title: 'حضور من',
-    page: '/dashboard/attendance/my',
+    id: 'attendance',
+    title: 'حضور و غیاب',
     icon: Fingerprint,
+    section: 'منابع انسانی',
+    roles: ['ADMIN'],
+    children: [
+      { id: 'attendance.records',   title: 'کارکرد روزانه',        page: '/dashboard/attendance/records',    icon: ClipboardList },
+      { id: 'attendance.monthly',   title: 'کارکرد ماهانه',        page: '/dashboard/attendance/monthly',    icon: CalendarRange },
+      { id: 'attendance.approvals', title: 'صف تایید',             page: '/dashboard/attendance/approvals',  icon: ClipboardCheck },
+      { id: 'attendance.workRules', title: 'قوانین و تقویم کاری', page: '/dashboard/attendance/work-rules', icon: SlidersHorizontal },
+      { id: 'attendance.shifts',    title: 'شیفت‌های نگهبانی',     page: '/dashboard/attendance/shifts',     icon: ShieldCheck },
+    ],
   },
-
-  // ── پایش جهانی — visible to all ───────────────────────────
-  {
-    id: 'worldmonitor',
-    title: 'پایش جهانی',
-    page: '/dashboard/worldmonitor',
-    icon: Globe,
-  },
-
-  // ── پایش امنیت زیستی — visible to all ─────────────────────
-  {
-    id: 'biosecurity',
-    title: 'پایش امنیت زیستی',
-    page: '/dashboard/biosecurity',
-    icon: Biohazard,
-    isNew: true,
-  },
-
-  // ── تیکت‌های من — visible to all ──────────────────────────
-  {
-    id: 'tickets.my',
-    title: 'تیکت‌های من',
-    page: '/dashboard/tickets/my',
-    icon: TicketCheck,
-  },
-
-  // ── عملکرد من (همه کاربران) ───────────────────────────────
-  {
-    id: 'worklog.my',
-    title: 'عملکرد من',
-    page: '/dashboard/work-log/my',
-    icon: ListTodo,
-    isNew: true,
-  },
-
-  // ── گزارش عملکرد کاربران — visible to whoever is granted the page ──
-  {
-    id: 'worklog.reports',
-    title: 'گزارش عملکرد کاربران',
-    page: '/dashboard/work-log/reports',
-    icon: NotebookPen,
-  },
-
-  // ── داشبورد مدیریتی — ADMIN, or anyone granted the page (department or per person) ──
-  {
-    id: 'analytics',
-    title: 'داشبورد مدیریتی',
-    page: '/dashboard/analytics',
-    icon: PieChart,
-    isNew: true,
-  },
-
-  // ── اطلاعیه‌ها — visible to all ───────────────────────────
-  {
-    id: 'announcements',
-    title: 'اطلاعیه‌ها',
-    page: '/dashboard/announcements',
-    icon: Megaphone,
-  },
+  { id: 'worklog.reports', title: 'گزارش عملکرد کاربران', page: '/dashboard/work-log/reports', icon: NotebookPen },
+  { id: 'users', title: 'کاربران', page: '/dashboard/users', icon: Users, roles: ['ADMIN', 'MANAGER'] },
+  { id: 'departments', title: 'دپارتمان‌ها', page: '/dashboard/departments', icon: FolderTree, roles: ['ADMIN'] },
 
   // ── ERP ───────────────────────────────────────────────────
   {
@@ -156,51 +116,24 @@ export const MENU: MenuItem[] = [
     section: 'ERP',
     roles: ['ADMIN', 'MANAGER', 'EXPERT'],
     children: [
-      { id: 'assets.list',        title: 'دارایی‌ها',      page: '/dashboard/assets',              icon: Boxes },
-      { id: 'assets.types',       title: 'انواع دارایی',   page: '/dashboard/assets/types',        icon: Layers },
-      { id: 'assets.categories',  title: 'دسته‌بندی‌ها',   page: '/dashboard/assets/categories',   icon: Tag },
-      { id: 'assets.assignments', title: 'واگذاری‌ها',     page: '/dashboard/assets/assignments',  icon: Handshake },
+      { id: 'assets.list',        title: 'دارایی‌ها',    page: '/dashboard/assets',             icon: Boxes },
+      { id: 'assets.assignments', title: 'واگذاری‌ها',   page: '/dashboard/assets/assignments', icon: Handshake },
+      { id: 'assets.types',       title: 'انواع دارایی', page: '/dashboard/assets/types',       icon: Layers },
+      { id: 'assets.categories',  title: 'دسته‌بندی‌ها', page: '/dashboard/assets/categories',  icon: Tag },
     ],
   },
   {
     id: 'org',
-    title: 'مدیریت سازمان',
+    title: 'ساختمان و مکان',
     icon: MapPin,
     roles: ['ADMIN', 'MANAGER'],
     children: [
-      { id: 'departments', title: 'دپارتمان‌ها', page: '/dashboard/departments', icon: MapPin },
-      { id: 'buildings',   title: 'ساختمان‌ها',  page: '/dashboard/buildings',   icon: Building },
-      { id: 'floors',      title: 'طبقات',        page: '/dashboard/floors',      icon: Layers },
-      { id: 'rooms',       title: 'اتاق‌ها',      page: '/dashboard/rooms',       icon: Home },
+      { id: 'buildings', title: 'ساختمان‌ها', page: '/dashboard/buildings', icon: Building },
+      { id: 'floors',    title: 'طبقات',      page: '/dashboard/floors',    icon: Layers },
+      { id: 'rooms',     title: 'اتاق‌ها',    page: '/dashboard/rooms',     icon: Home },
     ],
   },
-  {
-    id: 'users',
-    title: 'کاربران',
-    page: '/dashboard/users',
-    icon: Users,
-    roles: ['ADMIN', 'MANAGER'],
-  },
-  {
-    id: 'accounting',
-    title: 'حسابداری',
-    page: '/dashboard/accounting',
-    icon: Landmark,
-    roles: ['ADMIN', 'MANAGER'],
-  },
-
-  // ── مرکز اعلان‌ها ─────────────────────────────────────────
-  {
-    id: 'notifications',
-    title: 'اعلان‌ها',
-    icon: Bell,
-    section: 'اعلان‌ها',
-    children: [
-      { id: 'notifications.center',       title: 'مرکز اعلان‌ها',     page: '/dashboard/notifications',                icon: Bell },
-      { id: 'notifications.announcements', title: 'اطلاعیه‌ها',         page: '/dashboard/notifications/announcements',  icon: Megaphone, roles: ['ADMIN'] as Role[] },
-      { id: 'notifications.dashboard',    title: 'آمار اعلان‌ها',      page: '/dashboard/notifications/dashboard',      icon: BarChart3, roles: ['ADMIN'] as Role[] },
-    ],
-  },
+  { id: 'accounting', title: 'حسابداری', page: '/dashboard/accounting', icon: Landmark, roles: ['ADMIN', 'MANAGER'] },
 
   // ── سرویس‌دهی / Help Desk ─────────────────────────────────
   {
@@ -209,37 +142,10 @@ export const MENU: MenuItem[] = [
     icon: Ticket,
     section: 'سرویس‌دهی',
     children: [
-      { id: 'tickets.list',      title: 'همه تیکت‌ها',    page: '/dashboard/tickets',           icon: ClipboardList, roles: ['ADMIN', 'MANAGER', 'EXPERT'] as Role[] },
       { id: 'tickets.new',       title: 'تیکت جدید',      page: '/dashboard/tickets/new',       icon: PlusCircle },
+      { id: 'tickets.list',      title: 'همه تیکت‌ها',    page: '/dashboard/tickets',           icon: ClipboardList, roles: ['ADMIN', 'MANAGER', 'EXPERT'] as Role[] },
       { id: 'tickets.dashboard', title: 'داشبورد تیکت‌ها', page: '/dashboard/tickets/dashboard', icon: PieChart, roles: ['ADMIN', 'MANAGER'] as Role[] },
       { id: 'tickets.settings',  title: 'تنظیمات',         page: '/dashboard/tickets/settings',  icon: Settings, roles: ['ADMIN'] as Role[] },
-    ],
-  },
-
-  // ── تحلیل ─────────────────────────────────────────────────
-  {
-    id: 'reports',
-    title: 'گزارش‌ها',
-    page: '/dashboard/reports',
-    icon: BarChart3,
-    section: 'تحلیل',
-    roles: ['ADMIN', 'MANAGER', 'EXPERT'],
-  },
-
-  // ── حضور و غیاب ───────────────────────────────────────────
-  {
-    id: 'attendance',
-    title: 'حضور و غیاب',
-    icon: Fingerprint,
-    section: 'حضور و غیاب',
-    roles: ['ADMIN'],
-    children: [
-      { id: 'attendance.dashboard', title: 'داشبورد حضور',         page: '/dashboard/attendance',                icon: LayoutDashboard },
-      { id: 'attendance.records',   title: 'کارکرد روزانه',        page: '/dashboard/attendance/records',        icon: ClipboardList },
-      { id: 'attendance.monthly',   title: 'کارکرد ماهانه',        page: '/dashboard/attendance/monthly',        icon: CalendarRange },
-      { id: 'attendance.approvals', title: 'صف تایید',             page: '/dashboard/attendance/approvals',      icon: ClipboardCheck },
-      { id: 'attendance.workRules', title: 'قوانین و تقویم کاری', page: '/dashboard/attendance/work-rules',     icon: SlidersHorizontal },
-      { id: 'attendance.shifts',    title: 'شیفت‌های نگهبانی',     page: '/dashboard/attendance/shifts',         icon: ShieldCheck },
     ],
   },
 
@@ -251,16 +157,16 @@ export const MENU: MenuItem[] = [
     section: 'مدیریت',
     roles: ['ADMIN'],
     children: [
-      { id: 'admin.agents',      title: 'عوامل هوشمند',        page: '/dashboard/agents',              icon: Bot },
-      { id: 'admin.knowledge',   title: 'پایگاه دانش',         page: '/dashboard/knowledge',           icon: BookOpen },
-      { id: 'admin.workflows',   title: 'جریان‌های کاری',      page: '/dashboard/workflows',           icon: GitMerge },
-      { id: 'admin.aiSettings',  title: 'هوش مصنوعی',          page: '/dashboard/ai-settings',        icon: Cpu },
-      { id: 'admin.roles',       title: 'نقش‌ها و دسترسی',    page: '/dashboard/roles',               icon: UserCog },
-      { id: 'access',            title: 'دسترسی صفحات',        page: '/dashboard/access',             icon: FileText },
-      { id: 'admin.pages',       title: 'مدیریت صفحات',        page: '/dashboard/pages',              icon: FileText },
-      { id: 'admin.logs',        title: 'لاگ سیستم',           page: '/dashboard/system-logs',        icon: ScrollText },
-      { id: 'admin.sessions',    title: 'مدیریت نشست‌ها',      page: '/dashboard/security/sessions', icon: ShieldCheck },
-      { id: 'admin.settings',    title: 'تنظیمات سامانه',      page: '/dashboard/settings',           icon: SlidersHorizontal },
+      { id: 'access',           title: 'دسترسی صفحات',     page: '/dashboard/access',            icon: FileText },
+      { id: 'admin.settings',   title: 'تنظیمات سامانه',   page: '/dashboard/settings',          icon: SlidersHorizontal },
+      { id: 'admin.sessions',   title: 'مدیریت نشست‌ها',   page: '/dashboard/security/sessions', icon: ShieldCheck },
+      { id: 'admin.logs',       title: 'لاگ سیستم',        page: '/dashboard/system-logs',       icon: ScrollText },
+      { id: 'admin.aiSettings', title: 'هوش مصنوعی',       page: '/dashboard/ai-settings',       icon: Cpu },
+      { id: 'admin.agents',     title: 'عوامل هوشمند',     page: '/dashboard/agents',            icon: Bot },
+      { id: 'admin.knowledge',  title: 'پایگاه دانش',      page: '/dashboard/knowledge',         icon: BookOpen },
+      { id: 'admin.workflows',  title: 'جریان‌های کاری',   page: '/dashboard/workflows',         icon: GitMerge },
+      { id: 'admin.roles',      title: 'نقش‌ها و دسترسی', page: '/dashboard/roles',             icon: UserCog },
+      { id: 'admin.pages',      title: 'مدیریت صفحات',     page: '/dashboard/pages',             icon: FileText },
     ],
   },
 ];

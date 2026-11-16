@@ -12,7 +12,7 @@ export class AnalyticsController {
   constructor(private readonly service: AnalyticsService) {}
 
   @Get('overview')
-  overview() { return this.service.overview(); }
+  overview(@Query() q: any) { return this.service.overview(q); }
 
   @Get('attendance')
   attendance(@Query() q: any) { return this.service.attendance(q); }

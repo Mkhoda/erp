@@ -34,6 +34,7 @@ docker-compose.prod.yml     ← production stack
 - **messaging/** — Socket.IO gateway + REST: conversations, messages, reactions, presence, file upload, admin settings
 - **attendance/** — Full workforce management: raw punches, computed days, requests/approvals, work schedules, holidays, overrides
 - **todos/** — Per-user todo list (dashboard widget)
+- **performance/** — امتیاز عملکرد: monthly 0-100 score per person from work reports, punctuality, attendance, department ticket SLA (team-wide penalty for everyone with queue access) and logged-time coverage; weights in `PerformanceSettings`
 - **analytics/** — read-only org-wide aggregates for `/dashboard/analytics`, gated by `@PageAccess` on that page
 - **work-log/** — ثبت عملکرد: categories/tasks (global, admin-assigned per user with deadline, or personal), per-user completion, daily time entries capped by attendance worked time, daily report with late flag; only the current Jalali month is writable. `WorkLogSettings` singleton (late grace, cap toggle)
 - **ai-settings/** / **chat-history/** / **quota/** — AI chat integration
@@ -63,8 +64,6 @@ docker-compose.prod.yml     ← production stack
 | `/dashboard/users` | User management | Restricted |
 | `/dashboard/departments` | Departments | Restricted |
 | `/dashboard/buildings` / `floors` / `rooms` | Locations | Restricted |
-| `/dashboard/reports` | Reports | Restricted |
-| `/dashboard/attendance` | Attendance overview | Restricted |
 | `/dashboard/attendance/my` | My attendance + leave requests | All |
 | `/dashboard/attendance/records` | Daily records (admin/manager) | Restricted |
 | `/dashboard/attendance/calendar` | Attendance calendar | Restricted |
@@ -76,6 +75,9 @@ docker-compose.prod.yml     ← production stack
 | `/dashboard/attendance/sync` | Sync monitor | Admin |
 | `/dashboard/work-log/my` | My daily tasks, time and work report | All |
 | `/dashboard/work-log/reports` | Users' work reports, catalog (categories/tasks), settings | Restricted |
+| `/dashboard/performance` | Performance score ranking + weights (admin) | ADMIN; grantable |
+| `/dashboard/departments` | Department tree, drag & drop members (move / Ctrl = add), per-department member role, primary department | Admin |
+| `/print/work-log` | Printable per-person work-log report (outside the dashboard layout; browser "Save as PDF") | via work-log reports page |
 | `/dashboard/analytics` | Admin metrics dashboard (tabs: overview, attendance, assets, work log, tickets, system) | ADMIN; grantable per dept/role or per person |
 | `/dashboard/security/sessions` | Session management | Admin |
 | `/dashboard/settings` | System settings (5 tabs) | Admin |

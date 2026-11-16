@@ -251,8 +251,12 @@ function SidebarItem({
 }
 
 export default function TwoLayerSidebar({ allowedPages, role, collapsed, onNavigate, counts }: Props) {
-  // Track which sections we've already rendered a label for
-  const renderedSections = new Set<string>();
+  // An item belongs to the last section declared at or above it in MENU, so a section's
+  // label appears above its first VISIBLE item even when the item declaring it is hidden.
+  let current: string | undefined;
+  const sectionOf = new Map<string, string | undefined>();
+  for (const item of MENU) { if (item.section) current = item.section; sectionOf.set(item.id, current); }
+  let lastShown: string | undefined;
 
   return (
     <nav className="space-y-0.5" aria-label="ناوبری">
@@ -260,13 +264,14 @@ export default function TwoLayerSidebar({ allowedPages, role, collapsed, onNavig
         // Skip items not allowed for the user's role
         if (!shouldShow(item, allowedPages, role)) return null;
 
-        const showSection = item.section && !renderedSections.has(item.section);
-        if (item.section) renderedSections.add(item.section);
+        const section = sectionOf.get(item.id);
+        const showSection = !!section && section !== lastShown;
+        lastShown = section;
 
         return (
           <React.Fragment key={item.id}>
             {showSection && !collapsed && (
-              <div className="sidebar-section-label">{item.section}</div>
+              <div className="sidebar-section-label">{section}</div>
             )}
             {showSection && collapsed && (
               <div className="opacity-50 mx-2 my-1 border-theme border-t" />

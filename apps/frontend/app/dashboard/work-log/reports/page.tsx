@@ -2,8 +2,9 @@
 import React from "react";
 import {
   NotebookPen, Loader2, Eye, Plus, Pencil, Trash2, Save, Settings2, FolderTree, ClipboardList,
-  CheckCircle2, Circle, Repeat, CalendarClock, X,
+  CheckCircle2, Circle, Repeat, CalendarClock, X, UserRound, Printer,
 } from "lucide-react";
+import PersonReport, { PERIOD_LABEL, periodCount, periodTitle, type PeriodKind } from "../../../components/work-log/PersonReport";
 import { pageTitle } from "../../../../lib/branding";
 import { readError } from "../../../../lib/http";
 import JalaliDatePicker from "../../../components/ui/JalaliDatePicker";
@@ -14,7 +15,7 @@ import { useConfirm } from "../../../components/ui/ConfirmDialog";
 import { DOW_FA, STATUS_FA, STATE_META, faNum, fmtMin, faTime, faDateTime, faDate } from "../../../components/work-log/meta";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
-type Tab = "reports" | "catalog" | "settings";
+type Tab = "reports" | "person" | "catalog" | "settings";
 
 export default function WorkLogReportsPage() {
   React.useEffect(() => { document.title = pageTitle("گزارش عملکرد کاربران"); }, []);
@@ -38,6 +39,7 @@ export default function WorkLogReportsPage() {
 
   const tabs: Array<{ k: Tab; label: string; icon: any; show: boolean }> = [
     { k: "reports", label: "گزارش روزانه", icon: ClipboardList, show: true },
+    { k: "person", label: "داشبورد فرد", icon: UserRound, show: true },
     { k: "catalog", label: "دسته‌ها و وظایف", icon: FolderTree, show: true },
     { k: "settings", label: "تنظیمات", icon: Settings2, show: role === "ADMIN" },
   ];
@@ -62,6 +64,7 @@ export default function WorkLogReportsPage() {
       </div>
 
       {tab === "reports" && <ReportsTab h={h} personOptions={personOptions} departments={departments} />}
+      {tab === "person" && <PersonTab h={h} personOptions={personOptions} />}
       {tab === "catalog" && <CatalogTab h={h} personOptions={personOptions} isAdmin={role === "ADMIN"} />}
       {tab === "settings" && role === "ADMIN" && <SettingsTab h={h} />}
     </div>
@@ -314,6 +317,81 @@ function DayDetail({ d }: { d: any }) {
   );
 }
 
+// ═════════════════════════════ Per-person dashboard ═════════════════════════════
+
+function currentJalaliMonth() {
+  const p = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", timeZone: "Asia/Tehran" }).formatToParts(new Date());
+  return { jYear: +(p.find(x => x.type === "year")?.value || 0), jMonth: +(p.find(x => x.type === "month")?.value || 0) };
+}
+
+function PersonTab({ h, personOptions }: { h: any; personOptions: any[] }) {
+  const toast = useToast();
+  const now = React.useMemo(currentJalaliMonth, []);
+  const [userId, setUserId] = React.useState("");
+  const [period, setPeriod] = React.useState<PeriodKind>("month");
+  const [jYear, setJYear] = React.useState(now.jYear);
+  const [index, setIndex] = React.useState(now.jMonth);
+  const [data, setData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  // Switching the period kind lands on the slice that contains today.
+  function changePeriod(k: PeriodKind) {
+    setPeriod(k);
+    const span = { month: 1, quarter: 3, half: 6, year: 12 }[k];
+    setIndex(Math.ceil(now.jMonth / span));
+  }
+  const qs = `userId=${userId}&period=${period}&jYear=${jYear}&index=${index}`;
+
+  React.useEffect(() => {
+    if (!userId) { setData(null); return; }
+    let alive = true;
+    setLoading(true);
+    fetch(`${API}/work-log/admin/user-report?${qs}`, { headers: h })
+      .then(async r => { if (!r.ok) throw new Error(await readError(r, "خطا در دریافت گزارش")); return r.json(); })
+      .then(d => { if (alive) setData(d); })
+      .catch(e => toast.error(e.message))
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+    // eslint-disable-next-line
+  }, [qs]);
+
+  const indexOptions = Array.from({ length: periodCount(period) }, (_, i) => i + 1);
+  return (
+    <div className="space-y-4">
+      <div className="bg-theme-card border border-theme rounded-xl p-3 flex flex-wrap items-center gap-2">
+        <div className="w-72 max-w-full"><SearchSelect options={personOptions} value={userId} onChange={setUserId} searchKey="search" placeholder="انتخاب شخص" /></div>
+        <select value={period} onChange={e => changePeriod(e.target.value as PeriodKind)} className="input-theme text-sm w-auto">
+          {(Object.keys(PERIOD_LABEL) as PeriodKind[]).map(k => <option key={k} value={k}>{PERIOD_LABEL[k]}</option>)}
+        </select>
+        {period !== "year" && (
+          <select value={index} onChange={e => setIndex(+e.target.value)} className="input-theme text-sm w-auto">
+            {indexOptions.map(i => <option key={i} value={i}>{periodTitle(period, i, jYear).replace(/\s\S+$/, "")}</option>)}
+          </select>
+        )}
+        <select value={jYear} onChange={e => setJYear(+e.target.value)} className="input-theme text-sm w-auto">
+          {[now.jYear - 1, now.jYear].map(y => <option key={y} value={y}>{y.toLocaleString("fa-IR", { useGrouping: false })}</option>)}
+        </select>
+        <button disabled={!data} onClick={() => window.open(`/print/work-log?${qs}`, "_blank")}
+          className="mr-auto flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-40">
+          <Printer className="w-4 h-4" /> خروجی PDF
+        </button>
+      </div>
+      {!userId ? (
+        <div className="bg-theme-card border border-theme rounded-xl py-12 text-center text-sm text-theme-muted">یک نفر را انتخاب کنید تا داشبورد عملکرد او نمایش داده شود.</div>
+      ) : loading && !data ? (
+        <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
+      ) : data && (
+        <>
+          <div className="text-sm text-theme-muted">
+            {data.user?.firstName} {data.user?.lastName}{data.user?.department?.name ? ` · ${data.user.department.name}` : ""} — {periodTitle(data.period, data.index, data.jYear)}
+          </div>
+          <PersonReport data={data} />
+        </>
+      )}
+    </div>
+  );
+}
+
 // ═════════════════════════════ Categories & tasks ═════════════════════════════
 
 const EMPTY_TASK = { title: "", description: "", categoryId: "", deadline: "", recurring: false, estimateH: "" };
@@ -370,6 +448,7 @@ function CatalogTab({ h, personOptions, isAdmin }: { h: any; personOptions: any[
 
   async function saveTask() {
     if (!taskModal?.title?.trim()) { toast.warning("عنوان وظیفه را وارد کنید"); return; }
+    if (!taskModal.categoryId) { toast.warning("دسته‌بندی وظیفه را انتخاب کنید"); return; }
     const body = {
       title: taskModal.title, description: taskModal.description || "", categoryId: taskModal.categoryId || null,
       deadline: taskModal.deadline || null, recurring: !!taskModal.recurring && !taskModal.deadline,
@@ -482,7 +561,7 @@ function CatalogTab({ h, personOptions, isAdmin }: { h: any; personOptions: any[
               <div>
                 <label className="block mb-1 text-sm text-theme-secondary">دسته</label>
                 <select value={taskModal.categoryId} onChange={e => setTaskModal((s: any) => ({ ...s, categoryId: e.target.value }))} className="input-theme text-sm">
-                  <option value="">بدون دسته</option>
+                  {!taskModal.categoryId && <option value="">انتخاب دسته… (الزامی)</option>}
                   {usableCats.map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.userId == null ? " (عمومی)" : ""}</option>)}
                 </select>
               </div>

@@ -1,10 +1,11 @@
 "use client";
 import React from "react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import {
-  ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-} from "recharts";
+  toFa, faNum, hrs, fmtH, money, pct, faDay, useChartTheme, Tile, ChartCard, TooltipBox, HBars, DailyStack, DailyLines,
+} from "../../components/charts/ChartKit";
 import {
-  PieChart, Loader2, Users, Fingerprint, Boxes, ListTodo, Ticket, Activity, Table2, BarChart3, RefreshCw,
+  PieChart, Loader2, Users, Fingerprint, Boxes, ListTodo, Ticket, Activity, RefreshCw,
 } from "lucide-react";
 import { pageTitle } from "../../../lib/branding";
 import { readError } from "../../../lib/http";
@@ -23,40 +24,9 @@ const REQ_FA: Record<string, string> = { CHECK_IN_FIX: "اصلاح ورود", CH
 const NOTIF_FA: Record<string, string> = { SYSTEM: "سیستمی", TICKET: "تیکت", WORKFLOW: "گردش کار", APPROVAL: "تایید", HR: "منابع انسانی", FINANCE: "مالی", IT: "فناوری", ATTENDANCE: "حضور", SECURITY: "امنیت", CHAT: "گفتگو", REMINDER: "یادآوری", INFORMATION: "اطلاع‌رسانی" };
 
 // ── Formatting ───────────────────────────────────────────────────────────
-const toFa = (s: string) => s.replace(/[0-9]/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
-const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
-const hrs = (min: number) => Math.round((min || 0) / 6) / 10; // minutes → hours, 1 decimal
-const fmtH = (min: number) => `${faNum(hrs(min))} ساعت`;
-const money = (n: number) => `${faNum(Math.round(n || 0))} تومان`;
-const pct = (a: number, b: number) => (b ? `${faNum(Math.round((a / b) * 100))}٪` : "—");
-const faDay = (iso: string) => toFa(new Date(iso + "T00:00:00Z").toLocaleDateString("en-US-u-ca-persian", { day: "numeric", timeZone: "UTC" }));
-
 function currentJalali() {
   const p = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", timeZone: "Asia/Tehran" }).formatToParts(new Date());
   return { jYear: +(p.find(x => x.type === "year")?.value || 0), jMonth: +(p.find(x => x.type === "month")?.value || 0) };
-}
-
-// ── Chart palette (validated reference palette, fixed slot order, light + dark steps) ──
-const SERIES_LIGHT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"];
-const SERIES_DARK = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"];
-const INK = {
-  light: { grid: "#e1e0d9", axis: "#c3c2b7", muted: "#898781", text: "#52514e", surface: "#fcfcfb" },
-  dark: { grid: "#2c2c2a", axis: "#383835", muted: "#898781", text: "#c3c2b7", surface: "#1a1a19" },
-};
-function useIsDark() {
-  const [dark, setDark] = React.useState(false);
-  React.useEffect(() => {
-    const check = () => setDark(document.documentElement.classList.contains("dark"));
-    check();
-    const obs = new MutationObserver(check);
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => obs.disconnect();
-  }, []);
-  return dark;
-}
-function useChartTheme() {
-  const dark = useIsDark();
-  return { series: dark ? SERIES_DARK : SERIES_LIGHT, ink: dark ? INK.dark : INK.light };
 }
 
 type TabKey = "overview" | "attendance" | "assets" | "worklog" | "tickets" | "system";
@@ -77,14 +47,28 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const cur = TABS.find(t => t.k === tab)!;
-  const cacheKey = cur.period ? `${tab}:${period.jYear}-${period.jMonth}` : tab;
+  // Work-rule groups (checkboxes) + department narrow the people-based tabs.
+  const [groups, setGroups] = React.useState<Array<{ id: string; name: string; isDefault: boolean }>>([]);
+  const [groupIds, setGroupIds] = React.useState<string[]>([]);
+  const [deptId, setDeptId] = React.useState("");
+  const [departments, setDepartments] = React.useState<Array<{ id: string; name: string }>>([]);
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    const h = { Authorization: `Bearer ${token}` };
+    fetch(`${API}/attendance/schedules-lite`, { headers: h }).then(r => r.ok ? r.json() : []).then(d => setGroups(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(d => setDepartments(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+  const peopleTab = tab === "overview" || tab === "attendance" || tab === "worklog";
+  const peopleQs = peopleTab ? [groupIds.length ? `scheduleIds=${groupIds.join(",")}` : "", deptId ? `departmentId=${deptId}` : ""].filter(Boolean).join("&") : "";
+  const cacheKey = (cur.period ? `${tab}:${period.jYear}-${period.jMonth}` : tab) + (peopleQs ? `|${peopleQs}` : "");
 
   const load = React.useCallback(async (force = false) => {
     if (!force && data[cacheKey]) return;
     setLoading(true); setError("");
     try {
       const token = localStorage.getItem("token");
-      const qs = cur.period ? `?jYear=${period.jYear}&jMonth=${period.jMonth}` : "";
+      const parts = [cur.period ? `jYear=${period.jYear}&jMonth=${period.jMonth}` : "", peopleQs].filter(Boolean);
+      const qs = parts.length ? `?${parts.join("&")}` : "";
       const res = await fetch(`${API}/analytics/${cur.path}${qs}`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) { setError(await readError(res, "خطا در دریافت آمار")); return; }
       const d = await res.json();
@@ -132,6 +116,24 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
+      {peopleTab && (groups.length > 0 || departments.length > 0) && (
+        <div className="bg-theme-card border border-theme rounded-xl px-3 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <span className="text-xs text-theme-muted">گروه‌های قوانین کاری:</span>
+          {groups.map(g => (
+            <label key={g.id} className="flex items-center gap-1.5 text-theme-primary cursor-pointer">
+              <input type="checkbox" checked={groupIds.includes(g.id)} onChange={e => setGroupIds(ids => e.target.checked ? [...ids, g.id] : ids.filter(x => x !== g.id))} />
+              {g.isDefault ? "پیش‌فرض سازمان" : g.name}
+            </label>
+          ))}
+          <select value={deptId} onChange={e => setDeptId(e.target.value)} className="input-theme text-sm w-auto">
+            <option value="">همه دپارتمان‌ها</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+          {(groupIds.length > 0 || deptId) && <button onClick={() => { setGroupIds([]); setDeptId(""); }} className="text-xs text-red-600 hover:underline">حذف فیلترها</button>}
+          <span className="text-[11px] text-theme-muted mr-auto">هیچ گروهی انتخاب نشود = همه</span>
+        </div>
+      )}
+
       {error && <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       {!d ? (
         loading ? <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div> : null
@@ -141,130 +143,6 @@ export default function AnalyticsPage() {
         : tab === "worklog" ? <WorkLogTab d={d} />
         : tab === "tickets" ? <TicketsTab d={d} />
         : <SystemTab d={d} />}
-    </div>
-  );
-}
-
-// ═════════════════════════════ Building blocks ═════════════════════════════
-
-function Tile({ label, value, sub, icon: Icon }: { label: string; value: string; sub?: string; icon?: any }) {
-  return (
-    <div className="bg-theme-card border border-theme rounded-2xl px-4 py-3">
-      <div className="flex items-center gap-1.5 text-xs text-theme-muted">{Icon && <Icon className="w-3.5 h-3.5" />}{label}</div>
-      <div className="mt-1 text-2xl font-extrabold text-theme-primary">{value}</div>
-      {sub && <div className="text-[11px] text-theme-muted mt-0.5">{sub}</div>}
-    </div>
-  );
-}
-
-// Every chart has a table view (relief for light-mode series below 3:1, and for exact values).
-function ChartCard({ title, subtitle, table, children, className = "" }: {
-  title: string; subtitle?: string; className?: string;
-  table: { head: string[]; rows: (string | number)[][] }; children: React.ReactNode;
-}) {
-  const [asTable, setAsTable] = React.useState(false);
-  return (
-    <div className={`bg-theme-card border border-theme rounded-xl p-3 ${className}`}>
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div>
-          <div className="text-sm font-semibold text-theme-primary">{title}</div>
-          {subtitle && <div className="text-[11px] text-theme-muted">{subtitle}</div>}
-        </div>
-        <button onClick={() => setAsTable(v => !v)} title={asTable ? "نمایش نمودار" : "نمایش جدول"} className="p-1.5 rounded-lg text-theme-muted hover:bg-theme-hover">
-          {asTable ? <BarChart3 className="w-4 h-4" /> : <Table2 className="w-4 h-4" />}
-        </button>
-      </div>
-      {table.rows.length === 0 ? (
-        <div className="h-40 flex items-center justify-center text-xs text-theme-muted">داده‌ای وجود ندارد</div>
-      ) : asTable ? (
-        <div className="max-h-72 overflow-auto">
-          <table className="w-full text-xs">
-            <thead><tr className="text-theme-muted border-b border-theme">{table.head.map(h => <th key={h} className="text-right py-1.5 px-2 font-medium">{h}</th>)}</tr></thead>
-            <tbody>{table.rows.map((r, i) => (
-              <tr key={i} className="border-b border-theme/40">{r.map((c, j) => <td key={j} className="py-1.5 px-2 text-theme-secondary">{typeof c === "number" ? faNum(c) : c}</td>)}</tr>
-            ))}</tbody>
-          </table>
-        </div>
-      ) : children}
-    </div>
-  );
-}
-
-function TooltipBox({ active, payload, label, fmt, labelFmt }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div dir="rtl" className="bg-theme-card border border-theme rounded-lg shadow-lg px-3 py-2 text-xs">
-      {label != null && <div className="text-theme-primary font-medium mb-1">{labelFmt ? labelFmt(label) : label}</div>}
-      {payload.map((p: any) => (
-        <div key={p.dataKey} className="flex items-center gap-1.5 text-theme-secondary">
-          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: p.color }} />
-          <span>{p.name}:</span><span className="text-theme-primary font-medium">{fmt ? fmt(p.value) : faNum(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Ranked single-series horizontal bars (one hue, no legend — the title names the measure).
-function HBars({ data, valueLabel, fmt, limit = 10 }: { data: { name: string; value: number }[]; valueLabel: string; fmt?: (v: number) => string; limit?: number }) {
-  const { series, ink } = useChartTheme();
-  const sorted = [...data].sort((a, b) => b.value - a.value);
-  const top = sorted.slice(0, limit);
-  if (sorted.length > limit) top.push({ name: "سایر", value: sorted.slice(limit).reduce((s, x) => s + x.value, 0) });
-  const h = Math.max(120, top.length * 30 + 30);
-  return (
-    <div dir="ltr" style={{ height: h }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={top} layout="vertical" margin={{ top: 4, right: 4, bottom: 4, left: 4 }} barCategoryGap={6}>
-          <CartesianGrid horizontal={false} stroke={ink.grid} />
-          <XAxis type="number" reversed tick={{ fill: ink.muted, fontSize: 11 }} tickFormatter={v => faNum(v)} axisLine={{ stroke: ink.axis }} tickLine={false} />
-          <YAxis type="category" dataKey="name" orientation="right" width={130} tick={{ fill: ink.text, fontSize: 11 }} axisLine={{ stroke: ink.axis }} tickLine={false} />
-          <Tooltip cursor={{ fill: ink.grid, opacity: 0.4 }} content={<TooltipBox fmt={fmt} />} />
-          <Bar dataKey="value" name={valueLabel} fill={series[0]} radius={[4, 0, 0, 4]} maxBarSize={18} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-// Stacked daily bars: fixed slot order per series, legend always present (>= 2 series).
-function DailyStack({ data, series: defs, height = 240 }: { data: any[]; series: { key: string; label: string }[]; height?: number }) {
-  const { series, ink } = useChartTheme();
-  return (
-    <div dir="ltr" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barCategoryGap={2}>
-          <CartesianGrid vertical={false} stroke={ink.grid} />
-          <XAxis dataKey="date" reversed tickFormatter={faDay} tick={{ fill: ink.muted, fontSize: 10 }} axisLine={{ stroke: ink.axis }} tickLine={false} interval="preserveStartEnd" />
-          <YAxis orientation="right" width={36} allowDecimals={false} tick={{ fill: ink.muted, fontSize: 10 }} tickFormatter={v => faNum(v)} axisLine={false} tickLine={false} />
-          <Tooltip cursor={{ fill: ink.grid, opacity: 0.4 }} content={<TooltipBox labelFmt={(l: string) => `روز ${faDay(l)}`} />} />
-          <Legend wrapperStyle={{ fontSize: 11, direction: "rtl" }} />
-          {defs.map((s, i) => (
-            <Bar key={s.key} dataKey={s.key} name={s.label} stackId="a" fill={series[i]} stroke={ink.surface} strokeWidth={1}
-              radius={i === defs.length - 1 ? [4, 4, 0, 0] : 0} maxBarSize={22} />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function DailyLines({ data, series: defs, height = 240 }: { data: any[]; series: { key: string; label: string }[]; height?: number }) {
-  const { series, ink } = useChartTheme();
-  return (
-    <div dir="ltr" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke={ink.grid} />
-          <XAxis dataKey="date" reversed tickFormatter={faDay} tick={{ fill: ink.muted, fontSize: 10 }} axisLine={{ stroke: ink.axis }} tickLine={false} interval="preserveStartEnd" />
-          <YAxis orientation="right" width={36} allowDecimals={false} tick={{ fill: ink.muted, fontSize: 10 }} tickFormatter={v => faNum(v)} axisLine={false} tickLine={false} />
-          <Tooltip cursor={{ stroke: ink.axis }} content={<TooltipBox labelFmt={(l: string) => `روز ${faDay(l)}`} />} />
-          {defs.length > 1 && <Legend wrapperStyle={{ fontSize: 11, direction: "rtl" }} />}
-          {defs.map((s, i) => (
-            <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={series[i]} strokeWidth={2} dot={false} activeDot={{ r: 4, stroke: ink.surface, strokeWidth: 2 }} />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
     </div>
   );
 }
@@ -304,10 +182,26 @@ function AttendanceTab({ d }: { d: any }) {
   // "late" is a subset of present — chart present-on-time so the stack adds up.
   const daily = (d.daily || []).map((x: any) => ({ ...x, present: x.present - x.late }));
   const reqRows = (d.requests || []).map((r: any) => [REQ_FA[r.type] || r.type, r.status === "PENDING" ? "در انتظار" : r.status === "APPROVED" ? "تاییدشده" : r.status === "REJECTED" ? "ردشده" : r.status, r.count]);
+  const td = d.today || { statuses: {} };
+  const st = td.statuses || {};
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+      <div className="text-xs font-semibold text-theme-secondary">امروز (لحظه‌ای)</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2.5">
+        <Tile label="درصد حضور" value={td.attendancePct == null ? "—" : `${faNum(td.attendancePct)}٪`} sub={`${faNum(td.present || 0)} از ${faNum(td.activeUsers || 0)} نفر`} />
+        <Tile label="در حال کار" value={faNum(td.working || 0)} />
+        <Tile label="حاضر" value={faNum(st.PRESENT || 0)} />
+        <Tile label="با تاخیر" value={faNum(st.LATE || 0)} />
+        <Tile label="تعجیل" value={faNum(st.EARLY_LEAVE || 0)} />
+        <Tile label="غایب" value={faNum(st.ABSENT || 0)} />
+        <Tile label="ناقص" value={faNum(st.INCOMPLETE || 0)} />
+        <Tile label="مرخصی / ماموریت / دورکاری" value={faNum((st.LEAVE || 0) + (st.SICK_LEAVE || 0) + (st.MISSION || 0) + (st.REMOTE_WORK || 0))} />
+      </div>
+      <div className="text-xs font-semibold text-theme-secondary">{J_MONTHS[d.jMonth - 1]} {toFa(String(d.jYear))}</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2.5">
         <Tile label="کارکرد کل" value={fmtH(t.workedMinutes)} />
+        <Tile label="شب‌کاری" value={fmtH(t.nightMinutes)} />
+        <Tile label="تعجیل" value={fmtH(t.earlyLeaveMinutes)} />
         <Tile label="اضافه‌کار عادی" value={fmtH(t.overtimeMinutes)} />
         <Tile label="تعطیل‌کاری" value={fmtH(t.holidayOvertimeMinutes)} />
         <Tile label="کسری" value={fmtH(t.deficitMinutes)} />
@@ -335,10 +229,61 @@ function AttendanceTab({ d }: { d: any }) {
         <ChartCard title="روزها بر اساس وضعیت" subtitle="تعداد روز-نفر در ماه" table={{ head: ["وضعیت", "تعداد"], rows: statusRows.map(r => [r.name, r.value]) }}>
           <HBars data={statusRows} valueLabel="روز" />
         </ChartCard>
+        <ChartCard title="بیشترین کارکرد" subtitle="ساعت — همه‌ی کارکنان، شامل ساعتی" table={{ head: ["نام", "دپارتمان", "ساعت"], rows: (d.topWorked || []).map((r: any) => [r.name, r.department || "—", hrs(r.workedMinutes)]) }}>
+          <HBars data={people(d.topWorked || [], "workedMinutes")} valueLabel="ساعت" fmt={v => `${faNum(v)} ساعت`} />
+        </ChartCard>
         <ChartCard title="درخواست‌های اصلاح و مرخصی" subtitle="ثبت‌شده در این ماه" table={{ head: ["نوع", "وضعیت", "تعداد"], rows: reqRows }}>
           <HBars data={Object.values((d.requests || []).reduce((m: any, r: any) => { const k = REQ_FA[r.type] || r.type; m[k] = { name: k, value: (m[k]?.value || 0) + r.count }; return m; }, {}))} valueLabel="درخواست" />
         </ChartCard>
       </div>
+      <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-theme">
+          <span className="text-sm font-semibold text-theme-primary">رکوردهای ناقص نیازمند اصلاح ({faNum((d.incompleteOpen || []).length)})</span>
+          <a href="/dashboard/attendance/records" className="text-xs text-blue-600 hover:underline">کارکرد روزانه</a>
+        </div>
+        {(d.incompleteOpen || []).length === 0 ? (
+          <div className="py-6 text-center text-xs text-theme-muted">رکورد ناقصی در این ماه نیست</div>
+        ) : (
+          <div className="max-h-72 overflow-auto">
+            <table className="w-full text-xs">
+              <thead><tr className="text-theme-muted border-b border-theme"><th className="text-right py-1.5 px-3">نام</th><th className="text-right">دپارتمان</th><th className="text-right">تاریخ</th><th>ورود</th><th>خروج</th></tr></thead>
+              <tbody>{d.incompleteOpen.map((r: any) => (
+                <tr key={r.userId + r.date} className="border-b border-theme/40">
+                  <td className="py-1.5 px-3 text-theme-primary">{r.name}</td><td className="text-theme-muted">{r.department || "—"}</td>
+                  <td className="text-theme-muted">{new Date(r.date + "T00:00:00Z").toLocaleDateString("fa-IR", { timeZone: "UTC" })}</td>
+                  <td className="text-center" dir="ltr">{r.firstCheckIn ? new Date(r.firstCheckIn).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tehran" }) : "—"}</td>
+                  <td className="text-center" dir="ltr">{r.lastCheckOut ? new Date(r.lastCheckOut).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tehran" }) : "—"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <Insights d={d} />
+      <p className="text-[11px] text-theme-muted">کارکنان ساعتی فقط در آمار کارکرد می‌آیند؛ در رتبه‌بندی اضافه‌کار، تاخیر و کسری حساب نمی‌شوند.</p>
+    </div>
+  );
+}
+
+// Short plain-language notes derived from the month's numbers.
+function Insights({ d }: { d: any }) {
+  const notes: string[] = [];
+  const daily = (d.daily || []) as any[];
+  const worst = [...daily].sort((a, b) => b.absent - a.absent)[0];
+  if (worst?.absent) notes.push(`بیشترین غیبت در روز ${faDay(worst.date)} با ${faNum(worst.absent)} نفر بوده است.`);
+  const lateDays = daily.filter(x => x.late > 0);
+  if (lateDays.length) notes.push(`در ${faNum(lateDays.length)} روز از ماه تاخیر ثبت شده؛ میانگین ${faNum(Math.round(lateDays.reduce((s, x) => s + x.late, 0) / lateDays.length))} نفر در هر روز.`);
+  const deptDelay = [...(d.byDepartment || [])].sort((a: any, b: any) => b.delayMinutes - a.delayMinutes)[0];
+  if (deptDelay?.delayMinutes) notes.push(`بیشترین تاخیر مربوط به دپارتمان «${deptDelay.department}» با ${fmtH(deptDelay.delayMinutes)} است.`);
+  const deptOt = [...(d.byDepartment || [])].sort((a: any, b: any) => b.overtimeMinutes - a.overtimeMinutes)[0];
+  if (deptOt?.overtimeMinutes) notes.push(`بیشترین اضافه‌کار مربوط به دپارتمان «${deptOt.department}» با ${fmtH(deptOt.overtimeMinutes)} است.`);
+  if ((d.incompleteOpen || []).length) notes.push(`${faNum(d.incompleteOpen.length)} رکورد ناقص نیاز به اصلاح دارد.`);
+  if (d.today?.attendancePct != null) notes.push(`درصد حضور امروز ${faNum(d.today.attendancePct)}٪ است (${faNum(d.today.working || 0)} نفر هم‌اکنون در حال کار).`);
+  if (!notes.length) return null;
+  return (
+    <div className="bg-theme-card border border-theme rounded-xl p-3">
+      <div className="text-sm font-semibold text-theme-primary mb-2">بینش‌ها</div>
+      <ul className="space-y-1 text-sm text-theme-secondary list-disc pr-5">{notes.map(n => <li key={n}>{n}</li>)}</ul>
     </div>
   );
 }
@@ -351,7 +296,7 @@ function AssetsTab({ d }: { d: any }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <Tile icon={Boxes} label="تعداد اموال" value={faNum(d.total)} />
         <Tile label="ارزش کل" value={money(d.value)} />
-        <Tile label="واگذاری‌های فعال" value={faNum(d.activeAssignments)} sub={pct(d.activeAssignments, d.total) + " از اموال"} />
+        <Tile label="واگذاری‌های فعال" value={faNum(d.activeAssignments)} sub={`${pct(d.activeAssignments, d.total)} از اموال · ${faNum(d.assignments?.total || 0)} واگذاری تا کنون، ${faNum(d.assignments?.returned || 0)} بازگشتی`} />
         <Tile label="معیوب" value={faNum(d.byCondition.find((c: any) => c.key === "DEFECTIVE")?.count || 0)} />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -369,6 +314,11 @@ function AssetsTab({ d }: { d: any }) {
         </ChartCard>
         <ChartCard title="واگذاری فعال به تفکیک دپارتمان" table={{ head: ["دپارتمان", "تعداد"], rows: d.assignedByDepartment.map((r: any) => [r.name, r.count]) }}>
           <HBars data={d.assignedByDepartment.map((r: any) => ({ name: r.name, value: r.count }))} valueLabel="دارایی" />
+        </ChartCard>
+        <ChartCard title="روند واگذاری‌ها — ۱۲ ماه اخیر" subtitle="واگذاری جدید و بازگشت در هر ماه"
+          table={{ head: ["ماه", "واگذاری", "بازگشت"], rows: d.addedPerMonth.map((m: any) => [toFa(m.label), m.assigned || 0, m.returned || 0]) }}>
+          <DailyLines data={d.addedPerMonth.map((m: any) => ({ date: m.label, assigned: m.assigned || 0, returned: m.returned || 0 }))}
+            series={[{ key: "assigned", label: "واگذاری" }, { key: "returned", label: "بازگشت" }]} height={220} xFormat={(v: string) => toFa(v.slice(2))} />
         </ChartCard>
         <ChartCard title="دارایی‌های ثبت‌شده در ۱۲ ماه اخیر" table={{ head: ["ماه", "تعداد"], rows: months.map((m: any) => [toFa(m.date), m.count]) }}>
           <div dir="ltr" style={{ height: 220 }}>

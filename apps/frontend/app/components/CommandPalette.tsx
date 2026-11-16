@@ -33,7 +33,7 @@ const ALL_COMMANDS: CommandItem[] = [
   { id: "departments", title: "دپارتمان‌ها", icon: MapPin, href: "/dashboard/departments", section: "ERP", keywords: ["dept", "دپارتمان"] },
   { id: "buildings", title: "ساختمان‌ها", icon: Building, href: "/dashboard/buildings", section: "ERP", keywords: ["building", "ساختمان"] },
   // Admin
-  { id: "reports", title: "گزارش‌ها", icon: BarChart3, href: "/dashboard/reports", section: "تحلیل", keywords: ["report", "گزارش"] },
+  { id: "analytics", title: "داشبورد مدیریتی", icon: BarChart3, href: "/dashboard/analytics", section: "تحلیل", keywords: ["report", "گزارش", "dashboard", "داشبورد"] },
   { id: "access", title: "دسترسی صفحات", icon: FileText, href: "/dashboard/access", section: "مدیریت", keywords: ["access", "permission", "دسترسی"] },
   { id: "settings", title: "تنظیمات", icon: Settings, href: "/dashboard/settings", section: "مدیریت", keywords: ["setting", "تنظیمات"] },
 ];

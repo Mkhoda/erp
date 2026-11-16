@@ -38,14 +38,42 @@ export class AnalyticsService {
     return new Map(rows.map((u) => [u.id, { name: `${u.firstName} ${u.lastName}`, department: u.department?.name ?? null }]));
   }
 
+  /**
+   * People filter for the attendance / work-log / overview tabs: work-rule groups (scheduleIds,
+   * comma separated; the default group also matches people with no group) and a department.
+   * Returns null when nothing is filtered.
+   */
+  private async filteredUserIds(q: any): Promise<Set<string> | null> {
+    const scheduleIds = String(q?.scheduleIds || '').split(',').filter(Boolean);
+    const departmentId = q?.departmentId || null;
+    if (!scheduleIds.length && !departmentId) return null;
+    const and: any[] = [];
+    if (scheduleIds.length) {
+      const defaults = await this.prisma.workSchedule.findMany({ where: { id: { in: scheduleIds }, isDefault: true }, select: { id: true } });
+      const or: any[] = [{ attendanceRule: { scheduleId: { in: scheduleIds } } }];
+      if (defaults.length) or.push({ attendanceRule: null }, { attendanceRule: { scheduleId: null } });
+      and.push({ OR: or });
+    }
+    if (departmentId) and.push({ OR: [{ departmentId }, { userDepartments: { some: { departmentId } } }] });
+    const users = await this.prisma.user.findMany({ where: { AND: and }, select: { id: true } });
+    return new Set(users.map((u) => u.id));
+  }
+
+  private async hourlyIds(): Promise<Set<string>> {
+    const rows = await this.prisma.userAttendanceRule.findMany({ where: { employeeType: 'HOURLY' }, select: { userId: true } });
+    return new Set(rows.map((r) => r.userId));
+  }
+
   // ── نمای کلی ─────────────────────────────────────────────────────────────
-  async overview() {
+  async overview(q: any = {}) {
+    const only = await this.filteredUserIds(q);
+    const userIn = only ? { userId: { in: [...only] } } : {};
     const today = workDateOf(new Date());
     const now = Date.now();
     const [usersActive, usersDisabled, todayStatus, assetsCount, assetsValue, openTickets, overdueTickets, pendingRequests, activeSessions, unread] = await Promise.all([
       this.prisma.user.count({ where: { disabled: false } }),
       this.prisma.user.count({ where: { disabled: true } }),
-      this.prisma.attendanceDay.groupBy({ by: ['status'], where: { gregDate: today }, _count: true }),
+      this.prisma.attendanceDay.groupBy({ by: ['status'], where: { gregDate: today, ...userIn }, _count: true }),
       this.prisma.asset.count(),
       this.prisma.asset.aggregate({ _sum: { cost: true } }),
       this.prisma.ticket.count({ where: { status: { in: [...OPEN_TICKET] as any } } }),
@@ -57,7 +85,8 @@ export class AnalyticsService {
     const statusToday: Record<string, number> = {};
     for (const r of todayStatus) statusToday[r.status] = r._count;
     const present = ['PRESENT', 'LATE', 'EARLY_LEAVE', 'INCOMPLETE'].reduce((s, k) => s + (statusToday[k] ?? 0), 0);
-    const wl = await this.workLogs.adminDays(ADMIN_ACTOR, { from: isoDate(today), to: isoDate(today) });
+    const wlAll = await this.workLogs.adminDays(ADMIN_ACTOR, { from: isoDate(today), to: isoDate(today) });
+    const wl = only ? { summary: this.summarize(wlAll.rows.filter((r: any) => only.has(r.userId))) } : wlAll;
     return {
       date: isoDate(today),
       users: { active: usersActive, disabled: usersDisabled, onlineNow: activeSessions },
@@ -73,7 +102,9 @@ export class AnalyticsService {
   // ── حضور و غیاب ──────────────────────────────────────────────────────────
   async attendance(q: any) {
     const p = this.period(q);
-    const where = { gregDate: { gte: p.start, lt: p.endExcl } };
+    const only = await this.filteredUserIds(q);
+    const where: any = { gregDate: { gte: p.start, lt: p.endExcl }, ...(only ? { userId: { in: [...only] } } : {}) };
+    const today = workDateOf(new Date());
     const [totals, byStatus, byDay, perUser, requests] = await Promise.all([
       this.prisma.attendanceDay.aggregate({
         where,
@@ -86,8 +117,27 @@ export class AnalyticsService {
         by: ['userId'], where,
         _sum: { workedMinutes: true, overtimeMinutes: true, delayMinutes: true, deficitMinutes: true, remoteMinutes: true },
       }),
-      this.prisma.attendanceRequest.groupBy({ by: ['type', 'status'], where: { createdAt: { gte: p.start, lt: p.endExcl } }, _count: true }),
+      this.prisma.attendanceRequest.groupBy({ by: ['type', 'status'], where: { createdAt: { gte: p.start, lt: p.endExcl }, ...(only ? { userId: { in: [...only] } } : {}) }, _count: true }),
     ]);
+    const [todayRows, activeUsers, incompleteOpen, hourly] = await Promise.all([
+      this.prisma.attendanceDay.findMany({ where: { gregDate: today, ...(only ? { userId: { in: [...only] } } : {}) }, select: { status: true, firstCheckIn: true, lastCheckOut: true } }),
+      this.prisma.user.count({ where: { disabled: false, attendanceCardNo: { not: null }, ...(only ? { id: { in: [...only] } } : {}) } }),
+      // Incomplete days that are over (not today) — need a manual fix.
+      this.prisma.attendanceDay.findMany({
+        where: { ...where, status: 'INCOMPLETE', gregDate: { gte: p.start, lt: new Date(Math.min(p.endExcl.getTime(), today.getTime())) } },
+        select: { userId: true, gregDate: true, firstCheckIn: true, lastCheckOut: true },
+        orderBy: { gregDate: 'desc' }, take: 50,
+      }),
+      this.hourlyIds(),
+    ]);
+    // Today, live: still at work = checked in, no check-out yet.
+    const todayStatus: Record<string, number> = {};
+    let working = 0;
+    for (const r of todayRows) {
+      if (r.status === 'INCOMPLETE' && r.firstCheckIn && !r.lastCheckOut) working++;
+      else todayStatus[r.status] = (todayStatus[r.status] ?? 0) + 1;
+    }
+    const presentToday = working + ['PRESENT', 'LATE', 'EARLY_LEAVE', 'INCOMPLETE'].reduce((s, k) => s + (todayStatus[k] ?? 0), 0);
 
     const statusCounts: Record<string, number> = {};
     for (const r of byStatus) statusCounts[r.status] = r._count;
@@ -112,7 +162,11 @@ export class AnalyticsService {
       workedMinutes: u._sum.workedMinutes ?? 0, overtimeMinutes: u._sum.overtimeMinutes ?? 0,
       delayMinutes: u._sum.delayMinutes ?? 0, deficitMinutes: u._sum.deficitMinutes ?? 0, remoteMinutes: u._sum.remoteMinutes ?? 0,
     }));
-    const top = (k: keyof (typeof people)[number]) => [...people].filter((x) => (x[k] as number) > 0).sort((a, b) => (b[k] as number) - (a[k] as number)).slice(0, 10);
+    // Hourly staff only matter for worked time — never in overtime/lateness/deficit rankings.
+    const top = (k: keyof (typeof people)[number], includeHourly = false) => [...people]
+      .filter((x) => (x[k] as number) > 0 && (includeHourly || !hourly.has(x.userId)))
+      .sort((a, b) => (b[k] as number) - (a[k] as number)).slice(0, 10);
+    const incNames = await this.userNames([...new Set(incompleteOpen.map((r) => r.userId))]);
 
     // Per department (primary department of each user).
     const deptAgg = new Map<string, { department: string; people: number; workedMinutes: number; overtimeMinutes: number; delayMinutes: number; deficitMinutes: number }>();
@@ -131,9 +185,24 @@ export class AnalyticsService {
       statusCounts,
       daily: [...days.values()],
       topOvertime: top('overtimeMinutes'), topDelay: top('delayMinutes'), topDeficit: top('deficitMinutes'), topRemote: top('remoteMinutes'),
+      topWorked: top('workedMinutes', true),
+      today: { date: isoDate(today), statuses: todayStatus, working, present: presentToday, activeUsers, attendancePct: activeUsers ? Math.round((presentToday / activeUsers) * 100) : null },
+      incompleteOpen: incompleteOpen.map((r) => ({ userId: r.userId, ...(incNames.get(r.userId) ?? { name: '—', department: null }), date: isoDate(r.gregDate), firstCheckIn: r.firstCheckIn, lastCheckOut: r.lastCheckOut })),
       byDepartment: [...deptAgg.values()].sort((a, b) => b.workedMinutes - a.workedMinutes),
       requests: requests.map((r) => ({ type: r.type, status: r.status, count: r._count })),
     };
+  }
+
+  /** Same counters as WorkLogService.adminDays().summary, for an already-filtered set of rows. */
+  private summarize(rows: any[]) {
+    const s = { required: 0, submitted: 0, late: 0, missing: 0, pending: 0, loggedMinutes: 0 };
+    for (const r of rows) {
+      if (r.required) s.required++;
+      if (r.state === 'SUBMITTED') s.submitted++; else if (r.state === 'LATE') s.late++;
+      else if (r.state === 'MISSING') s.missing++; else if (r.state === 'PENDING') s.pending++;
+      s.loggedMinutes += r.loggedMinutes || 0;
+    }
+    return s;
   }
 
   // ── اموال ────────────────────────────────────────────────────────────────
@@ -149,30 +218,39 @@ export class AnalyticsService {
       this.prisma.asset.findMany({ where: { createdAt: { gte: new Date(Date.now() - 400 * DAY_MS) } }, select: { createdAt: true } }),
       this.prisma.assetAssignment.groupBy({ by: ['departmentId'], where: { returnedAt: null }, _count: true }),
     ]);
-    const [cats, types] = await Promise.all([
+    const since = new Date(Date.now() - 400 * DAY_MS);
+    const [cats, types, assignTotal, assignReturned, assignRecent, returnedRecent] = await Promise.all([
       this.prisma.assetCategory.findMany({ select: { id: true, name: true } }),
       this.prisma.assetType.findMany({ select: { id: true, name: true } }),
+      this.prisma.assetAssignment.count(),
+      this.prisma.assetAssignment.count({ where: { returnedAt: { not: null } } }),
+      this.prisma.assetAssignment.findMany({ where: { assignedAt: { gte: since } }, select: { assignedAt: true } }),
+      this.prisma.assetAssignment.findMany({ where: { returnedAt: { gte: since } }, select: { returnedAt: true } }),
     ]);
     const catName = new Map(cats.map((c) => [c.id, c.name]));
     const typeName = new Map(types.map((c) => [c.id, c.name]));
     const depts = await this.deptNames(assignByDept.map((a) => a.departmentId));
 
     // Assets added per Jalali month over the last 12 months.
-    const months = new Map<string, { label: string; count: number }>();
+    const months = new Map<string, { label: string; count: number; assigned: number; returned: number }>();
     const t = toJalaliParts(workDateOf(new Date()));
     for (let i = 11; i >= 0; i--) {
       let y = t.jYear, m = t.jMonth - i;
       while (m < 1) { m += 12; y--; }
-      months.set(`${y}-${m}`, { label: `${y}/${String(m).padStart(2, '0')}`, count: 0 });
+      months.set(`${y}-${m}`, { label: `${y}/${String(m).padStart(2, '0')}`, count: 0, assigned: 0, returned: 0 });
     }
-    for (const a of byMonth) {
-      const j = toJalaliParts(workDateOf(a.createdAt));
+    const bump = (d: Date, f: 'count' | 'assigned' | 'returned') => {
+      const j = toJalaliParts(workDateOf(d));
       const k = months.get(`${j.jYear}-${j.jMonth}`);
-      if (k) k.count++;
-    }
+      if (k) k[f]++;
+    };
+    for (const a of byMonth) bump(a.createdAt, 'count');
+    for (const a of assignRecent) bump(a.assignedAt, 'assigned');
+    for (const a of returnedRecent) bump(a.returnedAt!, 'returned');
 
     return {
       total, value: value._sum.cost ?? 0, activeAssignments: activeAssign,
+      assignments: { total: assignTotal, active: activeAssign, returned: assignReturned },
       byAvailability: byAvail.map((r) => ({ key: r.availability, count: r._count, value: r._sum.cost ?? 0 })),
       byCondition: byCond.map((r) => ({ key: r.condition, count: r._count })),
       byCategory: byCat.map((r) => ({ name: catName.get(r.categoryId) ?? '—', count: r._count, value: r._sum.cost ?? 0 })).sort((a, b) => b.count - a.count),
@@ -188,7 +266,9 @@ export class AnalyticsService {
     const today = workDateOf(new Date());
     const to = new Date(Math.min(p.endExcl.getTime() - DAY_MS, today.getTime()));
     if (to.getTime() < p.start.getTime()) return { ...p, start: isoDate(p.start), summary: null, daily: [], byDepartment: [], topUsers: [], byCategory: [] };
-    const days = await this.workLogs.adminDays(ADMIN_ACTOR, { from: isoDate(p.start), to: isoDate(to) });
+    const only = await this.filteredUserIds(q);
+    const all = await this.workLogs.adminDays(ADMIN_ACTOR, { from: isoDate(p.start), to: isoDate(to) });
+    const days = only ? { rows: all.rows.filter((r: any) => only.has(r.userId)), summary: this.summarize(all.rows.filter((r: any) => only.has(r.userId))) } : all;
 
     const daily = new Map<string, { date: string; jDay: number; submitted: number; late: number; missing: number }>();
     const dept = new Map<string, { department: string; required: number; submitted: number; late: number; missing: number; loggedMinutes: number }>();
@@ -212,7 +292,7 @@ export class AnalyticsService {
     }
 
     // Logged time by category over the period.
-    const byTask = await this.prisma.workTaskEntry.groupBy({ by: ['taskId'], where: { gregDate: { gte: p.start, lte: to } }, _sum: { minutes: true } });
+    const byTask = await this.prisma.workTaskEntry.groupBy({ by: ['taskId'], where: { gregDate: { gte: p.start, lte: to }, ...(only ? { userId: { in: [...only] } } : {}) }, _sum: { minutes: true } });
     const tasks = byTask.length ? await this.prisma.workTask.findMany({ where: { id: { in: byTask.map((t) => t.taskId) } }, select: { id: true, category: { select: { name: true, color: true } } } }) : [];
     const taskCat = new Map(tasks.map((t) => [t.id, t.category]));
     const cats = new Map<string, { name: string; color: string | null; minutes: number }>();

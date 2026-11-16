@@ -31,10 +31,8 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   { page: '/dashboard/floors',             label: 'طبقات' },
   { page: '/dashboard/rooms',              label: 'اتاق‌ها' },
   { page: '/dashboard/users',              label: 'کاربران' },
-  { page: '/dashboard/reports',            label: 'گزارش‌ها' },
 
   // ── Attendance & Workforce (restricted by dept + role) ──
-  { page: '/dashboard/attendance',             label: 'حضور و غیاب' },
   { page: '/dashboard/attendance/my',          label: 'حضور من' },
   { page: '/dashboard/attendance/records',     label: 'کارکرد روزانه' },
   { page: '/dashboard/attendance/monthly',     label: 'کارکرد ماهانه' },
@@ -58,6 +56,7 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
 
   // ── Admin metrics dashboard — ADMIN by default, grantable per department/role or per person ──
   { page: '/dashboard/analytics',            label: 'داشبورد مدیریتی' },
+  { page: '/dashboard/performance',          label: 'امتیاز عملکرد' },
 
   // ── Work log (ثبت عملکرد) ──
   { page: '/dashboard/work-log/my',          label: 'عملکرد من' },

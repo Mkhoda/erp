@@ -13,8 +13,6 @@ import { RecomputeService } from './engine/recompute.service';
 import { MaintenanceController } from './engine/maintenance.controller';
 import { RecordsService } from './records/records.service';
 import { RecordsController } from './records/records.controller';
-import { DashboardsService } from './dashboards/dashboards.service';
-import { DashboardsController } from './dashboards/dashboards.controller';
 import { ReportsService } from './reports/reports.service';
 import { ReportsController } from './reports/reports.controller';
 import { SchedulesService } from './schedules/schedules.service';
@@ -37,7 +35,6 @@ import { GuardShiftsController } from './guard-shifts/guard-shifts.controller';
     SyncController,
     MaintenanceController,
     RecordsController,
-    DashboardsController,
     ReportsController,
     SchedulesController,
     RequestsController,
@@ -55,7 +52,6 @@ import { GuardShiftsController } from './guard-shifts/guard-shifts.controller';
     GuardCalcService,
     RecomputeService,
     RecordsService,
-    DashboardsService,
     ReportsService,
     SchedulesService,
     RequestsService,
