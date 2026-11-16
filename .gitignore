@@ -275,3 +275,6 @@ file_list.txt
 
 # Deployment specific files that shouldn't be in source control
 docker-compose.override.yml
+
+# Left by update.sh when a deploy's migrations failed (auto-update retries while present)
+.deploy-failed

@@ -169,12 +169,31 @@ if [ "$DO_BUILD" -eq 1 ]; then
   npm --prefix apps/backend run build 2>&1 | grep -E '(error TS|Error:|warning TS)' | head -20 || true
   step_done
 
+  # The new backend build expects the new schema: if migrations don't apply, restarting
+  # would serve 500s on every query touching new columns. Retry (transient "Schema engine
+  # error"s happen when the DB server blips), and on a final failure stop BEFORE the frontend
+  # build and the restarts — the running processes keep the previous version — and leave
+  # .deploy-failed so auto-update.sh retries on its next tick even with no new commits.
   step_start "Prisma migrate"
-  if (cd apps/backend && npx prisma migrate deploy 2>&1 | grep -E '(Applying|applied|error|Error|No pending|failed)' | head -15); then
+  MIGRATE_OK=0
+  MIGRATE_LOG="$(mktemp)"
+  for attempt in 1 2 3; do
+    if (cd apps/backend && npx prisma migrate deploy) >"$MIGRATE_LOG" 2>&1; then
+      MIGRATE_OK=1; break
+    fi
+    warn "prisma migrate deploy failed (attempt $attempt/3)"
+    [ "$attempt" -lt 3 ] && sleep 15
+  done
+  grep -E '(Applying|applied|error|Error|No pending|failed)' "$MIGRATE_LOG" | head -15 || true
+  if [ "$MIGRATE_OK" -eq 1 ]; then
     step_done
+    rm -f "$MIGRATE_LOG"
   else
     step_fail
-    warn "Migration failed — check DB state"
+    tail -20 "$MIGRATE_LOG"; rm -f "$MIGRATE_LOG"
+    touch "$REPO_ROOT/.deploy-failed"
+    err "Migration failed — services NOT restarted (previous version keeps running). Will retry on next auto-update."
+    exit 1
   fi
 
   step_start "Frontend build"
@@ -345,3 +364,6 @@ if command -v pm2 >/dev/null 2>&1; then
   echo -e "${BOLD}Process status:${NC}"
   pm2 list --no-color 2>/dev/null | grep -E '(arzesh|name|\-\-\-)' || pm2 list
 fi
+
+# A deploy reached the end: clear any earlier failed-migration marker.
+rm -f "$REPO_ROOT/.deploy-failed"

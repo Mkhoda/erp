@@ -21,10 +21,16 @@ git fetch origin "$BRANCH" --quiet
 LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse "origin/$BRANCH")
 
-if [ "$LOCAL" = "$REMOTE" ]; then
+# .deploy-failed is left by update.sh when migrations could not be applied (services were
+# not restarted). Retry the whole pipeline until it succeeds, even with no new commits.
+if [ "$LOCAL" = "$REMOTE" ] && [ ! -f "$REPO_ROOT/.deploy-failed" ]; then
   exit 0
 fi
 
-echo "===== $(date '+%Y-%m-%d %H:%M:%S') — new commits on $BRANCH: ${LOCAL:0:7} -> ${REMOTE:0:7} ====="
+if [ "$LOCAL" = "$REMOTE" ]; then
+  echo "===== $(date '+%Y-%m-%d %H:%M:%S') — retrying failed deploy of ${LOCAL:0:7} ====="
+else
+  echo "===== $(date '+%Y-%m-%d %H:%M:%S') — new commits on $BRANCH: ${LOCAL:0:7} -> ${REMOTE:0:7} ====="
+fi
 ./update.sh
 echo "===== auto-update finished $(date '+%Y-%m-%d %H:%M:%S') ====="
