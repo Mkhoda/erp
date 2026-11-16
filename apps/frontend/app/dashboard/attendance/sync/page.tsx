@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import SearchSelect from "../../../components/ui/SearchSelect";
 import Modal from "../../../components/ui/Modal";
+import JalaliMonthNav from "../../../components/ui/JalaliMonthNav";
+import { localTodayIso, parseIso } from "../../../components/ui/jalali-calendar";
 
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 const toFa = (s: string) => s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]);
@@ -120,8 +122,8 @@ export default function SyncMonitorPage() {
   // range to [first punch, today]) — it never touches future-dated days, so a
   // leave/mission approved for an upcoming date needs this instead: rebuild one
   // whole Jalali month (any month, past or future) for all users or just one.
-  const [rmYear, setRmYear] = React.useState("");
-  const [rmMonth, setRmMonth] = React.useState("");
+  const [rmYear, setRmYear] = React.useState(() => String(parseIso(localTodayIso())!.jy));
+  const [rmMonth, setRmMonth] = React.useState(() => String(parseIso(localTodayIso())!.jm));
   const [rmUserId, setRmUserId] = React.useState("");
   const [users, setUsers] = React.useState<any[]>([]);
   React.useEffect(() => {
@@ -223,10 +225,7 @@ export default function SyncMonitorPage() {
         <div className="pt-2 border-t border-theme space-y-2">
           <span className="text-xs text-theme-muted flex items-center gap-1"><TimerReset className="w-3.5 h-3.5 text-blue-500" /> پیش‌نمایش بازمحاسبه یک ماه برای یک کاربر (شامل روزهای آینده — برای مرخصی/ماموریت از‌پیش‌ثبت‌شده) — فقط گزارش، چیزی تغییر نمی‌کند</span>
           <div className="flex flex-wrap items-center gap-2">
-            <input value={rmYear} onChange={e => setRmYear(e.target.value.replace(/\D/g, ""))} placeholder="سال (1405)" dir="ltr"
-              className="input-theme text-sm w-24 py-1.5" />
-            <input value={rmMonth} onChange={e => setRmMonth(e.target.value.replace(/\D/g, ""))} placeholder="ماه (1-12)" dir="ltr"
-              className="input-theme text-sm w-24 py-1.5" />
+            <JalaliMonthNav jYear={+rmYear} jMonth={+rmMonth} onChange={(y, m) => { setRmYear(String(y)); setRmMonth(String(m)); }} />
             <SearchSelect
               className="w-56"
               options={userOptions}

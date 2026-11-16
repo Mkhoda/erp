@@ -4,6 +4,8 @@ import { Trophy, Loader2, Settings2, Save, Info, X } from "lucide-react";
 import { pageTitle } from "../../../lib/branding";
 import { readError } from "../../../lib/http";
 import Modal from "../../components/ui/Modal";
+import JalaliMonthNav from "../../components/ui/JalaliMonthNav";
+import { localTodayIso } from "../../components/ui/jalali-calendar";
 import { useToast } from "../../components/ui/Toast";
 import { faNum, fmtH } from "../../components/charts/ChartKit";
 
@@ -121,12 +123,8 @@ export default function PerformancePage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select className="input-theme text-sm w-auto" value={period.jMonth} onChange={e => setPeriod(p => ({ ...p, jMonth: +e.target.value }))}>
-            {J_MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-          </select>
-          <select className="input-theme text-sm w-auto" value={period.jYear} onChange={e => setPeriod(p => ({ ...p, jYear: +e.target.value }))}>
-            {[now.jYear - 1, now.jYear].map(y => <option key={y} value={y}>{y.toLocaleString("fa-IR", { useGrouping: false })}</option>)}
-          </select>
+          <JalaliMonthNav jYear={period.jYear} jMonth={period.jMonth} max={localTodayIso()}
+            onChange={(jYear, jMonth) => setPeriod(p => ({ ...p, jYear, jMonth }))} />
           <select className="input-theme text-sm w-auto" value={deptId} onChange={e => setDeptId(e.target.value)}>
             <option value="">همه دپارتمان‌ها</option>
             {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}

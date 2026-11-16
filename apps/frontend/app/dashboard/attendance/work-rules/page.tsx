@@ -3,10 +3,13 @@ import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
   Save, Loader2, SlidersHorizontal, CalendarDays, Timer, Plus, Trash2, Users,
-  CalendarRange, LayoutGrid, List, Settings, Activity, ChevronRight, ChevronLeft, X,
+  CalendarRange, LayoutGrid, List, Settings, Activity, X,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import TimeSelect from "../../../components/ui/TimeSelect";
+import JalaliDatePicker from "../../../components/ui/JalaliDatePicker";
+import JalaliMonthNav from "../../../components/ui/JalaliMonthNav";
+import { jalaliToGregorian as jalaliToGregorianIso, parseIso } from "../../../components/ui/jalali-calendar";
 import AttendanceSettingsPage from "../settings/page";
 import SyncMonitorPage from "../sync/page";
 
@@ -15,7 +18,6 @@ const inputCls = "w-full bg-theme-primary border border-theme rounded-lg px-3 py
 const faNum = (n: number) => (n ?? 0).toLocaleString("fa-IR");
 const hrs = (m: number) => (m ? `≈ ${faNum(Math.round((m / 60) * 10) / 10)} ساعت` : "");
 
-const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
 // JS getDay(): Sat=6 .. Fri=5. Persian week starts Saturday.
 const WEEK = [
   { d: 6, name: "شنبه" }, { d: 0, name: "یکشنبه" }, { d: 1, name: "دوشنبه" },
@@ -207,10 +209,9 @@ export default function WorkRulesPage() {
       {/* ── Calendar tab ── */}
       {tab === "calendar" && group && (
         <div className="bg-theme-card border border-theme rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <button onClick={() => { if (vm === 1) { setVm(12); setVy(y => y - 1); } else setVm(m => m - 1); }} className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted"><ChevronRight className="w-4 h-4" /></button>
-            <div className="text-center"><div className="font-bold text-theme-primary">{J_MONTHS[vm - 1]} {faDigits(String(vy))}</div><div className="text-[11px] text-theme-muted">{group.isDefault ? "پیش‌فرض سازمان" : group.name}</div></div>
-            <button onClick={() => { if (vm === 12) { setVm(1); setVy(y => y + 1); } else setVm(m => m + 1); }} className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted"><ChevronLeft className="w-4 h-4" /></button>
+          <div className="flex flex-col items-center gap-1 mb-3">
+            <JalaliMonthNav jYear={vy} jMonth={vm} onChange={(y, m) => { setVy(y); setVm(m); }} />
+            <div className="text-[11px] text-theme-muted">{group.isDefault ? "پیش‌فرض سازمان" : group.name}</div>
           </div>
           <div className="grid grid-cols-7 mb-1">{WEEK.map(w => <div key={w.d} className="text-center text-[11px] font-medium text-theme-muted py-1">{w.name.slice(0, 1)}</div>)}</div>
           <div className="grid grid-cols-7 gap-1">
@@ -434,36 +435,16 @@ function AgendaTab({ group, holidays, overrides, groupName, onDelete, onEdit }: 
   );
 }
 
-// ── Jalali three-select date picker ─────────────────────────────────────────
+// ── Jalali date field ("jy/jm/jd" in/out) on the shared calendar popover ────
 function JalaliDateSelect({ value, onChange, label, allowEmpty = false }: {
   value: string; onChange: (v: string) => void; label: string; allowEmpty?: boolean;
 }) {
-  const { jy: ty } = todayJ();
-  const parts = value ? value.split("/").map(Number) : [0, 0, 0];
-  const jy = parts[0] || 0, jm = parts[1] || 0, jd = parts[2] || 0;
-  const years = Array.from({ length: 8 }, (_, i) => ty - 5 + i);
-  const toFaN = (n: number) => n.toLocaleString("fa-IR", { useGrouping: false });
-  function upd(ny: number, nm: number, nd: number) {
-    if (allowEmpty && !ny) { onChange(""); return; }
-    if (!ny || !nm || !nd) return;
-    onChange(`${ny}/${nm}/${Math.min(nd, jMonthLen(ny, nm))}`);
-  }
+  const [jy, jm, jd] = value ? value.split("/").map(Number) : [0, 0, 0];
   return (
     <Field label={label}>
-      <div className="flex gap-1" dir="ltr">
-        <select value={jy || ""} onChange={e => upd(+e.target.value || 0, jm, jd || 1)} className={inputCls + " px-1 text-center"}>
-          {allowEmpty && <option value="">—</option>}
-          {years.map(y => <option key={y} value={y}>{toFaN(y)}</option>)}
-        </select>
-        <select value={jm || ""} onChange={e => upd(jy, +e.target.value, jd || 1)} className={inputCls + " px-1 text-center"} disabled={allowEmpty && !jy}>
-          {!jm && <option value="">{allowEmpty ? "ماه" : "—"}</option>}
-          {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{J_MONTHS[m - 1]}</option>)}
-        </select>
-        <select value={jd || ""} onChange={e => upd(jy, jm, +e.target.value)} className={inputCls + " px-1 text-center"} disabled={allowEmpty && !jm}>
-          {!jd && <option value="">{allowEmpty ? "روز" : "—"}</option>}
-          {Array.from({ length: jy && jm ? jMonthLen(jy, jm) : 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{toFaN(d)}</option>)}
-        </select>
-      </div>
+      <JalaliDatePicker className={inputCls} clearable={allowEmpty} placeholder={allowEmpty ? "—" : "انتخاب تاریخ"}
+        value={jy && jm && jd ? jalaliToGregorianIso(jy, jm, jd) : ""}
+        onChange={v => { const p = parseIso(v); onChange(p ? `${p.jy}/${p.jm}/${p.jd}` : allowEmpty ? "" : value); }} />
     </Field>
   );
 }

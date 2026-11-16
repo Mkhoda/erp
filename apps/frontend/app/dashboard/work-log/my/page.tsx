@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { pageTitle } from "../../../../lib/branding";
 import { readError } from "../../../../lib/http";
-import JalaliDatePicker from "../../../components/ui/JalaliDatePicker";
+import JalaliDayNav from "../../../components/ui/JalaliDayNav";
 import Modal from "../../../components/ui/Modal";
 import { useToast } from "../../../components/ui/Toast";
 import { useConfirm } from "../../../components/ui/ConfirmDialog";
@@ -175,10 +175,7 @@ export default function MyWorkLogPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => go(shiftDate(date, -1))} title="روز قبل" className="p-2 rounded-lg bg-theme-card border border-theme text-theme-primary"><ChevronRight className="w-4 h-4" /></button>
-          <div className="w-64"><JalaliDatePicker value={date} onChange={v => go(v)} /></div>
-          <button onClick={() => go(shiftDate(date, 1))} disabled={!b || date >= b.today} title="روز بعد" className="p-2 rounded-lg bg-theme-card border border-theme text-theme-primary disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
-          {b && date !== b.today && <button onClick={() => go(b.today)} className="text-sm px-3 py-2 rounded-lg bg-theme-card border border-theme text-theme-primary">امروز</button>}
+          <JalaliDayNav value={date} onChange={go} max={b?.today} today={b?.today} />
         </div>
       </div>
 

@@ -8,6 +8,8 @@ import PersonReport, { PERIOD_LABEL, periodCount, periodTitle, type PeriodKind }
 import { pageTitle } from "../../../../lib/branding";
 import { readError } from "../../../../lib/http";
 import JalaliDatePicker from "../../../components/ui/JalaliDatePicker";
+import JalaliMonthNav from "../../../components/ui/JalaliMonthNav";
+import { localTodayIso } from "../../../components/ui/jalali-calendar";
 import SearchSelect from "../../../components/ui/SearchSelect";
 import Modal from "../../../components/ui/Modal";
 import { useToast } from "../../../components/ui/Toast";
@@ -363,14 +365,20 @@ function PersonTab({ h, personOptions }: { h: any; personOptions: any[] }) {
         <select value={period} onChange={e => changePeriod(e.target.value as PeriodKind)} className="input-theme text-sm w-auto">
           {(Object.keys(PERIOD_LABEL) as PeriodKind[]).map(k => <option key={k} value={k}>{PERIOD_LABEL[k]}</option>)}
         </select>
-        {period !== "year" && (
-          <select value={index} onChange={e => setIndex(+e.target.value)} className="input-theme text-sm w-auto">
-            {indexOptions.map(i => <option key={i} value={i}>{periodTitle(period, i, jYear).replace(/\s\S+$/, "")}</option>)}
-          </select>
+        {period === "month" ? (
+          <JalaliMonthNav jYear={jYear} jMonth={index} max={localTodayIso()} onChange={(y, m) => { setJYear(y); setIndex(m); }} />
+        ) : (
+          <>
+            {period !== "year" && (
+              <select value={index} onChange={e => setIndex(+e.target.value)} className="input-theme text-sm w-auto">
+                {indexOptions.map(i => <option key={i} value={i}>{periodTitle(period, i, jYear).replace(/\s\S+$/, "")}</option>)}
+              </select>
+            )}
+            <select value={jYear} onChange={e => setJYear(+e.target.value)} className="input-theme text-sm w-auto">
+              {[now.jYear - 1, now.jYear].map(y => <option key={y} value={y}>{y.toLocaleString("fa-IR", { useGrouping: false })}</option>)}
+            </select>
+          </>
         )}
-        <select value={jYear} onChange={e => setJYear(+e.target.value)} className="input-theme text-sm w-auto">
-          {[now.jYear - 1, now.jYear].map(y => <option key={y} value={y}>{y.toLocaleString("fa-IR", { useGrouping: false })}</option>)}
-        </select>
         <button disabled={!data} onClick={() => window.open(`/print/work-log?${qs}`, "_blank")}
           className="mr-auto flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-40">
           <Printer className="w-4 h-4" /> خروجی PDF

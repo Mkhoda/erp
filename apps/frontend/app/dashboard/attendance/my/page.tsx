@@ -3,11 +3,13 @@ import React from "react";
 import { Loader2, Fingerprint, Pencil, AlertTriangle, Send, Hourglass, Eye, Paperclip, Upload, X } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import TimeSelect from "../../../components/ui/TimeSelect";
+import JalaliDatePicker from "../../../components/ui/JalaliDatePicker";
+import JalaliPeriodPicker from "../../../components/ui/JalaliPeriodPicker";
+import { jalaliToGregorian as j2iso, parseIso } from "../../../components/ui/jalali-calendar";
 import DayDetailModal from "../../../components/attendance/DayDetailModal";
 import { pageTitle } from "../../../../lib/branding";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
-const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
 const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", SICK_LEAVE:"استعلاجی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار" };
 const STATUS_CLS: Record<string,string> = { PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600", EARLY_LEAVE:"bg-yellow-500/15 text-yellow-600", ABSENT:"bg-red-500/15 text-red-600", INCOMPLETE:"bg-orange-500/15 text-orange-600", LEAVE:"bg-blue-500/15 text-blue-600", SICK_LEAVE:"bg-rose-500/15 text-rose-600", MISSION:"bg-violet-500/15 text-violet-600", REMOTE_WORK:"bg-cyan-500/15 text-cyan-600", HOLIDAY:"bg-slate-400/15 text-slate-500", COMPANY_HOLIDAY:"bg-slate-400/15 text-slate-500", WEEKEND:"bg-slate-300/20 text-slate-500", OFF_DUTY:"bg-slate-300/20 text-slate-500", WORKING:"bg-teal-500/15 text-teal-600" };
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
@@ -23,7 +25,6 @@ const fmtMin = (m: number) => toFa(`${Math.floor(Math.abs(m||0)/60)}:${String(Ma
 const faTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("fa-IR", { hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tehran", hour12:false }) : "—";
 const faDate = (g: string) => new Date(g).toLocaleDateString("fa-IR", { timeZone:"UTC" });
 const faDOW  = (g: string) => new Date(g).toLocaleDateString("fa-IR", { weekday:"long", timeZone:"UTC" });
-const J_MONTHS_NAMES = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
 function toJalali(gy0: number, gm: number, gd: number) {
   const gdm = [0,31,59,90,120,151,181,212,243,273,304,334]; let jy: number, gy: number;
   if (gy0>1600){jy=979;gy=gy0-1600;}else{jy=0;gy=gy0-621;}
@@ -43,7 +44,6 @@ function jalaliToGregorian(jy0: number, jm: number, jd: number) {
   let gd=days+1;const sal=[0,31,(gy%4===0&&gy%100!==0)||gy%400===0?29:28,31,30,31,30,31,31,30,31,30,31];let gm=1;
   for(;gm<=12;gm++){if(gd<=sal[gm])break;gd-=sal[gm];}return{y:gy,m:gm,d:gd};
 }
-const jMonthLen=(jy:number,jm:number)=>(jm<=6?31:jm<=11?30:jy%4===3?30:29);
 const todayJ=()=>{const t=new Date();return toJalali(t.getFullYear(),t.getMonth()+1,t.getDate());};
 
 // Minutes between two "HH:MM" clock times on the same day; null if incomplete/invalid.
@@ -103,7 +103,6 @@ export default function MyAttendancePage() {
 
   const [rows, setRows] = React.useState<any[]>([]);
   const [summary, setSummary] = React.useState<any>(null);
-  const [periods, setPeriods] = React.useState<Array<{ jYear: number; jMonth: number }>>([]);
   const [myReqs, setMyReqs] = React.useState<any[]>([]);
   const [leave, setLeave] = React.useState<any>(null);
   const [jYear, setJYear] = React.useState(() => currentJalali().jYear);
@@ -175,13 +174,6 @@ export default function MyAttendancePage() {
   }, [jYear, jMonth, jDay]);
 
   React.useEffect(() => { load(); }, [load]);
-  React.useEffect(() => {
-    fetch(`${API}/attendance/me/periods`, { headers: h }).then(r => r.ok ? r.json() : []).then((p) => setPeriods(Array.isArray(p) ? p : [])).catch(() => {});
-    // eslint-disable-next-line
-  }, []);
-
-  const yearOpts = [...new Set([...(jYear ? [jYear] : []), ...periods.map(p => p.jYear)])].sort((a, b) => b - a);
-  const monthOpts = [...new Set([...(jMonth ? [jMonth] : []), ...periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth)])].sort((a, b) => a - b);
 
   function openLeaveModal() {
     const { jy, jm, jd } = todayJ();
@@ -298,18 +290,8 @@ export default function MyAttendancePage() {
           <div><h1 className="text-xl font-bold text-theme-primary">حضور من</h1><p className="text-sm text-theme-muted">کارکرد روزانه و درخواست اصلاح</p></div>
         </div>
         <div className="flex items-center gap-2">
-          <select className="input-theme text-sm w-auto" value={jYear} onChange={e => { setJYear(+e.target.value); setJMonth(0); setJDay(0); }}>
-            <option value={0}>همه سال‌ها</option>
-            {yearOpts.map(y => <option key={y} value={y}>سال {toFa(String(y))}</option>)}
-          </select>
-          <select className="input-theme text-sm w-auto" value={jMonth} onChange={e => { setJMonth(+e.target.value); setJDay(0); }}>
-            <option value={0}>همه ماه‌ها</option>
-            {monthOpts.map(m => <option key={m} value={m}>{J_MONTHS[m-1]}</option>)}
-          </select>
-          <select className="input-theme text-sm w-auto" value={jDay} onChange={e => setJDay(+e.target.value)}>
-            <option value={0}>همه روزها</option>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>روز {toFa(String(d))}</option>)}
-          </select>
+          <JalaliPeriodPicker className="min-w-44" value={{ jYear, jMonth, jDay }}
+            onChange={p => { setJYear(p.jYear); setJMonth(p.jMonth); setJDay(p.jDay); }} />
         </div>
       </div>
 
@@ -533,36 +515,9 @@ export default function MyAttendancePage() {
         <div className="space-y-4">
           <div>
             <label className="block mb-1 text-theme-secondary text-xs">تاریخ مرخصی</label>
-            <div className="flex gap-2" dir="ltr">
-              {(() => {
-                const { jy: ty } = todayJ();
-                const years = Array.from({ length: 5 }, (_, i) => ty - 1 + i);
-                const toFaN = (n: number) => n.toLocaleString("fa-IR", { useGrouping: false });
-                const upd = (ny: number, nm: number, nd: number) => {
-                  if (!ny || !nm || !nd) return;
-                  setLeaveForm(s => ({ ...s, jy: ny, jm: nm, jd: Math.min(nd, jMonthLen(ny, nm)) }));
-                };
-                return (
-                  <>
-                    <select value={leaveForm.jy || ""} onChange={e => upd(+e.target.value, leaveForm.jm, leaveForm.jd || 1)}
-                      className="input-theme text-sm text-center flex-1">
-                      {!leaveForm.jy && <option value="">سال</option>}
-                      {years.map(y => <option key={y} value={y}>{toFaN(y)}</option>)}
-                    </select>
-                    <select value={leaveForm.jm || ""} onChange={e => upd(leaveForm.jy, +e.target.value, leaveForm.jd || 1)}
-                      className="input-theme text-sm text-center flex-1">
-                      {!leaveForm.jm && <option value="">ماه</option>}
-                      {J_MONTHS_NAMES.map((name, i) => <option key={i+1} value={i+1}>{name}</option>)}
-                    </select>
-                    <select value={leaveForm.jd || ""} onChange={e => upd(leaveForm.jy, leaveForm.jm, +e.target.value)}
-                      className="input-theme text-sm text-center flex-1">
-                      {!leaveForm.jd && <option value="">روز</option>}
-                      {Array.from({ length: leaveForm.jy && leaveForm.jm ? jMonthLen(leaveForm.jy, leaveForm.jm) : 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{toFaN(d)}</option>)}
-                    </select>
-                  </>
-                );
-              })()}
-            </div>
+            <JalaliDatePicker clearable={false}
+              value={leaveForm.jy && leaveForm.jm && leaveForm.jd ? j2iso(leaveForm.jy, leaveForm.jm, leaveForm.jd) : ""}
+              onChange={v => { const p = parseIso(v); if (p) setLeaveForm(s => ({ ...s, jy: p.jy, jm: p.jm, jd: p.jd })); }} />
           </div>
           <div>
             <label className="block mb-1 text-theme-secondary text-xs">نوع درخواست</label>

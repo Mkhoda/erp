@@ -2,16 +2,18 @@
 import React from "react";
 import { pageTitle } from "../../../../lib/branding";
 import {
-  ShieldCheck, Loader2, Plus, Trash2, Pencil, ChevronRight, ChevronLeft,
+  ShieldCheck, Loader2, Plus, Trash2, Pencil,
   CalendarRange, LayoutGrid, Users as UsersIcon,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
+import JalaliDatePicker from "../../../components/ui/JalaliDatePicker";
+import JalaliMonthNav from "../../../components/ui/JalaliMonthNav";
+import { parseIso } from "../../../components/ui/jalali-calendar";
 import DayDetailModal from "../../../components/attendance/DayDetailModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
-const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
 const WEEK = [
   { d: 6, name: "شنبه" }, { d: 0, name: "یکشنبه" }, { d: 1, name: "دوشنبه" },
   { d: 2, name: "سه‌شنبه" }, { d: 3, name: "چهارشنبه" }, { d: 4, name: "پنج‌شنبه" }, { d: 5, name: "جمعه" },
@@ -66,26 +68,12 @@ const isoDate = (jy: number, jm: number, jd: number) => {
   return `${g.getUTCFullYear()}-${String(g.getUTCMonth() + 1).padStart(2, "0")}-${String(g.getUTCDate()).padStart(2, "0")}`;
 };
 
-function JalaliDateSelect({ jy, jm, jd, onChange, yearsBack = 1, yearsFwd = 2 }:
-  { jy: number; jm: number; jd: number; onChange: (jy: number, jm: number, jd: number) => void; yearsBack?: number; yearsFwd?: number }) {
-  const { jy: ty } = todayJ();
-  const years = Array.from({ length: yearsBack + yearsFwd + 1 }, (_, i) => ty - yearsBack + i);
-  const upd = (ny: number, nm: number, nd: number) => { if (!ny || !nm || !nd) return; onChange(ny, nm, Math.min(nd, jMonthLen(ny, nm))); };
+// Jalali parts in/out, shared calendar popover in between.
+function JalaliDateSelect({ jy, jm, jd, onChange }:
+  { jy: number; jm: number; jd: number; onChange: (jy: number, jm: number, jd: number) => void }) {
   return (
-    <div className="flex gap-2" dir="ltr">
-      <select value={jy || ""} onChange={e => upd(+e.target.value, jm, jd || 1)} className="input-theme text-sm text-center flex-1">
-        {!jy && <option value="">سال</option>}
-        {years.map(y => <option key={y} value={y}>{faDigits(String(y))}</option>)}
-      </select>
-      <select value={jm || ""} onChange={e => upd(jy, +e.target.value, jd || 1)} className="input-theme text-sm text-center flex-1">
-        {!jm && <option value="">ماه</option>}
-        {J_MONTHS.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
-      </select>
-      <select value={jd || ""} onChange={e => upd(jy, jm, +e.target.value)} className="input-theme text-sm text-center flex-1">
-        {!jd && <option value="">روز</option>}
-        {Array.from({ length: jy && jm ? jMonthLen(jy, jm) : 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{faDigits(String(d))}</option>)}
-      </select>
-    </div>
+    <JalaliDatePicker clearable={false} value={jy && jm && jd ? isoDate(jy, jm, jd) : ""}
+      onChange={v => { const p = parseIso(v); if (p) onChange(p.jy, p.jm, p.jd); }} />
   );
 }
 
@@ -368,10 +356,8 @@ export default function GuardShiftsPage() {
             <p className="text-theme-muted text-sm">برای نمایش تقویم، ابتدا یک نگهبان انتخاب کنید.</p>
           ) : (
             <>
-              <div className="flex items-center justify-between mb-3">
-                <button onClick={() => { if (vm === 1) { setVm(12); setVy(y => y - 1); } else setVm(m => m - 1); }} className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted"><ChevronRight className="w-4 h-4" /></button>
-                <div className="font-bold text-theme-primary">{J_MONTHS[vm - 1]} {faDigits(String(vy))}</div>
-                <button onClick={() => { if (vm === 12) { setVm(1); setVy(y => y + 1); } else setVm(m => m + 1); }} className="p-1.5 rounded-lg hover:bg-theme-hover text-theme-muted"><ChevronLeft className="w-4 h-4" /></button>
+              <div className="flex items-center justify-center mb-3">
+                <JalaliMonthNav jYear={vy} jMonth={vm} onChange={(y, m) => { setVy(y); setVm(m); }} />
               </div>
               {calLoading ? <div className="flex items-center justify-center h-40"><Loader2 className="w-5 h-5 animate-spin text-blue-500" /></div> : (
                 <>

@@ -7,13 +7,13 @@ import {
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import SearchSelect from "../../../components/ui/SearchSelect";
+import JalaliPeriodPicker from "../../../components/ui/JalaliPeriodPicker";
 import DayDetailModal from "../../../components/attendance/DayDetailModal";
 import Link from "next/link";
 import { usePagePerms } from "../../../../lib/permissions";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
-const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
 const STATUS_FA: Record<string,string> = { PRESENT:"حاضر", LATE:"تاخیر", EARLY_LEAVE:"تعجیل", ABSENT:"غیبت", INCOMPLETE:"ناقص", LEAVE:"مرخصی", SICK_LEAVE:"استعلاجی", MISSION:"ماموریت", REMOTE_WORK:"دورکاری", HOLIDAY:"تعطیل", COMPANY_HOLIDAY:"تعطیل شرکت", WEEKEND:"آخر هفته", OFF_DUTY:"استراحت (شیفت)", WORKING:"در حال کار", UNMAPPED:"کارت بدون کاربر" };
 const STATUS_CLS: Record<string,string> = {
   PRESENT:"bg-green-500/15 text-green-600", LATE:"bg-amber-500/15 text-amber-600",
@@ -86,7 +86,6 @@ export default function AttendanceRecordsPage() {
   const [summary, setSummary] = React.useState<any>(null);
   const [departments, setDepartments] = React.useState<Array<{ id: string; name: string }>>([]);
   const [users, setUsers] = React.useState<any[]>([]);
-  const [periods, setPeriods] = React.useState<Array<{ jYear: number; jMonth: number }>>([]);
   const [loading, setLoading] = React.useState(true);
   const [detail, setDetail] = React.useState<any>(null);
   const [exporting, setExporting] = React.useState<string | null>(null);
@@ -190,7 +189,6 @@ export default function AttendanceRecordsPage() {
   React.useEffect(() => {
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
     fetch(`${API}/users/brief`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
-    fetch(`${API}/attendance/records/periods`, { headers: h }).then(r => r.ok ? r.json() : []).then(p => setPeriods(Array.isArray(p) ? p : [])).catch(() => {});
     // eslint-disable-next-line
   }, []);
 
@@ -253,11 +251,6 @@ export default function AttendanceRecordsPage() {
     finally { setExporting(null); }
   }
 
-  // Data-driven options: only years/months that actually have records.
-  // Always include the currently-selected year/month so the default filter shows
-  // even before its data has loaded into `periods`.
-  const yearOpts = [...new Set([...(jYear ? [jYear] : []), ...periods.map(p => p.jYear)])].sort((a, b) => b - a);
-  const monthOpts = [...new Set([...(jMonth ? [jMonth] : []), ...periods.filter(p => !jYear || p.jYear === jYear).map(p => p.jMonth)])].sort((a, b) => a - b);
   // Split the backend's raw INCOMPLETE set into "still working today" vs.
   // genuinely incomplete, so the status filter doesn't lump the two together.
   // Unmapped-card pseudo-rows (no AttendanceDay, no status) are appended
@@ -353,19 +346,9 @@ export default function AttendanceRecordsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-theme-card border border-theme rounded-xl p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
-        <ClearableSelect value={jYear} onChange={v => { setJYear(+v); setJMonth(0); setJDay(0); }}>
-          <option value={0}>همه سال‌ها</option>
-          {yearOpts.map(y => <option key={y} value={y}>سال {faY(y)}</option>)}
-        </ClearableSelect>
-        <ClearableSelect value={jMonth} onChange={v => { setJMonth(+v); setJDay(0); }}>
-          <option value={0}>همه ماه‌ها</option>
-          {monthOpts.map(m => <option key={m} value={m}>{J_MONTHS[m-1]}</option>)}
-        </ClearableSelect>
-        <ClearableSelect value={jDay} onChange={v => setJDay(+v)}>
-          <option value={0}>همه روزها</option>
-          {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>روز {toFa(String(d))}</option>)}
-        </ClearableSelect>
+      <div className="bg-theme-card border border-theme rounded-xl p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+        <JalaliPeriodPicker className="col-span-2 md:col-span-1" value={{ jYear, jMonth, jDay }}
+          onChange={p => { setJYear(p.jYear); setJMonth(p.jMonth); setJDay(p.jDay); }} />
         <ClearableSelect value={deptId} onChange={setDeptId}>
           <option value="">همه دپارتمان‌ها</option>
           {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}

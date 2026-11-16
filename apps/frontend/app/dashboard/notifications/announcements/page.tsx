@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { useToast } from "../../../components/ui/Toast";
 import SearchSelect from "../../../components/ui/SearchSelect";
+import JalaliDatePicker from "../../../components/ui/JalaliDatePicker";
+import { parseIso } from "../../../components/ui/jalali-calendar";
 import { AnnAttachment, fmtSize } from "../../../components/announcements/shared";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -38,7 +40,6 @@ const ROLES = [
   { id: "USER", name: "کاربر" },
   { id: "EXPERT", name: "کارشناس" },
 ];
-const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
 
 // ── Jalali ↔ Gregorian ──────────────────────────────────────────────────────
 function toJalali(gy0: number, gm: number, gd: number) {
@@ -118,22 +119,11 @@ function JalaliDateTimePicker({ label, value, onChange }: { label: string; value
         </label>
         {on && (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <select value={state.jy} onChange={e => update({ jy: Number(e.target.value) })}
-              className="input-theme text-sm py-1 w-24" dir="ltr">
-              {Array.from({ length: 15 }, (_, i) => 1400 + i).map(y =>
-                <option key={y} value={y}>{y.toLocaleString("fa-IR")}</option>
-              )}
-            </select>
-            <select value={state.jm} onChange={e => update({ jm: Number(e.target.value) })}
-              className="input-theme text-sm py-1">
-              {J_MONTHS.map((name, i) => <option key={i+1} value={i+1}>{name}</option>)}
-            </select>
-            <select value={clampedJd} onChange={e => update({ jd: Number(e.target.value) })}
-              className="input-theme text-sm py-1 w-16" dir="ltr">
-              {Array.from({ length: maxDay }, (_, i) => i + 1).map(d =>
-                <option key={d} value={d}>{d.toLocaleString("fa-IR")}</option>
-              )}
-            </select>
+            <div className="w-44">
+              <JalaliDatePicker className="input-theme py-1" clearable={false}
+                value={(() => { const g = jalaliToGregorian(state.jy, state.jm, clampedJd); return `${g.y}-${String(g.m).padStart(2, "0")}-${String(g.d).padStart(2, "0")}`; })()}
+                onChange={v => { const p = parseIso(v); if (p) update({ jy: p.jy, jm: p.jm, jd: p.jd }); }} />
+            </div>
             <span className="text-theme-muted text-xs">ساعت</span>
             <select value={state.h} onChange={e => update({ h: Number(e.target.value) })}
               className="input-theme text-sm py-1 w-16" dir="ltr">

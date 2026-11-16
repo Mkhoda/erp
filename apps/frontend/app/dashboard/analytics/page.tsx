@@ -8,6 +8,8 @@ import {
   PieChart, Loader2, Users, Fingerprint, Boxes, ListTodo, Ticket, Activity, RefreshCw,
 } from "lucide-react";
 import { pageTitle } from "../../../lib/branding";
+import JalaliMonthNav from "../../components/ui/JalaliMonthNav";
+import { localTodayIso } from "../../components/ui/jalali-calendar";
 import { readError } from "../../../lib/http";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -79,7 +81,6 @@ export default function AnalyticsPage() {
   React.useEffect(() => { load(); }, [load]);
 
   const d = data[cacheKey];
-  const yearOpts = [period.jYear - 1, period.jYear, period.jYear + 1].filter((y, i, a) => a.indexOf(y) === i);
 
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-4" dir="rtl">
@@ -94,12 +95,8 @@ export default function AnalyticsPage() {
         <div className="flex items-center gap-2">
           {cur.period && (
             <>
-              <select className="input-theme text-sm w-auto" value={period.jMonth} onChange={e => setPeriod(p => ({ ...p, jMonth: +e.target.value }))}>
-                {J_MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-              </select>
-              <select className="input-theme text-sm w-auto" value={period.jYear} onChange={e => setPeriod(p => ({ ...p, jYear: +e.target.value }))}>
-                {yearOpts.map(y => <option key={y} value={y}>{toFa(String(y))}</option>)}
-              </select>
+              <JalaliMonthNav jYear={period.jYear} jMonth={period.jMonth} max={localTodayIso()}
+                onChange={(jYear, jMonth) => setPeriod(p => ({ ...p, jYear, jMonth }))} />
             </>
           )}
           <button onClick={() => load(true)} disabled={loading} title="بروزرسانی" className="p-2 rounded-lg bg-theme-card border border-theme text-theme-primary disabled:opacity-50">
