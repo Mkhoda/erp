@@ -96,6 +96,8 @@ export class RecordsService {
     ]);
     const statusCounts: Record<string, number> = {};
     for (const r of byStatus) statusCounts[r.status] = r._count;
+    // Remote days that count = remote-work days the person actually came in (remote time > 0).
+    const remoteDays = await this.prisma.attendanceDay.count({ where: { AND: [where, { remoteMinutes: { gt: 0 } }] } });
     return {
       records: agg._count,
       distinctDays: byDate.length,
@@ -109,7 +111,7 @@ export class RecordsService {
       nightMinutes: agg._sum.nightMinutes ?? 0,
       remoteMinutes: agg._sum.remoteMinutes ?? 0,
       remoteOvertimeMinutes: agg._sum.remoteOvertimeMinutes ?? 0,
-      remoteDays: statusCounts['REMOTE_WORK'] ?? 0,
+      remoteDays: remoteDays,
       hourlyLeaveMinutes: hourlyAgg._sum.leaveMinutes ?? 0,
       leaveDays: statusCounts['LEAVE'] ?? 0,
       statusCounts,
@@ -301,7 +303,8 @@ export class RecordsService {
   // otherwise invisible on this page even though the device saw the punch.
   async unmappedCards(f: Pick<RecordFilter, 'jYear' | 'jMonth' | 'jDay'>) {
     const range = jalaliRange(f.jYear, f.jMonth, f.jDay);
-    const where: Prisma.RawAttendanceRecordWhereInput = { userId: null };
+    const ignored = (await this.prisma.ignoredAttendanceCard.findMany({ select: { cardNo: true } })).map((c) => c.cardNo);
+    const where: Prisma.RawAttendanceRecordWhereInput = { userId: null, ...(ignored.length ? { cardNo: { notIn: ignored } } : {}) };
     if (range) where.punchAt = { gte: tehranMidnightInstant(range.start), lt: tehranMidnightInstant(range.endExcl) };
     const recs = await this.prisma.rawAttendanceRecord.findMany({
       where,
@@ -328,7 +331,7 @@ export class RecordsService {
   async dayDetail(userId: string, gregDate: Date) {
     const dayStart = tehranMidnightInstant(gregDate);
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-    const [day, punches, override] = await Promise.all([
+    const [day, punches, override, shiftDay] = await Promise.all([
       this.prisma.attendanceDay.findUnique({
         where: { userId_gregDate: { userId, gregDate } },
         include: { user: { select: USER_SELECT } },
@@ -343,7 +346,8 @@ export class RecordsService {
         orderBy: { createdAt: 'desc' },
         include: { createdBy: { select: { firstName: true, lastName: true } } },
       }),
+      this.prisma.attendanceShiftDay.findUnique({ where: { userId_gregDate: { userId, gregDate } } }),
     ]);
-    return { day, punches, override };
+    return { day, punches, override, shiftDay };
   }
 }

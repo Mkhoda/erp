@@ -89,7 +89,19 @@ export class RecomputeService {
     const pairs = rows
       .filter((r) => r.userId)
       .map((r) => ({ userId: r.userId as string, gregDate: workDateOf(r.punchAt) }));
-    return this.recomputeDays(pairs);
+    // A punch can also change the PREVIOUS day: it may be the exit of an overnight shift
+    // that started there (see CalcService.shiftContext), which closes that day at 24:00.
+    return this.recomputeDays(RecomputeService.withNeighbors(pairs, 1, 0));
+  }
+
+  /** Expand each (user, day) to the days around it — for changes an overnight shift can carry across midnight. */
+  static withNeighbors(pairs: Array<{ userId: string; gregDate: Date }>, before: number, after: number) {
+    const DAY = 24 * 60 * 60 * 1000;
+    const out: Array<{ userId: string; gregDate: Date }> = [];
+    for (const p of pairs) {
+      for (let k = -before; k <= after; k++) out.push({ userId: p.userId, gregDate: new Date(p.gregDate.getTime() + k * DAY) });
+    }
+    return out;
   }
 
   // Recompute one user's whole Jalali month (used after manual edits / re-seed).
@@ -311,7 +323,8 @@ export class RecomputeService {
       select: { cardNo: true },
       where: { cardNo: { not: '' } },
     });
-    const cardNos = distinct.map((d) => d.cardNo).filter(Boolean);
+    const ignored = new Set((await this.prisma.ignoredAttendanceCard.findMany({ select: { cardNo: true } })).map((c) => c.cardNo));
+    const cardNos = distinct.map((d) => d.cardNo).filter((c) => c && !ignored.has(c));
 
     // Which already map to a user?
     const existing = await this.prisma.user.findMany({

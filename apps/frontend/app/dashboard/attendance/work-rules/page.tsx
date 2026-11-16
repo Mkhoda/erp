@@ -35,7 +35,7 @@ const NEW_DEFAULTS = {
   flexEnabled: false, flexInStart: "07:30", flexInEnd: "09:00", graceMinutes: 0,
   otMinThreshold: 30, otRounding: 15, otMaxDaily: 240, otMaxMonthly: 3600, annualLeaveDays: 26, sickLeaveDays: 5,
   deficitToLeaveEnabled: true, absentToLeaveEnabled: true,
-  maxDailyLeaveEnabled: true, maxDailyLeaveMinutes: 210, remoteOtPercent: 0,
+  maxDailyLeaveEnabled: true, maxDailyLeaveMinutes: 210, remoteOtPercent: 0, autoOvernightShift: false,
 };
 const minToHHMM = (m: number) => `${String(Math.floor((m || 0) / 60)).padStart(2, "0")}:${String((m || 0) % 60).padStart(2, "0")}`;
 const hhmmToMin = (v: string) => { const [hh, mm] = (v || "0:0").split(":").map(Number); return (hh || 0) * 60 + (mm || 0); };
@@ -308,6 +308,15 @@ export default function WorkRulesPage() {
               </label>
             </div>
           </Section>
+          <Section title="شیفت شبانه" icon={Timer}>
+            <label className="flex items-start gap-2 text-sm text-theme-primary">
+              <input type="checkbox" className="mt-1" checked={!!form.autoOvernightShift} onChange={e => setF("autoOvernightShift", e.target.checked)} />
+              <span>
+                تشخیص خودکار شیفت: اگر کسی در یک روز فقط ورود و روز بعد فقط خروج داشت، به‌صورت شیفت محاسبه شود
+                <span className="block text-xs text-theme-muted mt-0.5">روز اول تا ساعت ۲۴ کارکرد (مازاد موظفی = اضافه‌کار)؛ روز دوم از ۰۰:۰۰ تا شروع بازه ورود اضافه‌کار و از آن به بعد کارکرد عادی. نیازی به ثبت دستی خروج ۲۴ و ورود ۰۰ نیست؛ اصلاح‌های دستی هم درست محاسبه می‌شوند.</span>
+              </span>
+            </label>
+          </Section>
           <Section title="سقف مرخصی ساعتی روزانه" icon={Timer}>
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-sm text-theme-primary">
@@ -326,7 +335,7 @@ export default function WorkRulesPage() {
           <Section title="دورکاری" icon={SlidersHorizontal}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="درصد دورکاری به‌عنوان اضافه‌کار (۰ تا ۱۰۰)"
-                hint={`هر روز دورکاری = ${hrs(form.dailyMinutes)}؛ ${faNum(Math.min(100, Math.max(0, +form.remoteOtPercent || 0)))}٪ آن جداگانه به‌عنوان «اضافه‌کار دورکاری» نمایش داده می‌شود و با اضافه‌کار عادی جمع نمی‌شود`}>
+                hint={`فقط روزهای دورکاری که فرد حضور هم داشته (ورود و خروج ثبت شده) حساب می‌شوند و ساعات حضورش دورکاری است؛ ${faNum(Math.min(100, Math.max(0, +form.remoteOtPercent || 0)))}٪ آن جداگانه به‌عنوان «اضافه‌کار دورکاری» نمایش داده می‌شود و با اضافه‌کار عادی جمع نمی‌شود`}>
                 <input type="number" min={0} max={100} className={inputCls} value={form.remoteOtPercent ?? ""} onChange={e => setF("remoteOtPercent", Math.min(100, Math.max(0, +e.target.value)))} />
               </Field>
             </div>

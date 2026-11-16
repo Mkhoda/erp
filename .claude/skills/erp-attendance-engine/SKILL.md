@@ -129,10 +129,19 @@ touching any single line.
     - `deficitMinutes > 0` + `deficitToLeaveEnabled` ⇒ converts **only the shortfall amount**
       from balance (`Math.min(deficitMinutes, remaining)`), never inflated to a full day just
       because balance ran low — a 10-minute deficit must never cost a full day of leave.
+12b. **Overnight shift** — `shiftContext()` (looks at D-2..D+1): a day with exactly one raw punch
+    whose next day has a punch is a shift when it's marked (`AttendanceShiftDay`) or the group has
+    `autoOvernightShift` and the next day also has exactly one punch. That day is closed at 24:00; the
+    next day starts at 00:00 and its punch is the exit — 00:00 → work-window floor is pure overtime,
+    the rest counts toward the requirement (normal early-leave/deficit rules still apply). The old
+    manual workaround (override out ≥ 23:55 / in ≤ 00:05) is recognised too. Because D depends on
+    D+1's punches, sync recomputes the previous day and overrides recompute D-1..D+1
+    (`RecomputeService.withNeighbors`). `UserAttendanceRule.noTimeWindow`: worked time from the real
+    arrival, no lateness/early-leave, overtime only beyond the required total.
 13. **Remote work** — a company remote-work day with no punch OR both punches (a lone
-    check-in stays INCOMPLETE) becomes `REMOTE_WORK`, as does an approved request. Then
-    `remoteMinutes = max(sched.dailyMinutes, workedMinutes if both punches)` — present hours
-    on a remote day count as remote, so regular `overtimeMinutes` and delay/early are zeroed —
+    check-in stays INCOMPLETE) becomes `REMOTE_WORK`, as does an approved request. Remote time
+    counts ONLY when the person also came in: `remoteMinutes = workedMinutes` with both punches,
+    else 0 — present hours on a remote day are remote, so regular `overtimeMinutes` and delay/early are zeroed —
     and `remoteOvertimeMinutes = remoteMinutes ×
     WorkSchedule.remoteOtPercent / 100`. That OT-equivalent is reporting-only: never added to
     `overtimeMinutes`, not subject to the monthly OT cap. Guard engine doesn't set these.
@@ -290,7 +299,6 @@ not layered together.
 
 | Page | Purpose | Notes |
 |---|---|---|
-| `page.tsx` | Attendance overview/dashboard | Calls `attendance/dashboard` |
 | `my/page.tsx` | Self-service: my days, leave-balance, submit correction/leave requests | Inline Jalali IIFE + leave modal |
 | `records/page.tsx` | Admin/manager daily records grid, direct override edit | `currentJalali()` only, not full IIFE |
 | `monthly/page.tsx` | Monthly aggregated report per user | `records/monthly-summary` |

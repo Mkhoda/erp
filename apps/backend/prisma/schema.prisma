@@ -83,6 +83,7 @@ model User {
   dailyWorkReports         DailyWorkReport[]        @relation("DailyWorkReportUser")
   pagePermissions          UserPagePermission[]     @relation("UserPagePermissionUser")
   pagePermissionsGranted   UserPagePermission[]     @relation("UserPagePermissionGrantor")
+  shiftDays                AttendanceShiftDay[]     @relation("ShiftDayUser")
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 }
@@ -97,6 +98,10 @@ enum Role {
 model Department {
   id               String                  @id @default(cuid())
   name             String                  @unique
+  parentId         String? // tree: parent department (null = top level)
+  parent           Department?             @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children         Department[]            @relation("DepartmentTree")
+  sortOrder        Int                     @default(0)
   users            User[]
   userDepartments  UserDepartment[]
   assetAssignments AssetAssignment[]
@@ -305,6 +310,7 @@ model UserDepartment {
   departmentId String
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  role         String     @default("MEMBER") // position in THIS department: MANAGER | DEPUTY | EXPERT | MEMBER
   createdAt    DateTime   @default(now())
 
   @@id([userId, departmentId])
@@ -757,6 +763,7 @@ model WorkSchedule {
   maxDailyLeaveEnabled  Boolean              @default(true) // cap hourly leave granted in a single day
   maxDailyLeaveMinutes  Int                  @default(210) @map("hourlyLeaveCapMinutes") // above this (3:30) the day becomes full LEAVE + worked time → overtime; reuses a pre-existing unused DB column
   remoteOtPercent       Int                  @default(0) // share (0-100%) of remote-work time reported as overtime-equivalent (AttendanceDay.remoteOvertimeMinutes)
+  autoOvernightShift    Boolean              @default(false) // one punch on a day + one on the next (and nothing else) ⇒ treat as an overnight shift split at midnight
   userRules             UserAttendanceRule[]
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
@@ -788,6 +795,7 @@ model UserAttendanceRule {
   otAllowed     Boolean       @default(true)
   otMaxDaily    Int?
   otMaxMonthly  Int?
+  noTimeWindow  Boolean       @default(false) // no arrival/departure window: worked time counts from the real arrival, no lateness/early-leave
   updatedAt     DateTime      @updatedAt
 }
 
@@ -1693,4 +1701,38 @@ model AssetOwner {
   assets      Asset[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// روز شیفت: this user's work on this date continues past midnight. The day is closed at
+// 24:00 and the next day's first punch is the shift's exit (00:00 → work-window start counts
+// as overtime there). Set by an admin; groups can also auto-detect it (autoOvernightShift).
+model AttendanceShiftDay {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("ShiftDayUser", fields: [userId], references: [id], onDelete: Cascade)
+  gregDate    DateTime
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, gregDate])
+}
+
+// Attendance card numbers removed from the system on purpose (e.g. test/old cards): their
+// raw punches are deleted, they never get a placeholder user again, and they're hidden
+// from the unmapped-cards list and reports.
+model IgnoredAttendanceCard {
+  cardNo      String   @id
+  reason      String?
+  createdById String?
+  createdAt   DateTime @default(now())
+}
+
+// Performance score (امتیاز عملکرد) settings — singleton. `weights` maps each component key
+// (report, punctuality, attendance, tickets, coverage) to its weight; components a person has
+// no data for are skipped and the remaining weights rescaled.
+model PerformanceSettings {
+  id        String   @id @default("singleton")
+  weights   Json     @default("{\"report\":25,\"punctuality\":25,\"attendance\":20,\"tickets\":20,\"coverage\":10}")
+  updatedAt DateTime @updatedAt
 }

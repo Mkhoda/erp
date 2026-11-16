@@ -49,6 +49,12 @@ export interface EffectiveSchedule {
   // Share (0-100) of a remote-work day's time reported as overtime-equivalent
   // (remoteOvertimeMinutes) — shown on its own, never added to overtimeMinutes.
   remoteOtPercent: number;
+  // Group setting: a day with a single punch followed by a day with a single punch is an
+  // overnight shift split at midnight (see shiftContext()).
+  autoOvernightShift: boolean;
+  // Per-user: no arrival/departure window — worked time counts from the real arrival,
+  // no lateness / early-leave, overtime only beyond the required daily total.
+  noTimeWindow: boolean;
 }
 
 // Hardcoded fallback matching the WorkSchedule schema defaults — used when no
@@ -78,6 +84,8 @@ const DEFAULTS: EffectiveSchedule = {
   maxDailyLeaveEnabled: true,
   maxDailyLeaveMinutes: 210,   // 3:30
   remoteOtPercent: 0,
+  autoOvernightShift: false,
+  noTimeWindow: false,
 };
 
 @Injectable()
@@ -121,6 +129,7 @@ export class CalcService {
       s.maxDailyLeaveEnabled = base.maxDailyLeaveEnabled;
       s.maxDailyLeaveMinutes = base.maxDailyLeaveMinutes;
       s.remoteOtPercent = base.remoteOtPercent;
+      s.autoOvernightShift = base.autoOvernightShift;
     }
     if (rule) {
       s.employeeType = rule.employeeType as 'FULL_TIME' | 'HOURLY';
@@ -133,6 +142,7 @@ export class CalcService {
       if (rule.otMaxDaily != null) s.otMaxDaily = rule.otMaxDaily;
       if (rule.otMaxMonthly != null) s.otMaxMonthly = rule.otMaxMonthly;
       s.otAllowed = rule.otAllowed;
+      s.noTimeWindow = !!rule.noTimeWindow;
     }
     // Hourly staff: presence only — never accrue overtime or lateness penalties.
     if (s.employeeType === 'HOURLY') s.otAllowed = false;
@@ -300,10 +310,26 @@ export class CalcService {
     // Resolve check-in / check-out, letting an override replace either side.
     let firstIn: Date | null = punches.length ? punches[0].punchAt : null;
     let lastOut: Date | null = punches.length > 1 ? punches[punches.length - 1].punchAt : null;
+
+    // Overnight shift (روز شیفت): a continuation day starts at 00:00 and its punches are the
+    // shift's exit; a carry-out day is closed at 24:00. Overrides still win either side below.
+    const shift = await this.shiftContext(userId, gregDate, sched);
+    if (shift.continuation) {
+      firstIn = dayStart;
+      lastOut = punches.length ? punches[punches.length - 1].punchAt : null;
+    } else if (shift.carryOut) {
+      lastOut = dayEnd;
+    }
+
     if (override?.clearCheckIn) firstIn = null;
     else if (override?.newCheckIn) firstIn = override.newCheckIn;
     if (override?.clearCheckOut) lastOut = null;
     else if (override?.newCheckOut) lastOut = override.newCheckOut;
+    // An override that sets only the check-in turns a lone later raw punch into the check-out.
+    if (override?.newCheckIn && !override.newCheckOut && !override.clearCheckOut && !lastOut && punches.length === 1
+      && punches[0].punchAt.getTime() > override.newCheckIn.getTime()) {
+      lastOut = punches[0].punchAt;
+    }
 
     let workedMinutes = 0;
     let overtimeMinutes = 0;
@@ -328,7 +354,8 @@ export class CalcService {
     const pinnedByOverride = !!override
       && (!!override.newCheckIn || override.clearCheckIn)
       && (!!override.newCheckOut || override.clearCheckOut);
-    const ambiguousPunches = punches.length > 2 && !pinnedByOverride;
+    // On a continuation day the virtual 00:00 start counts as one of the punches.
+    const ambiguousPunches = (punches.length + (shift.continuation ? 1 : 0)) > 2 && !pinnedByOverride;
 
     if (bothPunches) {
       const inMin = minutesOfDay(firstIn!);
@@ -343,14 +370,25 @@ export class CalcService {
       const earlyArrivalFloor = sched.flexEnabled
         ? Math.max(sched.startMin, sched.flexInStart - sched.graceMinutes)
         : sched.startMin;
-      const effectiveInMin = Math.max(inMin, earlyArrivalFloor);
+      // No-time-window users count from their real arrival; everyone else is floored.
+      const effectiveInMin = sched.noTimeWindow ? inMin : Math.max(inMin, earlyArrivalFloor);
+      // Continuation of last night's shift (started at 00:00): time before the work window
+      // opens is overtime of its own; the requirement starts at the window.
+      const continuation = shift.continuation && inMin <= 5;
+      const preStart = continuation ? Math.max(0, Math.min(outMin, earlyArrivalFloor) - inMin) : 0;
+      const postStart = continuation
+        ? Math.max(0, outMin - earlyArrivalFloor - (outMin > earlyArrivalFloor ? sched.lunchMinutes : 0))
+        : 0;
 
-      workedMinutes = Math.max(0, outMin - effectiveInMin - sched.lunchMinutes);
+      workedMinutes = continuation
+        ? preStart + postStart
+        : Math.max(0, outMin - effectiveInMin - sched.lunchMinutes);
 
       // Window-based: late if arriving after the check-in window ends; early
-      // leave if departing before the check-out window starts.
-      delayMinutes = Math.max(0, inMin - sched.checkInEnd);
-      earlyLeaveMinutes = Math.max(0, sched.checkOutStart - outMin);
+      // leave if departing before the check-out window starts. A continuation
+      // day's 00:00 "arrival" is never late; no-window users have neither.
+      delayMinutes = continuation || sched.noTimeWindow ? 0 : Math.max(0, inMin - sched.checkInEnd);
+      earlyLeaveMinutes = sched.noTimeWindow ? 0 : Math.max(0, sched.checkOutStart - outMin);
 
       // Overtime is the GREATER of two measures, so it works whether a schedule is
       // configured around a fixed end-time or a required duration:
@@ -360,9 +398,11 @@ export class CalcService {
       //   (b) net minutes beyond the required daily total. A late arrival is covered
       //       separately by leave, so it is added back and never reduces overtime —
       //       e.g. required 420, present 563 ⇒ 143m.
-      const otPastEnd = outMin - sched.endMin;
+      const otPastEnd = sched.noTimeWindow ? -Infinity : outMin - sched.endMin;
       const otBeyondRequired = workedMinutes + delayMinutes - sched.dailyMinutes;
-      const extra = Math.max(otPastEnd, otBeyondRequired);
+      const extra = continuation
+        ? preStart + Math.max(0, otPastEnd, postStart - sched.dailyMinutes)
+        : Math.max(otPastEnd, otBeyondRequired);
       if (sched.otAllowed && extra >= sched.otMinThreshold) {
         const rounded = sched.otRounding > 0
           ? Math.floor(extra / sched.otRounding) * sched.otRounding : extra;
@@ -371,9 +411,10 @@ export class CalcService {
       }
 
       // Night minutes = overlap with 22:00–06:00 (next day window 22:00–30:00)
+      const nightFrom = continuation ? inMin : effectiveInMin; // a shift continuation was present from 00:00
       nightMinutes =
-        this.overlapMinutes(effectiveInMin, outMin, 22 * 60, 30 * 60) +
-        this.overlapMinutes(effectiveInMin, outMin, 0, 6 * 60);
+        this.overlapMinutes(nightFrom, outMin, 22 * 60, 30 * 60) +
+        this.overlapMinutes(nightFrom, outMin, 0, 6 * 60);
     }
 
     // Hourly staff: only presence matters — drop lateness/early-leave.
@@ -535,14 +576,15 @@ export class CalcService {
     }
 
     // Remote work (دورکاری): an approved REMOTE_WORK request or a company
-    // remote-work day. Its time is the day's required hours — or, if the person
-    // was also present, their present hours when those are longer (present hours
-    // on a remote day count as remote). Because those hours are remote time, they
+    // remote-work day. Remote time is counted only when the person also came in
+    // (both punches) and equals their present hours; a remote day without punches
+    // stays REMOTE_WORK (not absent) but carries no remote time. Because those hours are remote time, they
     // don't also earn regular overtime: the overtime-equivalent comes only from
     // remoteOtPercent, reported separately and never added to overtimeMinutes
     // (nor counted against the monthly OT cap).
     const isRemoteStatus = status === AttendanceStatus.REMOTE_WORK;
-    const remoteMinutes = isRemoteStatus ? Math.max(sched.dailyMinutes, bothPunches ? workedMinutes : 0) : 0;
+    // Remote time (and its OT share) counts only on remote days the person actually came in.
+    const remoteMinutes = isRemoteStatus && bothPunches ? workedMinutes : 0;
     if (isRemoteStatus && bothPunches) overtimeMinutes = 0;
     // Punctuality windows don't apply to remote work, and stray lateness here would
     // otherwise be charged against the leave balance as tardy minutes.
@@ -556,6 +598,52 @@ export class CalcService {
       delayMinutes, earlyLeaveMinutes, deficitMinutes, nightMinutes, leaveMinutes, sickLeaveMinutes,
       autoConvertedLeave, status, isHolidayWork, hasOverride: !!override,
     };
+  }
+
+  /**
+   * Overnight-shift context for one day. Looks at D-2..D+1 because whether today's single
+   * punch is a shift's exit depends on whether yesterday carried over, which in turn
+   * depends on the day before:
+   *   carry(x)  = x has exactly one raw punch, no override check-out, the next day has a
+   *               punch, and x is a marked shift day — or the group auto-detects and the
+   *               next day also has exactly one punch ("two days, two records").
+   *   cont(x)   = carry(x-1), or the old manual workaround (yesterday's override check-out
+   *               >= 23:55 and today's override check-in <= 00:05) on a shift day / auto group.
+   *   carry(x) only when !cont(x) — a continuation day's lone punch is an exit, not an entry.
+   */
+  private async shiftContext(userId: string, gregDate: Date, sched: EffectiveSchedule): Promise<{ carryOut: boolean; continuation: boolean }> {
+    const DAY = 24 * 60 * 60 * 1000;
+    const days = [-2, -1, 0, 1].map((k) => new Date(gregDate.getTime() + k * DAY));
+    const marks = await this.prisma.attendanceShiftDay.findMany({ where: { userId, gregDate: { gte: days[0], lte: days[3] } }, select: { gregDate: true } });
+    if (!marks.length && !sched.autoOvernightShift) return { carryOut: false, continuation: false };
+    const from = tehranMidnightInstant(days[0]);
+    const to = new Date(tehranMidnightInstant(days[3]).getTime() + DAY);
+    const [raw, overrides] = await Promise.all([
+      this.prisma.rawAttendanceRecord.findMany({ where: { userId, punchAt: { gte: from, lt: to } }, select: { punchAt: true } }),
+      this.prisma.attendanceOverride.findMany({ where: { userId, gregDate: { gte: days[0], lte: days[3] } }, orderBy: { createdAt: 'desc' } }),
+    ]);
+    const count = new Map<number, number>();
+    for (const r of raw) { const k = workDateOf(r.punchAt).getTime(); count.set(k, (count.get(k) ?? 0) + 1); }
+    const ov = new Map<number, (typeof overrides)[number]>();
+    for (const o of overrides) if (!ov.has(o.gregDate.getTime())) ov.set(o.gregDate.getTime(), o); // latest wins
+    const marked = new Set(marks.map((m) => m.gregDate.getTime()));
+    const t = (i: number) => days[i].getTime();
+    const cond = (i: number) => {
+      const o = ov.get(t(i));
+      if ((count.get(t(i)) ?? 0) !== 1 || o?.newCheckOut || o?.clearCheckOut) return false;
+      const next = count.get(t(i + 1)) ?? 0;
+      return next >= 1 && (marked.has(t(i)) || (sched.autoOvernightShift && next === 1));
+    };
+    const manualCont = (i: number) => {
+      const o = ov.get(t(i)), p = ov.get(t(i - 1));
+      return !!o?.newCheckIn && minutesOfDay(o.newCheckIn) <= 5
+        && !!p?.newCheckOut && minutesOfDay(p.newCheckOut) >= 23 * 60 + 55
+        && (marked.has(t(i - 1)) || sched.autoOvernightShift);
+    };
+    const carry0 = cond(0);                                             // D-2 (its own past ignored)
+    const cont1 = carry0 || manualCont(1), carry1 = !cont1 && cond(1);  // D-1
+    const cont2 = carry1 || manualCont(2), carry2 = !cont2 && cond(2);  // D
+    return { carryOut: carry2, continuation: cont2 };
   }
 
   // Remaining annual leave balance in minutes, counting only days strictly

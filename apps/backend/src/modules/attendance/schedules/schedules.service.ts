@@ -38,6 +38,7 @@ export class SchedulesService {
     if ('deficitToLeaveEnabled' in dto) data.deficitToLeaveEnabled = !!dto.deficitToLeaveEnabled;
     if ('absentToLeaveEnabled' in dto) data.absentToLeaveEnabled = !!dto.absentToLeaveEnabled;
     if ('maxDailyLeaveEnabled' in dto) data.maxDailyLeaveEnabled = !!dto.maxDailyLeaveEnabled;
+    if ('autoOvernightShift' in dto) data.autoOvernightShift = !!dto.autoOvernightShift;
     if (Array.isArray(dto.workDays)) data.workDays = dto.workDays.map((d: any) => +d).filter((d: number) => d >= 0 && d <= 6);
     return data;
   }
@@ -179,6 +180,7 @@ export class SchedulesService {
       otAllowed: dto.otAllowed == null ? true : !!dto.otAllowed,
       otMaxDaily: num(dto.otMaxDaily),
       otMaxMonthly: num(dto.otMaxMonthly),
+      noTimeWindow: !!dto.noTimeWindow,
     } as const;
 
     const rule = await this.prisma.userAttendanceRule.upsert({

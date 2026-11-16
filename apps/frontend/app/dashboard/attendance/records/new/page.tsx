@@ -40,6 +40,17 @@ export default function NewAttendanceRecordPage() {
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [shiftSaving, setShiftSaving] = React.useState(false);
+
+  async function toggleShiftDay(enabled: boolean) {
+    setShiftSaving(true);
+    try {
+      const res = await fetch(`${API}/attendance/shift-days`, { method: "PUT", headers: h, body: JSON.stringify({ userId, date, enabled }) });
+      if (!res.ok) { const e2 = await res.json().catch(() => ({})); toast.error(e2.message || "ذخیره ناموفق بود"); return; }
+      toast.success(enabled ? "روز شیفت ثبت و کارکرد دوباره محاسبه شد" : "روز شیفت برداشته شد");
+      await loadDetail();
+    } finally { setShiftSaving(false); }
+  }
   // Manual entry needs the records page's separate "ثبت" flag (POST /attendance/manual-entry).
   const perms = usePagePerms("/dashboard/attendance/records");
 
@@ -197,6 +208,20 @@ export default function NewAttendanceRecordPage() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Overnight shift mark */}
+      {userId && date && (
+        <div className="bg-theme-card border border-theme rounded-xl p-4">
+          <label className="flex items-start gap-2 text-sm text-theme-primary cursor-pointer">
+            <input type="checkbox" className="mt-1" checked={!!detail?.shiftDay} disabled={shiftSaving} onChange={e => toggleShiftDay(e.target.checked)} />
+            <span>
+              روز شیفت — کار این روز تا روز بعد ادامه دارد
+              <span className="block text-xs text-theme-muted mt-0.5">این روز تا ساعت ۲۴ محاسبه می‌شود (مازاد موظفی = اضافه‌کار) و اولین پانچ روز بعد خروج همین شیفت است؛ روز بعد از ۰۰:۰۰ تا شروع بازه ورود اضافه‌کار و از آن به بعد کارکرد عادی حساب می‌شود.</span>
+            </span>
+            {shiftSaving && <Loader2 className="w-4 h-4 animate-spin text-theme-muted" />}
+          </label>
         </div>
       )}
 

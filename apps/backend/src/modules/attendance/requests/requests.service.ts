@@ -115,7 +115,8 @@ export class RequestsService {
           requestId: req.id,
         },
       });
-      await this.recompute.recomputeDays([{ userId: req.userId, gregDate: req.gregDate }]).catch(() => undefined);
+      // Neighbours too: an override can start or end an overnight shift that spans midnight.
+      await this.recompute.recomputeDays(RecomputeService.withNeighbors([{ userId: req.userId, gregDate: req.gregDate }], 1, 1)).catch(() => undefined);
     }
 
     return this.prisma.attendanceRequest.update({
@@ -153,8 +154,27 @@ export class RequestsService {
         createdById: adminId,
       },
     });
-    await this.recompute.recomputeDays([{ userId: dto.userId, gregDate }]).catch(() => undefined);
+    await this.recompute.recomputeDays(RecomputeService.withNeighbors([{ userId: dto.userId, gregDate }], 1, 1)).catch(() => undefined);
     return { ok: true };
+  }
+
+  // روز شیفت: mark/unmark a user's day as an overnight shift (work continues past midnight).
+  // Recomputes D-1..D+2: the mark closes D at 24:00, turns D+1's first punch into the exit,
+  // and can change what D+2 / D-1 are chained to.
+  async setShiftDay(adminId: string, dto: { userId: string; date: string; enabled: boolean; note?: string }) {
+    const gregDate = parseWorkDate(dto.date);
+    if (!dto.userId || isNaN(gregDate.getTime())) throw new BadRequestException('کاربر و تاریخ را مشخص کنید');
+    if (dto.enabled) {
+      await this.prisma.attendanceShiftDay.upsert({
+        where: { userId_gregDate: { userId: dto.userId, gregDate } },
+        create: { userId: dto.userId, gregDate, note: dto.note || null, createdById: adminId },
+        update: { note: dto.note || null },
+      });
+    } else {
+      await this.prisma.attendanceShiftDay.deleteMany({ where: { userId: dto.userId, gregDate } });
+    }
+    await this.recompute.recomputeDays(RecomputeService.withNeighbors([{ userId: dto.userId, gregDate }], 1, 2)).catch(() => undefined);
+    return { ok: true, enabled: !!dto.enabled };
   }
 
   async pendingCount(scopeDeptIds?: string[]) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
@@ -49,6 +49,14 @@ export class RequestsController {
   @UseGuards(PageAccessGuard)
   override(@Req() req: any, @Body() body: any) {
     return this.requests.adminOverride(req.user.userId, body);
+  }
+
+  // Mark/unmark a day as an overnight shift (روز شیفت) — from the manual entry page.
+  @Put('shift-days')
+  @PageAccess({ pages: ['/dashboard/attendance/records'], action: 'create' })
+  @UseGuards(PageAccessGuard)
+  shiftDay(@Req() req: any, @Body() body: any) {
+    return this.requests.setShiftDay(req.user.userId, { userId: body?.userId, date: body?.date, enabled: !!body?.enabled, note: body?.note });
   }
 
   // Manual check-in/out entry (records/new page) — needs the page's separate "ثبت" flag.
