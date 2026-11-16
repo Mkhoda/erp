@@ -21,6 +21,9 @@ interface LoginContext {
   userAgent?: string;
   rememberMe?: boolean;
   maxSessions?: number; // per-user session limit (default 1); 0 = unlimited
+  authMethod?: string;  // recorded on the Session row (default 'password')
+  ttlSec?: number;      // explicit token lifetime (overrides the settings-based TTL)
+  skipSessionLimit?: boolean; // don't evict the user's other sessions (impersonation)
 }
 
 @Injectable()
@@ -185,6 +188,31 @@ export class AuthService {
     return { ok: true };
   }
 
+  /**
+   * ADMIN signs in as another user ("ورود به‌جای کاربر") for support/troubleshooting. Issues a
+   * 1-hour token on a separate session tagged authMethod='impersonation', never evicts the
+   * target's own sessions, and writes an AuditLog row. Other admins and disabled accounts
+   * can't be impersonated.
+   */
+  async impersonate(adminId: string, targetId: string, ctx: LoginContext = {}) {
+    const [admin, target] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: adminId }, select: { role: true, firstName: true, lastName: true } }),
+      this.prisma.user.findUnique({ where: { id: targetId }, select: { id: true, email: true, role: true, disabled: true, firstName: true, lastName: true } }),
+    ]);
+    if (admin?.role !== 'ADMIN') throw new UnauthorizedException('فقط مدیر ارشد می‌تواند به‌جای کاربر وارد شود');
+    if (!target) throw new UnauthorizedException('کاربر یافت نشد');
+    if (target.role === 'ADMIN') throw new UnauthorizedException('ورود به‌جای مدیر ارشد مجاز نیست');
+    if (target.disabled) throw new UnauthorizedException('این کاربر غیرفعال است');
+    const tokens = await this.signUser(target.id, target.email, target.role, { ...ctx, authMethod: 'impersonation', ttlSec: 60 * 60, skipSessionLimit: true });
+    await this.prisma.auditLog.create({
+      data: {
+        userId: target.id, adminId, action: 'IMPERSONATE', ipAddress: ctx.ip, userAgent: ctx.userAgent,
+        details: { admin: `${admin.firstName} ${admin.lastName}`, target: `${target.firstName} ${target.lastName}` },
+      },
+    }).catch(() => undefined);
+    return { ...tokens, user: { id: target.id, name: `${target.firstName} ${target.lastName}` } };
+  }
+
   private async signUser(
     sub: string,
     email: string | null,
@@ -192,7 +220,7 @@ export class AuthService {
     ctx: LoginContext = {},
   ) {
     const settings = await this.authSettings.get();
-    const ttlSec = ctx.rememberMe ? settings.rememberMeTtlSec : settings.accessTokenTtlSec;
+    const ttlSec = ctx.ttlSec ?? (ctx.rememberMe ? settings.rememberMeTtlSec : settings.accessTokenTtlSec);
     const sessionId = randomUUID();
     const issuedAt = new Date();
     const expiresAt = new Date(issuedAt.getTime() + ttlSec * 1000);
@@ -221,11 +249,11 @@ export class AuthService {
       os: ua.os,
       platform: ua.platform,
       rememberMe: ctx.rememberMe ?? false,
-      authMethod: 'password',
+      authMethod: ctx.authMethod ?? 'password',
     });
 
     // Evict oldest sessions beyond the per-user limit (non-blocking — don't await)
-    this.sessions.enforceLimit(sub, ctx.maxSessions ?? 1, sessionId).catch(() => {});
+    if (!ctx.skipSessionLimit) this.sessions.enforceLimit(sub, ctx.maxSessions ?? 1, sessionId).catch(() => {});
 
     return { access_token: token, expires_in: ttlSec };
   }

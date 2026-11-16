@@ -125,7 +125,7 @@ export default function SyncMonitorPage() {
   const [rmUserId, setRmUserId] = React.useState("");
   const [users, setUsers] = React.useState<any[]>([]);
   React.useEffect(() => {
-    fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
+    fetch(`${API}/users/brief`, { headers: h }).then(r => r.ok ? r.json() : []).then(setUsers).catch(() => {});
     // eslint-disable-next-line
   }, []);
   const userOptions = users.map((u: any) => ({

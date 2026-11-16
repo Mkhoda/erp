@@ -108,7 +108,7 @@ export default function GuardShiftsPage() {
       const [s, a, u] = await Promise.all([
         fetch(`${API}/attendance/guard-shifts`, { headers: h }).then(r => r.ok ? r.json() : []),
         fetch(`${API}/attendance/guard-shifts/assignments`, { headers: h }).then(r => r.ok ? r.json() : []),
-        fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []),
+        fetch(`${API}/users/brief`, { headers: h }).then(r => r.ok ? r.json() : []),
       ]);
       setShifts(Array.isArray(s) ? s : []);
       setAssignments(Array.isArray(a) ? a : []);

@@ -224,7 +224,7 @@ export default function AnnouncementsPage() {
     if (!token) return;
     Promise.all([
       fetch(`${API}/departments`, { headers: h as any }).then(r => r.ok ? r.json() : []),
-      fetch(`${API}/users`, { headers: h as any }).then(r => r.ok ? r.json() : []),
+      fetch(`${API}/users/brief`, { headers: h as any }).then(r => r.ok ? r.json() : []),
     ]).then(([depts, us]) => {
       setDepartments(Array.isArray(depts) ? depts : []);
       const arr = Array.isArray(us) ? us : (us?.data ?? []);

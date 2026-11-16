@@ -24,7 +24,7 @@ const NOT_ASSIGNABLE: Record<string, string> = {
 };
 
 @UseGuards(JwtAuthGuard, PageAccessGuard)
-@PageAccess({ pages: ['/dashboard/assets/assignments', '/dashboard/assets'], readAlso: ['/dashboard/reports'] })
+@PageAccess({ pages: ['/dashboard/assets/assignments', '/dashboard/assets'] })
 @UseFilters(AssetsPrismaErrorFilter)
 @Controller('asset-assignments')
 export class AssetAssignmentsController {

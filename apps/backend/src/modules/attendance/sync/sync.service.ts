@@ -131,7 +131,9 @@ export class SyncService {
         });
         const cardToUser = new Map(users.map((u) => [u.attendanceCardNo!, u.id]));
 
-        const data: Prisma.RawAttendanceRecordCreateManyInput[] = rows.map((r) => ({
+        // Cards removed on purpose (IgnoredAttendanceCard) are dropped at import time.
+        const ignored = new Set((await this.prisma.ignoredAttendanceCard.findMany({ where: { cardNo: { in: cardNos } }, select: { cardNo: true } })).map((c) => c.cardNo));
+        const data: Prisma.RawAttendanceRecordCreateManyInput[] = rows.filter((r) => !ignored.has(r.cardNo)).map((r) => ({
           sourceId,
           recordId: r.recordId,
           cardNo: r.cardNo,

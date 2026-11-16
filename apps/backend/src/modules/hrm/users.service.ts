@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RecomputeService } from '../attendance/engine/recompute.service';
@@ -183,10 +183,10 @@ export class UsersService {
       throw e;
     }
     if (departmentIds) {
-      // reset memberships
-      await this.prisma.userDepartment.deleteMany({ where: { userId: id } });
+      // Sync memberships without wiping the ones kept — each keeps its per-department role.
+      await this.prisma.userDepartment.deleteMany({ where: { userId: id, departmentId: { notIn: departmentIds } } });
       if (departmentIds.length) {
-        await this.prisma.userDepartment.createMany({ data: departmentIds.map((d) => ({ userId: id, departmentId: d })) });
+        await this.prisma.userDepartment.createMany({ data: departmentIds.map((d) => ({ userId: id, departmentId: d })), skipDuplicates: true });
       }
     }
     // Auto-link + recompute attendance when a card number was set/changed.
@@ -194,4 +194,99 @@ export class UsersService {
     return updated;
   }
   remove(id: string) { return this.prisma.user.delete({ where: { id } }); }
+
+  /**
+   * Bulk actions from the users grid. ADMIN only (enforced by the controller).
+   *   addDepartment / moveDepartment / removeDepartment — membership changes (move = this one only, made primary)
+   *   disable / enable — sign-in on/off
+   *   setRole — system role
+   *   purgeCards — see purgeCards()
+   */
+  async bulk(actorId: string, dto: { ids: string[]; action: string; departmentId?: string; role?: string }) {
+    const ids = Array.isArray(dto?.ids) ? [...new Set(dto.ids.filter(Boolean))] : [];
+    if (!ids.length) throw new BadRequestException('هیچ کاربری انتخاب نشده است');
+    const ROLES = ['ADMIN', 'MANAGER', 'EXPERT', 'USER'];
+    switch (dto.action) {
+      case 'addDepartment':
+      case 'moveDepartment': {
+        if (!dto.departmentId) throw new BadRequestException('دپارتمان را انتخاب کنید');
+        const departmentId = dto.departmentId;
+        await this.prisma.$transaction(async (tx) => {
+          if (dto.action === 'moveDepartment') {
+            await tx.userDepartment.deleteMany({ where: { userId: { in: ids }, departmentId: { not: departmentId } } });
+            await tx.user.updateMany({ where: { id: { in: ids } }, data: { departmentId } });
+          } else {
+            await tx.user.updateMany({ where: { id: { in: ids }, departmentId: null }, data: { departmentId } });
+          }
+          await tx.userDepartment.createMany({ data: ids.map((userId) => ({ userId, departmentId })), skipDuplicates: true });
+        });
+        return { ok: true, count: ids.length };
+      }
+      case 'removeDepartment': {
+        if (!dto.departmentId) throw new BadRequestException('دپارتمان را انتخاب کنید');
+        await this.prisma.userDepartment.deleteMany({ where: { userId: { in: ids }, departmentId: dto.departmentId } });
+        // Whoever had it as primary falls back to another membership (or none).
+        const affected = await this.prisma.user.findMany({ where: { id: { in: ids }, departmentId: dto.departmentId }, select: { id: true } });
+        for (const u of affected) {
+          const next = await this.prisma.userDepartment.findFirst({ where: { userId: u.id }, orderBy: { createdAt: 'asc' } });
+          await this.prisma.user.update({ where: { id: u.id }, data: { departmentId: next?.departmentId ?? null } });
+        }
+        return { ok: true, count: ids.length };
+      }
+      case 'disable':
+      case 'enable': {
+        // Never lock yourself out.
+        const target = ids.filter((id) => !(dto.action === 'disable' && id === actorId));
+        const r = await this.prisma.user.updateMany({ where: { id: { in: target } }, data: { disabled: dto.action === 'disable' } });
+        return { ok: true, count: r.count };
+      }
+      case 'setRole': {
+        if (!dto.role || !ROLES.includes(dto.role)) throw new BadRequestException('نقش نامعتبر است');
+        const target = ids.filter((id) => id !== actorId);
+        const r = await this.prisma.user.updateMany({ where: { id: { in: target } }, data: { role: dto.role as any } });
+        return { ok: true, count: r.count };
+      }
+      case 'purgeCards':
+        return this.purgeCards(actorId, ids.filter((id) => id !== actorId));
+      default:
+        throw new BadRequestException('عملیات نامعتبر است');
+    }
+  }
+
+  /**
+   * Remove people (typically auto-created "کارت <n>" placeholders) from the system for good:
+   * their attendance data and raw punches go, the user row goes, and the card number lands on
+   * the ignore list so sync/provisioning never brings it back into reports. A user with other
+   * history (assets, tickets, messages, …) can't be deleted and is reported back instead.
+   */
+  async purgeCards(actorId: string, ids: string[]) {
+    const deleted: string[] = [];
+    const failed: Array<{ id: string; name: string; reason: string }> = [];
+    const users = await this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, lastName: true, attendanceCardNo: true, role: true } });
+    for (const u of users) {
+      const name = `${u.firstName} ${u.lastName}`.trim();
+      if (u.role === 'ADMIN') { failed.push({ id: u.id, name, reason: 'مدیر ارشد قابل حذف نیست' }); continue; }
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.attendanceDay.deleteMany({ where: { userId: u.id } });
+          await tx.attendanceOverride.deleteMany({ where: { userId: u.id } });
+          await tx.attendanceRequest.deleteMany({ where: { userId: u.id } });
+          await tx.rawAttendanceRecord.deleteMany({ where: { OR: [{ userId: u.id }, ...(u.attendanceCardNo ? [{ cardNo: u.attendanceCardNo }] : [])] } });
+          await tx.session.deleteMany({ where: { userId: u.id } });
+          if (u.attendanceCardNo) {
+            await tx.ignoredAttendanceCard.upsert({
+              where: { cardNo: u.attendanceCardNo },
+              create: { cardNo: u.attendanceCardNo, reason: name, createdById: actorId },
+              update: {},
+            });
+          }
+          await tx.user.delete({ where: { id: u.id } });
+        });
+        deleted.push(u.id);
+      } catch {
+        failed.push({ id: u.id, name, reason: 'این کاربر سوابق دیگری (اموال، تیکت، پیام و …) دارد؛ به‌جای حذف غیرفعالش کنید' });
+      }
+    }
+    return { ok: true, deleted: deleted.length, failed };
+  }
 }

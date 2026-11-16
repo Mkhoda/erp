@@ -1,12 +1,21 @@
 import { PrismaService } from '../../prisma/prisma.service';
+import { resolvePagePermissions } from '../permissions/page-perms.util';
 
 // Resolve the department ids a user is allowed to see attendance for.
-// ADMIN → undefined (no restriction). MANAGER → own department + memberships.
+// ADMIN → undefined (no restriction). Everyone else → own department + memberships —
+// unless `fullAccessPage` is given and they hold EVERY action of that page (e.g. view +
+// create + edit on the daily records page, by department/role or a per-person grant):
+// full access to the page means seeing all users, not just their own department.
 export async function resolveDeptScope(
   prisma: PrismaService,
   user: { userId?: string; id?: string; role?: string },
+  fullAccessPage?: string,
 ): Promise<string[] | undefined> {
   if (user?.role === 'ADMIN') return undefined;
+  if (fullAccessPage) {
+    const f = (await resolvePagePermissions(prisma, user, [fullAccessPage])).get(fullAccessPage);
+    if (f && f.canRead && f.canCreate && f.canWrite) return undefined;
+  }
   const uid = user?.userId ?? user?.id;
   if (!uid) return [];
   const [u, memberships] = await Promise.all([

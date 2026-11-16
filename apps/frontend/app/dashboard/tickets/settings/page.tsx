@@ -81,7 +81,7 @@ export default function TicketSettingsPage() {
     setLoading(true);
     Promise.all([
       fetch(`${API}/departments`, { headers: h as any }).then(r => r.ok ? r.json() : []),
-      fetch(`${API}/users`, { headers: h as any }).then(r => r.ok ? r.json() : []),
+      fetch(`${API}/users/brief`, { headers: h as any }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/tickets/settings/global`, { headers: h as any }).then(r => r.ok ? r.json() : {}),
     ]).then(([depts, us, stg]) => {
       setDepartments(Array.isArray(depts) ? depts : (depts.data ?? []));

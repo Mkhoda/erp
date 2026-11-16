@@ -107,7 +107,7 @@ export default function TicketsPage() {
   React.useEffect(() => {
     Promise.all([
       fetch(`${API}/tickets/config/enabled`, { headers: h }).then(r => r.ok ? r.json() : []),
-      fetch(`${API}/users`, { headers: h }).then(r => r.ok ? r.json() : []),
+      fetch(`${API}/users/brief`, { headers: h }).then(r => r.ok ? r.json() : []),
     ]).then(([cfgs, us]) => {
       setDepartments(cfgs.map((c: any) => ({ id: c.department.id, name: c.department.name })));
       setCategories(cfgs.flatMap((c: any) => c.categories?.map((cat: any) => ({ id: cat.id, name: `${c.department.name} — ${cat.name}` })) ?? []));

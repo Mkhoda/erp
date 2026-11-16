@@ -12,6 +12,16 @@ export class DepartmentsController {
   @Get()
   findAll() { return this.departmentsService.findAll(); }
 
+  // Org chart for the departments page (tree + members + people in no department).
+  @Get('tree')
+  @Roles('ADMIN')
+  tree() { return this.departmentsService.tree(); }
+
+  // Drag-and-drop a person between departments ("move") or into one more ("copy").
+  @Post('move-member')
+  @Roles('ADMIN')
+  moveMember(@Body() body: any) { return this.departmentsService.moveMember(body); }
+
   @Get(':id')
   findOne(@Param('id') id: string) { return this.departmentsService.findOne(id); }
 
@@ -29,8 +39,20 @@ export class DepartmentsController {
 
   @Post(':id/members')
   @Roles('ADMIN')
-  addMember(@Param('id') id: string, @Body() body: { userId: string }) {
-    return this.departmentsService.addMember(id, body.userId);
+  addMember(@Param('id') id: string, @Body() body: { userId: string; role?: string }) {
+    return this.departmentsService.addMember(id, body.userId, body.role);
+  }
+
+  @Patch(':id/members/:userId')
+  @Roles('ADMIN')
+  setMemberRole(@Param('id') id: string, @Param('userId') userId: string, @Body() body: { role: string }) {
+    return this.departmentsService.setMemberRole(id, userId, body.role);
+  }
+
+  @Post(':id/members/:userId/primary')
+  @Roles('ADMIN')
+  setPrimary(@Param('id') id: string, @Param('userId') userId: string) {
+    return this.departmentsService.setPrimary(id, userId);
   }
 
   @Delete(':id/members/:userId')

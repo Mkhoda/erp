@@ -7,6 +7,9 @@ import { PagePermissionGuard } from '../../permissions/page.guard';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RecordsService, RecordFilter } from './records.service';
 import { resolveDeptScope, parseWorkDate } from '../scope.util';
+
+// Full access (view + create + edit) on this page lifts the own-department restriction.
+const RECORDS_PAGE = '/dashboard/attendance/records';
 import { CalcService } from '../engine/calc.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard, PagePermissionGuard)
@@ -28,7 +31,7 @@ export class RecordsController {
       userId: q.userId || undefined,
       departmentId: q.departmentId || undefined,
       status: q.status || undefined,
-      scopeDepartmentIds: await resolveDeptScope(this.prisma, req.user),
+      scopeDepartmentIds: await resolveDeptScope(this.prisma, req.user, RECORDS_PAGE),
     };
   }
 
@@ -63,7 +66,7 @@ export class RecordsController {
     return this.records.periods({
       userId: q.userId || undefined,
       departmentId: q.departmentId || undefined,
-      scopeDepartmentIds: await resolveDeptScope(this.prisma, req.user),
+      scopeDepartmentIds: await resolveDeptScope(this.prisma, req.user, RECORDS_PAGE),
     });
   }
 

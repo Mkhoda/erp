@@ -43,7 +43,7 @@ const ROUTE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   "/dashboard/floors": { label: "طبقات", Icon: Layers },
   "/dashboard/rooms": { label: "اتاق‌ها", Icon: Home },
   "/dashboard/departments": { label: "دپارتمان‌ها", Icon: MapPin },
-  "/dashboard/reports": { label: "گزارش‌ها", Icon: LayoutDashboard },
+  "/dashboard/analytics": { label: "داشبورد مدیریتی", Icon: LayoutDashboard },
   "/dashboard/system-logs": { label: "لاگ سیستم", Icon: Bell },
   "/dashboard/messaging": { label: "پیام‌رسانی", Icon: MessageSquare },
   "/dashboard/messaging/admin": { label: "تنظیمات پیام‌رسانی", Icon: Settings },
@@ -84,6 +84,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     refreshSystemName().then(setOrgName);
   }, []);
 
+  // Admin impersonation: the original admin token is parked in localStorage("impersonator").
+  const [impersonator, setImpersonator] = React.useState<{ token: string; name: string } | null>(null);
+  React.useEffect(() => {
+    try { const raw = localStorage.getItem("impersonator"); if (raw) setImpersonator(JSON.parse(raw)); } catch { /* ignore */ }
+  }, []);
+  const endImpersonation = React.useCallback(async () => {
+    const API = process.env.NEXT_PUBLIC_API_URL || "/api";
+    let saved: { token: string } | null = null;
+    try { saved = JSON.parse(localStorage.getItem("impersonator") || "null"); } catch { /* ignore */ }
+    const current = localStorage.getItem("token");
+    // Close the impersonation session itself, then restore the admin's own token.
+    if (current) await fetch(`${API}/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${current}` } }).catch(() => {});
+    localStorage.removeItem("impersonator");
+    if (saved?.token) {
+      localStorage.setItem("token", saved.token);
+      document.cookie = `token=${saved.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      window.location.href = "/dashboard/users";
+    } else {
+      localStorage.removeItem("token");
+      document.cookie = "token=; path=/; max-age=0";
+      window.location.href = "/signin";
+    }
+  }, []);
+
   // Auth
   React.useEffect(() => {
     const token = localStorage.getItem("token");
@@ -104,11 +128,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setAuthReady(true);
       })
       .catch(() => {
+        if (localStorage.getItem("impersonator")) { endImpersonation(); return; }
         localStorage.removeItem("token");
         document.cookie = "token=; path=/; max-age=0";
         router.replace("/signin");
       });
-  }, [router]);
+  }, [router, endImpersonation]);
 
   // Permissions
   React.useEffect(() => {
@@ -219,6 +244,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [pathname]);
 
   const logout = () => {
+    // While impersonating, "logout" means going back to the admin account.
+    if (impersonator) { endImpersonation(); return; }
     localStorage.removeItem("token");
     document.cookie = "token=; path=/; max-age=0";
     router.replace("/signin");
@@ -430,6 +457,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
+
+        {/* Signed in as another user (admin "ورود به‌جای کاربر") */}
+        {impersonator && (
+          <div className="flex flex-wrap items-center justify-center gap-3 px-4 py-2 bg-amber-500 text-white text-sm">
+            <span>شما به‌جای «{impersonator.name}» وارد شده‌اید.</span>
+            <button onClick={endImpersonation} className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 font-medium">بازگشت به حساب مدیر</button>
+          </div>
+        )}
 
         {/* Page content */}
         <main className="flex-1 p-4 overflow-auto">

@@ -93,6 +93,14 @@ export class AuthController {
     return { ...rest, hasPassword: Boolean(password) };
   }
 
+  // ADMIN: sign in as another user (support). The frontend keeps the admin token to switch back.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Post('impersonate/:userId')
+  impersonate(@Req() req: any, @Param('userId') userId: string) {
+    return this.authService.impersonate(req.user.userId, userId, { ip: extractIp(req), userAgent: req.headers['user-agent'] });
+  }
+
   // Revoke the calling user's current session (logout)
   @UseGuards(JwtAuthGuard)
   @Post('logout')

@@ -7,7 +7,7 @@ import { AssetsPrismaErrorFilter } from './prisma-error.filter';
 // تعلق — the organizations/companies an asset can belong to. Managed from the assets page,
 // so it follows that page's view / add-edit / delete flags.
 @UseGuards(JwtAuthGuard, PageAccessGuard)
-@PageAccess({ pages: ['/dashboard/assets'], readAlso: ['/dashboard/reports'] })
+@PageAccess({ pages: ['/dashboard/assets'], readAlso: ['/dashboard/assets/assignments'] })
 @UseFilters(AssetsPrismaErrorFilter)
 @Controller('asset-owners')
 export class AssetOwnersController {

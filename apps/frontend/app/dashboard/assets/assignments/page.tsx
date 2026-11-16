@@ -66,7 +66,7 @@ export default function AssignmentsPage() {
 
   async function loadLookups() {
     const get = (u: string) => fetch(`${API}/${u}`, { headers: auth }).then(r => (r.ok ? r.json() : [])).catch(() => []);
-    const [a, u, d, b] = await Promise.all([get("assets?take=500"), get("users"), get("departments"), get("buildings")]);
+    const [a, u, d, b] = await Promise.all([get("assets?take=500"), get("users/brief"), get("departments"), get("buildings")]);
     setAssets(Array.isArray(a) ? a : a?.data || []);
     setUsers(Array.isArray(u) ? u : u?.data || []);
     setDepts(Array.isArray(d) ? d : []);

@@ -75,9 +75,9 @@ export class SchedulesController {
   }
 
   // ── Per-user rule (used from the users panel) ──
-  // Schedules list is needed by the users panel (manager allowed to read).
+  // Work-rule groups list: the users panel and the group filters on the dashboards/score pages.
   @Get('schedules-lite')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
   schedulesLite() {
     return this.schedules.list();
   }

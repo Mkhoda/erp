@@ -103,7 +103,7 @@ export default function TicketDetailPage() {
     setLoading(true);
     Promise.all([
       loadTicket(),
-      isStaffRole ? fetch(`${API}/users`, { headers: h as any }).then(r => r.ok ? r.json() : []) : Promise.resolve([]),
+      isStaffRole ? fetch(`${API}/users/brief`, { headers: h as any }).then(r => r.ok ? r.json() : []) : Promise.resolve([]),
       fetch(`${API}/tickets/config/enabled`, { headers: h as any }).then(r => r.ok ? r.json() : []),
     ]).then(([, us, cfgs]) => {
       setUsers((Array.isArray(us) ? us : (us.data ?? [])).map((u: any) => ({ ...u, fullName: `${u.firstName} ${u.lastName}` })));

@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { AssetsPrismaErrorFilter } from './prisma-error.filter';
 
 @UseGuards(JwtAuthGuard, PageAccessGuard)
-@PageAccess({ pages: ['/dashboard/assets'], readAlso: ['/dashboard/reports'] })
+@PageAccess({ pages: ['/dashboard/assets'], readAlso: ['/dashboard/assets/assignments'] })
 @UseFilters(AssetsPrismaErrorFilter)
 @Controller('assets')
 export class AssetsController {

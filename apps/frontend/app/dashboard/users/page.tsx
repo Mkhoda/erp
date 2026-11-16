@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { List, LayoutGrid, Plus, Pencil, Users as UsersIcon, Upload, Phone, Ban, CheckCircle, KeyRound, Eye, EyeOff, UserX, CreditCard, Mail, ShieldCheck, Clock, Hash, FolderTree, ChevronDown, ChevronLeft } from "lucide-react";
+import { List, LayoutGrid, Plus, Pencil, Users as UsersIcon, Upload, Phone, Ban, CheckCircle, KeyRound, Eye, EyeOff, UserX, CreditCard, Mail, ShieldCheck, Clock, Hash, FolderTree, ChevronDown, ChevronLeft, LogIn } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader";
 import SearchBar from "../../components/ui/SearchBar";
 import SkeletonTable, { SkeletonCards } from "../../components/ui/SkeletonTable";
@@ -72,7 +72,12 @@ export default function UsersPage() {
   const [loading, setLoading]               = React.useState(true);
   const [open, setOpen]                     = React.useState(false);
   const [bulkOpen, setBulkOpen]             = React.useState(false);
-  const [deptTreeOpen, setDeptTreeOpen]     = React.useState(false);
+  // Row selection for bulk actions, and the "kind" quick filter.
+  const [selected, setSelected]             = React.useState<Set<string>>(new Set());
+  const [kindFilter, setKindFilter]         = React.useState("");
+  const [bulk, setBulk]                     = React.useState<{ action: string; departmentId: string; role: string }>({ action: "", departmentId: "", role: "USER" });
+  const [bulkBusy, setBulkBusy]             = React.useState(false);
+  const [me, setMe]                         = React.useState<{ id: string; role: string } | null>(null);
   const [editing, setEditing]               = React.useState<any | null>(null);
   const [deptSearch, setDeptSearch]         = React.useState("");
   const [saving, setSaving]                 = React.useState(false);
@@ -108,8 +113,13 @@ export default function UsersPage() {
 
   React.useEffect(() => { load(); loadDeps(); }, []);
 
+  // "کارت <n>" users are auto-created attendance-only placeholders (disabled), see provisionCardsAndRecompute.
+  const isPlaceholder = (u: User) => u.firstName === "کارت";
   const filtered = users.filter(u => {
-    if (!showDisabled && u.disabled) return false;
+    if (kindFilter === "placeholder") { if (!isPlaceholder(u)) return false; }
+    else if (!showDisabled && u.disabled) return false;
+    if (kindFilter === "noCard" && u.attendanceCardNo) return false;
+    if (kindFilter === "noDept" && u.userDepartments?.length) return false;
     const name  = `${u.firstName || ""} ${u.lastName || ""}`.toLowerCase();
     const matchQ    = name.includes(query.toLowerCase()) || (u.phone || "").includes(query) || (u.email || "").toLowerCase().includes(query.toLowerCase()) || (u.attendanceCardNo || "").includes(query);
     const matchRole = roleFilter === "ALL" || u.role === roleFilter;
@@ -120,7 +130,55 @@ export default function UsersPage() {
   // Paging (same "show count" + prev/next as the attendance records grid).
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
-  React.useEffect(() => { setPage(1); }, [query, roleFilter, departmentFilter, showDisabled, pageSize]);
+  React.useEffect(() => { setPage(1); setSelected(new Set()); }, [query, roleFilter, departmentFilter, showDisabled, pageSize, kindFilter]);
+  React.useEffect(() => {
+    fetch(`${API}/auth/me`, { headers: h() }).then(r => r.ok ? r.json() : null).then(d => d && setMe({ id: d.id, role: d.role })).catch(() => {});
+    // eslint-disable-next-line
+  }, []);
+
+  const toggleSel = (id: string) => setSelected(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const allOnPage = paged.length > 0 && paged.every(u => selected.has(u.id));
+  const toggleAllOnPage = () => setSelected(s => { const n = new Set(s); paged.forEach(u => allOnPage ? n.delete(u.id) : n.add(u.id)); return n; });
+
+  const BULK_LABEL: Record<string, string> = {
+    addDepartment: "افزودن به دپارتمان", moveDepartment: "انتقال به دپارتمان (فقط همین)", removeDepartment: "حذف از دپارتمان",
+    enable: "فعال‌سازی", disable: "غیرفعال‌سازی", setRole: "تغییر نقش", purgeCards: "حذف کامل از سامانه",
+  };
+  async function runBulk() {
+    const ids = [...selected];
+    if (!bulk.action || !ids.length) return;
+    if (["addDepartment", "moveDepartment", "removeDepartment"].includes(bulk.action) && !bulk.departmentId) { toast.warning("دپارتمان را انتخاب کنید"); return; }
+    const purge = bulk.action === "purgeCards";
+    const ok = await confirm(BULK_LABEL[bulk.action], purge
+      ? `${ids.length.toLocaleString("fa-IR")} کاربر به‌همراه همه‌ی سوابق حضور و پانچ‌های کارتشان برای همیشه حذف می‌شوند و کارتشان دیگر در گزارش‌ها و همگام‌سازی نمی‌آید. این کار برگشت‌پذیر نیست. ادامه می‌دهید؟`
+      : `این عملیات روی ${ids.length.toLocaleString("fa-IR")} کاربر انتخاب‌شده انجام شود؟`, purge ? "danger" : "warning");
+    if (!ok) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch(`${API}/users/bulk-action`, { method: "POST", headers: { "Content-Type": "application/json", ...h() }, body: JSON.stringify({ ids, ...bulk }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(d.message || "خطا در عملیات"); return; }
+      if (purge) {
+        toast.success(`${(d.deleted || 0).toLocaleString("fa-IR")} کاربر حذف شد`);
+        if (d.failed?.length) toast.warning(`${d.failed.length.toLocaleString("fa-IR")} مورد حذف نشد: ${d.failed.slice(0, 3).map((f: any) => `${f.name} (${f.reason})`).join("، ")}`);
+      } else toast.success("انجام شد");
+      setSelected(new Set()); setBulk(b => ({ ...b, action: "" }));
+      await load();
+    } finally { setBulkBusy(false); }
+  }
+
+  // ADMIN: sign in as this user. The admin token is kept so the dashboard can switch back.
+  async function impersonate(u: User) {
+    const ok = await confirm("ورود به‌جای کاربر", `با حساب «${u.firstName} ${u.lastName}» وارد می‌شوید (حداکثر یک ساعت). این ورود ثبت می‌شود. ادامه می‌دهید؟`, "warning");
+    if (!ok) return;
+    const res = await fetch(`${API}/auth/impersonate/${u.id}`, { method: "POST", headers: h() });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.access_token) { toast.error(d.message || "ورود ناموفق بود"); return; }
+    try { localStorage.setItem("impersonator", JSON.stringify({ token, name: `${u.firstName} ${u.lastName}` })); } catch { /* ignore */ }
+    localStorage.setItem("token", d.access_token);
+    document.cookie = `token=${d.access_token}; path=/; max-age=${d.expires_in || 3600}; SameSite=Lax`;
+    window.location.href = "/dashboard";
+  }
 
   // Stats
   const active    = users.filter(u => !u.disabled).length;
@@ -128,7 +186,7 @@ export default function UsersPage() {
   const admins    = users.filter(u => u.role === "ADMIN" || u.role === "MANAGER").length;
   const withCard  = users.filter(u => u.attendanceCardNo).length;
 
-  const DEFAULT_RULE = { employeeType: "FULL_TIME", scheduleId: "", otAllowed: true, checkInEnd: "", checkOutStart: "", dailyMinutes: "", otMaxDaily: "", otMaxMonthly: "" };
+  const DEFAULT_RULE = { employeeType: "FULL_TIME", scheduleId: "", otAllowed: true, noTimeWindow: false, checkInEnd: "", checkOutStart: "", dailyMinutes: "", otMaxDaily: "", otMaxMonthly: "" };
 
   function onAdd() {
     setEditing({ firstName: "", lastName: "", phone: "", email: "", password: "", role: "USER", maxSessions: 1, departmentIds: [], rule: { ...DEFAULT_RULE } });
@@ -220,7 +278,7 @@ export default function UsersPage() {
         iconColor="from-emerald-500 to-emerald-600"
         extra={ViewToggle}
         actions={[
-          { label: "دپارتمان‌ها", icon: FolderTree, onClick: () => setDeptTreeOpen(true), variant: "secondary" },
+          { label: "دپارتمان‌ها", icon: FolderTree, onClick: () => { window.location.href = "/dashboard/departments"; }, variant: "secondary" },
           { label: "وارد دسته‌ای", icon: Upload, onClick: () => setBulkOpen(true), variant: "secondary" },
           { label: "افزودن کاربر", icon: Plus, onClick: onAdd },
         ]}
@@ -248,11 +306,44 @@ export default function UsersPage() {
           <option value="">همه دپارتمان‌ها</option>
           {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
+        <select value={kindFilter} onChange={e => setKindFilter(e.target.value)} className="text-sm select-theme">
+          <option value="">همه کاربران</option>
+          <option value="placeholder">کارت‌های بی‌نام («کارت …»)</option>
+          <option value="noCard">بدون کارت حضور</option>
+          <option value="noDept">بدون دپارتمان</option>
+        </select>
         <label className="flex items-center gap-1.5 text-theme-secondary text-sm whitespace-nowrap cursor-pointer">
           <input type="checkbox" checked={showDisabled} onChange={e => setShowDisabled(e.target.checked)} className="rounded accent-blue-600" />
           نمایش غیرفعال {disabled > 0 && <span className="text-[10px] badge badge-warning">{disabled}</span>}
         </label>
       </SearchBar>
+
+      {/* Bulk actions */}
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/30 text-sm">
+          <span className="font-medium text-blue-700 dark:text-blue-300">{selected.size.toLocaleString("fa-IR")} کاربر انتخاب شده</span>
+          <select value={bulk.action} onChange={e => setBulk(b => ({ ...b, action: e.target.value }))} className="text-sm select-theme w-auto">
+            <option value="">انتخاب عملیات…</option>
+            {Object.entries(BULK_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          {["addDepartment", "moveDepartment", "removeDepartment"].includes(bulk.action) && (
+            <select value={bulk.departmentId} onChange={e => setBulk(b => ({ ...b, departmentId: e.target.value }))} className="text-sm select-theme w-auto">
+              <option value="">دپارتمان…</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          )}
+          {bulk.action === "setRole" && (
+            <select value={bulk.role} onChange={e => setBulk(b => ({ ...b, role: e.target.value }))} className="text-sm select-theme w-auto">
+              {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          )}
+          <button onClick={runBulk} disabled={!bulk.action || bulkBusy}
+            className={`px-3 py-1.5 rounded-lg text-white text-xs disabled:opacity-50 ${bulk.action === "purgeCards" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}`}>
+            {bulkBusy ? "در حال انجام…" : "اجرا"}
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-xs text-theme-muted hover:text-theme-primary mr-auto">لغو انتخاب</button>
+        </div>
+      )}
 
       {/* ── LIST VIEW ── */}
       {view === "list" ? (
@@ -261,6 +352,7 @@ export default function UsersPage() {
             <table className="table-theme">
               <thead>
                 <tr>
+                  <th className="w-10"><input type="checkbox" checked={allOnPage} onChange={toggleAllOnPage} title="انتخاب همه‌ی این صفحه" /></th>
                   <th>کاربر</th>
                   <th>تماس</th>
                   <th>نقش</th>
@@ -271,13 +363,14 @@ export default function UsersPage() {
                 </tr>
               </thead>
               {loading ? (
-                <SkeletonTable cols={7} rows={6} />
+                <SkeletonTable cols={8} rows={6} />
               ) : (
                 <tbody>
                   {filtered.length === 0 ? (
-                    <EmptyStateRow icon={UsersIcon} title="کاربری یافت نشد" description={query ? "عبارت جستجو را تغییر دهید" : undefined} actionLabel={!query ? "افزودن کاربر" : undefined} onAction={!query ? onAdd : undefined} colSpan={7} />
+                    <EmptyStateRow icon={UsersIcon} title="کاربری یافت نشد" description={query ? "عبارت جستجو را تغییر دهید" : undefined} actionLabel={!query ? "افزودن کاربر" : undefined} onAction={!query ? onAdd : undefined} colSpan={8} />
                   ) : paged.map(u => (
-                    <tr key={u.id} className={u.disabled ? "opacity-55" : ""}>
+                    <tr key={u.id} className={`${u.disabled ? "opacity-55" : ""} ${selected.has(u.id) ? "bg-blue-50/60 dark:bg-blue-950/20" : ""}`}>
+                      <td><input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSel(u.id)} /></td>
                       {/* Name + email */}
                       <td>
                         <div className="flex items-center gap-3 text-justify">
@@ -338,6 +431,11 @@ export default function UsersPage() {
                           >
                             {u.disabled ? <CheckCircle className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
                           </button>
+                          {me?.role === "ADMIN" && u.role !== "ADMIN" && !u.disabled && u.id !== me.id && (
+                            <button onClick={() => impersonate(u)} title="ورود به‌جای این کاربر" className="text-xs py-1 px-2.5 rounded-lg border border-theme text-theme-secondary hover:text-blue-600 hover:border-blue-400">
+                              <LogIn className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -615,6 +713,9 @@ export default function UsersPage() {
                 <label className="flex items-center gap-2 text-theme-primary text-sm">
                   <input type="checkbox" checked={!!editing?.rule?.flexEnabled} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, flexEnabled: e.target.checked } }))} /> شناوری
                 </label>
+                <label className="flex items-center gap-2 text-theme-primary text-sm" title="ورود از همان ساعت واقعی حساب می‌شود (مثلاً ۶ صبح)، بدون تاخیر/تعجیل؛ اضافه‌کار فقط مازاد ساعت موظف">
+                  <input type="checkbox" checked={!!editing?.rule?.noTimeWindow} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, noTimeWindow: e.target.checked } }))} /> بدون محدودیت ساعت ورود/خروج
+                </label>
                 {editing?.rule?.employeeType !== "HOURLY" && (
                   <label className="flex items-center gap-2 text-theme-primary text-sm">
                     <input type="checkbox" checked={editing?.rule?.otAllowed !== false} onChange={e => setEditing((s: any) => ({ ...s, rule: { ...s.rule, otAllowed: e.target.checked } }))} /> اضافه‌کار مجاز
@@ -659,112 +760,7 @@ export default function UsersPage() {
         <BulkImportModal departments={departments} onClose={() => setBulkOpen(false)} onImported={async () => { setBulkOpen(false); await load(); }} />
       )}
 
-      {deptTreeOpen && (
-        <DepartmentsTreeModal allUsers={users} onClose={() => setDeptTreeOpen(false)} onChanged={load} />
-      )}
     </div>
-  );
-}
-
-function DepartmentsTreeModal({ onClose, onChanged, allUsers }: { onClose: () => void; onChanged: () => void; allUsers: User[] }) {
-  const toast = useToast();
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const h = () => ({ Authorization: `Bearer ${token}` });
-
-  type DeptWithMembers = { id: string; name: string; userDepartments: Array<{ userId: string; user: { id: string; firstName: string; lastName: string; role: string; disabled?: boolean } }> };
-  const [depts, setDepts]         = React.useState<DeptWithMembers[]>([]);
-  const [loading, setLoading]     = React.useState(true);
-  const [expanded, setExpanded]   = React.useState<Set<string>>(new Set());
-  const [addSearch, setAddSearch] = React.useState<Record<string, string>>({});
-  const [busy, setBusy]           = React.useState<string | null>(null);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const r = await fetch(`${API}/departments`, { headers: h() });
-      const data = await r.json();
-      setDepts(Array.isArray(data) ? data : []);
-    } catch { setDepts([]); } finally { setLoading(false); }
-  }
-  React.useEffect(() => { load(); }, []);
-
-  function toggle(id: string) {
-    setExpanded(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  }
-
-  async function addMember(deptId: string, userId: string) {
-    setBusy(`${deptId}:${userId}`);
-    try {
-      const r = await fetch(`${API}/departments/${deptId}/members`, { method: "POST", headers: { "Content-Type": "application/json", ...h() }, body: JSON.stringify({ userId }) });
-      if (!r.ok) throw new Error();
-      await load(); await onChanged();
-    } catch { toast.error("خطا در افزودن عضو"); } finally { setBusy(null); }
-  }
-
-  async function removeMember(deptId: string, userId: string) {
-    setBusy(`${deptId}:${userId}`);
-    try {
-      const r = await fetch(`${API}/departments/${deptId}/members/${userId}`, { method: "DELETE", headers: h() });
-      if (!r.ok) throw new Error();
-      await load(); await onChanged();
-    } catch { toast.error("خطا در حذف عضو"); } finally { setBusy(null); }
-  }
-
-  return (
-    <Modal open onClose={onClose} title="دپارتمان‌ها و اعضا" subtitle="برای مشاهده و مدیریت اعضا، روی هر دپارتمان کلیک کنید" size="xl">
-      <div className="space-y-2">
-        {loading ? (
-          <p className="py-8 text-theme-muted text-sm text-center">در حال بارگذاری...</p>
-        ) : depts.length === 0 ? (
-          <p className="py-8 text-theme-muted text-sm text-center">دپارتمانی یافت نشد</p>
-        ) : depts.map(d => {
-          const memberIds = new Set(d.userDepartments.map(x => x.userId));
-          const q = (addSearch[d.id] || "").toLowerCase();
-          const candidates = allUsers.filter(u => !memberIds.has(u.id) && `${u.firstName} ${u.lastName}`.toLowerCase().includes(q));
-          const isOpen = expanded.has(d.id);
-          return (
-            <div key={d.id} className="border border-theme rounded-xl overflow-hidden">
-              <button type="button" onClick={() => toggle(d.id)} className="flex justify-between items-center bg-theme-secondary hover:bg-theme-hover px-3 py-2.5 w-full text-right transition-colors">
-                <div className="flex items-center gap-2">
-                  {isOpen ? <ChevronDown className="w-4 h-4 text-theme-muted" /> : <ChevronLeft className="w-4 h-4 text-theme-muted" />}
-                  <span className="font-medium text-theme-primary text-sm">{d.name}</span>
-                </div>
-                <span className="badge badge-teal">{d.userDepartments.length.toLocaleString("fa-IR")} عضو</span>
-              </button>
-              {isOpen && (
-                <div className="space-y-2 bg-theme-card p-3">
-                  {d.userDepartments.length === 0 ? (
-                    <p className="text-theme-muted text-xs">این دپارتمان عضوی ندارد</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {d.userDepartments.map(m => (
-                        <div key={m.userId} className="flex justify-between items-center bg-theme-secondary px-2.5 py-1.5 rounded-lg text-sm">
-                          <span className="text-theme-primary">{m.user.firstName} {m.user.lastName}</span>
-                          <button type="button" disabled={busy === `${d.id}:${m.userId}`} onClick={() => removeMember(d.id, m.userId)} className="text-red-500 hover:text-red-600 text-xs disabled:opacity-40">حذف</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="pt-2 border-theme border-t">
-                    <input placeholder="جستجوی کاربر برای افزودن..." value={addSearch[d.id] || ""} onChange={e => setAddSearch(s => ({ ...s, [d.id]: e.target.value }))} className="mb-1.5 text-xs input-theme" />
-                    <div className="border border-theme rounded-lg max-h-32 overflow-auto">
-                      {candidates.length === 0 ? (
-                        <p className="px-3 py-2 text-theme-muted text-xs">کاربری یافت نشد</p>
-                      ) : candidates.slice(0, 30).map(u => (
-                        <button key={u.id} type="button" disabled={busy === `${d.id}:${u.id}`} onClick={() => addMember(d.id, u.id)} className="flex justify-between items-center hover:bg-theme-hover disabled:opacity-40 px-3 py-1.5 w-full text-xs transition-colors">
-                          <span className="text-theme-secondary">{u.firstName} {u.lastName}</span>
-                          <Plus className="w-3.5 h-3.5 text-blue-500" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </Modal>
   );
 }
 

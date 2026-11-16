@@ -6,11 +6,13 @@ import { Roles } from '../auth/roles.decorator';
 import { Page } from '../permissions/page.decorator';
 import { PagePermissionGuard } from '../permissions/page.guard';
 import { PageAccess, PageAccessGuard } from '../permissions/page-access.guard';
+import { PrismaService } from '../../prisma/prisma.service';
+import { resolveDeptScope } from '../attendance/scope.util';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService, private readonly prisma: PrismaService) {}
 
   @Get()
   @Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
@@ -23,14 +25,21 @@ export class UsersController {
   @Get('brief')
   @Roles('ADMIN', 'MANAGER', 'EXPERT', 'USER')
   @PageAccess({
-    pages: ['/dashboard/users', '/dashboard/attendance/records', '/dashboard/attendance/monthly', '/dashboard/work-log/reports', '/dashboard/analytics'],
+    pages: [
+      '/dashboard/users', '/dashboard/attendance/records', '/dashboard/attendance/monthly', '/dashboard/attendance/shifts',
+      '/dashboard/attendance/sync', '/dashboard/work-log/reports', '/dashboard/analytics',
+      '/dashboard/assets', '/dashboard/assets/assignments', '/dashboard/tickets', '/dashboard/tickets/settings',
+      '/dashboard/notifications/announcements', '/dashboard/performance', '/dashboard/departments',
+    ],
     action: 'read',
   })
   @UseGuards(PageAccessGuard)
   async brief(@Req() req: any) {
-    const users: any[] = await this.usersService.findAll(req.user);
+    // Full access to daily records lifts a manager's own-department limit here too.
+    const unrestricted = (await resolveDeptScope(this.prisma, req.user, '/dashboard/attendance/records')) === undefined;
+    const users: any[] = await this.usersService.findAll(unrestricted ? { ...req.user, role: 'ADMIN' } : req.user);
     return users.map(u => ({
-      id: u.id, firstName: u.firstName, lastName: u.lastName, phone: u.phone,
+      id: u.id, firstName: u.firstName, lastName: u.lastName, phone: u.phone, email: u.email,
       attendanceCardNo: u.attendanceCardNo, role: u.role, disabled: u.disabled, departmentId: u.departmentId, department: u.department ? { id: u.department.id, name: u.department.name } : null,
     }));
   }
@@ -55,6 +64,13 @@ export class UsersController {
   @Roles('ADMIN', 'MANAGER')
   bulkCreate(@Req() req: any, @Body() body: { users: any[] }) {
     return this.usersService.bulkCreate(body.users || [], req.user);
+  }
+
+  // Bulk actions from the users grid (department assignment, enable/disable, role, purge cards).
+  @Post('bulk-action')
+  @Roles('ADMIN')
+  bulkAction(@Req() req: any, @Body() body: any) {
+    return this.usersService.bulk(req.user.userId ?? req.user.id, body);
   }
 
   @Patch(':id')

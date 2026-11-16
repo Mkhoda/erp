@@ -62,7 +62,7 @@ export default function AssetDetailPage() {
   React.useEffect(() => {
     const h = { headers: auth } as any;
     Promise.all([
-      fetch(`${API}/users`, h).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`${API}/users/brief`, h).then(r => r.ok ? r.json() : []).catch(() => []),
       fetch(`${API}/departments`, h).then(r => r.ok ? r.json() : []).catch(() => []),
       fetch(`${API}/buildings`, h).then(r => r.ok ? r.json() : []).catch(() => []),
     ]).then(([u, d, b]) => {

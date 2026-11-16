@@ -22,7 +22,8 @@ export class ReportsController {
   ) {}
 
   private async gather(req: any, q: any): Promise<{ rows: any[]; meta: ReportMeta }> {
-    const scope = await resolveDeptScope(this.prisma, req.user);
+    // Exports follow the daily-records page: full access there means all users.
+    const scope = await resolveDeptScope(this.prisma, req.user, '/dashboard/attendance/records');
     const rows = await this.records.list(
       {
         jYear: q.jYear ? +q.jYear : undefined,
