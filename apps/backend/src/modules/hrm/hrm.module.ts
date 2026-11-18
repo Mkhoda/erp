@@ -6,12 +6,11 @@ import { HrmController } from './hrm.controller';
 import { UsersService } from './users.service';
 import { DepartmentsService } from './departments.service';
 import { TimesheetsService } from './timesheets.service';
-import { PrismaService } from '../../prisma/prisma.service';
 import { AttendanceModule } from '../attendance/attendance.module';
 
 @Module({
   imports: [AttendanceModule],
   controllers: [UsersController, DepartmentsController, TimesheetsController, HrmController],
-  providers: [UsersService, DepartmentsService, TimesheetsService, PrismaService],
+  providers: [UsersService, DepartmentsService, TimesheetsService],
 })
 export class HrmModule {}

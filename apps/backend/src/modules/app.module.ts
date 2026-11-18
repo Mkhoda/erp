@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
 import { AuthModule } from './auth/auth.module';
 import { HrmModule } from './hrm/hrm.module';
 import { ReportsController } from './reports.controller';
@@ -27,6 +27,7 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
 
 @Module({
   imports: [
+    PrismaModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [
@@ -57,7 +58,6 @@ import { LoggingInterceptor } from '../common/logging.interceptor';
   ],
   controllers: [ReportsController],
   providers: [
-    PrismaService,
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
   ],
 })

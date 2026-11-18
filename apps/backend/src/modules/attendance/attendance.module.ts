@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { PrismaService } from '../../prisma/prisma.service';
 import { MssqlProvider } from './integration/mssql.provider';
 import { SourcesService } from './integration/sources.service';
 import { SourcesController } from './integration/sources.controller';
@@ -43,7 +42,6 @@ import { GuardShiftsController } from './guard-shifts/guard-shifts.controller';
     GuardShiftsController,
   ],
   providers: [
-    PrismaService,
     MssqlProvider,
     SourcesService,
     SyncService,

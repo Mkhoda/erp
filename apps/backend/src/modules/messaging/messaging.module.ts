@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MulterModule } from '@nestjs/platform-express';
-import { PrismaService } from '../../prisma/prisma.service';
 import { SessionsModule } from '../sessions/sessions.module';
 import { AuthSettingsModule } from '../auth-settings/auth-settings.module';
 import { PresenceService } from './presence.service';
@@ -26,7 +25,6 @@ import { MessagingController } from './messaging.controller';
     AuthSettingsModule,
   ],
   providers: [
-    PrismaService,
     PresenceService,
     ConversationsService,
     MessagesService,

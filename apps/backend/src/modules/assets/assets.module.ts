@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
 import { AssetsService } from './assets.service';
 import { AssetsController } from './assets.controller';
 import { AssetCategoriesService } from './categories.service';
@@ -15,6 +14,6 @@ import { AssetOwnersController } from './owners.controller';
 
 @Module({
   controllers: [AssetsController, AssetCategoriesController, AssetAssignmentsController, AssetsReportController, UploadController, BuildingsController, FloorsController, RoomsController, AssetTypesController, AssetOwnersController],
-  providers: [AssetsService, AssetCategoriesService, PrismaService],
+  providers: [AssetsService, AssetCategoriesService],
 })
 export class AssetsModule {}
