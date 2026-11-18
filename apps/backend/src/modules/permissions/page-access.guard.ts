@@ -14,8 +14,9 @@ export type PageAccessOptions = {
   pages: string[];
   /** Extra pages that only grant GET endpoints (e.g. dropdown lookups from another page) */
   readAlso?: string[];
-  /** Overrides the action derived from the HTTP method (GET→read, DELETE→delete, else→write) */
-  action?: PageAction;
+  /** Overrides the action derived from the HTTP method (GET→read, DELETE→delete, else→write);
+   *  an array passes when the user holds any one of them */
+  action?: PageAction | PageAction[];
 };
 
 /**
@@ -42,12 +43,15 @@ export class PageAccessGuard implements CanActivate {
     if (!user) return false;
     if (user.role === 'ADMIN') return true;
 
-    const action: PageAction = opts.action ?? (req.method === 'GET' ? 'read' : req.method === 'DELETE' ? 'delete' : 'write');
-    const pages = action === 'read' ? [...opts.pages, ...(opts.readAlso ?? [])] : opts.pages;
+    const actions: PageAction[] = opts.action
+      ? (Array.isArray(opts.action) ? opts.action : [opts.action])
+      : [req.method === 'GET' ? 'read' : req.method === 'DELETE' ? 'delete' : 'write'];
+    const action = actions[0]; // for the denial message
+    const pages = actions.includes('read') ? [...opts.pages, ...(opts.readAlso ?? [])] : opts.pages;
 
     // Department/role rows + per-person grants, merged the same way as the menu.
     const perms = await resolvePagePermissions(this.prisma, user, pages);
-    if (pages.some(p => perms.get(p)?.[FLAG[action]])) return true;
+    if (pages.some(p => actions.some(a => perms.get(p)?.[FLAG[a]]))) return true;
 
     const msg = action === 'delete' ? 'شما مجوز حذف در این بخش را ندارید'
       : action === 'create' ? 'شما مجوز ثبت در این بخش را ندارید'

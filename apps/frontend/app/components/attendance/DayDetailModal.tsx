@@ -47,7 +47,45 @@ function conversionNote(row: any): string | null {
   return `بخشی از کسری کارکرد این روز (${fmtMin(row.leaveMinutes)}) به‌صورت خودکار از مرخصی ساعتی کسر شد.`;
 }
 
-export type DayDetail = { row: any; punches?: any[]; override?: any };
+export type DayDetail = { row: any; punches?: any[]; override?: any; shiftDay?: any };
+
+const API = process.env.NEXT_PUBLIC_API_URL || "/api";
+
+// روز شیفت: work on this day carried on past midnight. Saved immediately (PUT /attendance/shift-days,
+// needs the records page's "ثبت" or "ویرایش" flag); the server recomputes this day and its neighbours.
+function ShiftDayToggle({ userId, date, initial, onChanged }: { userId: string; date: string; initial: boolean; onChanged?: () => void }) {
+  const [on, setOn] = React.useState(initial);
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState<{ ok: boolean; text: string } | null>(null);
+  React.useEffect(() => { setOn(initial); setMsg(null); }, [initial, userId, date]);
+  async function toggle(enabled: boolean) {
+    setSaving(true); setMsg(null);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API}/attendance/shift-days`, {
+        method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, date, enabled }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); setMsg({ ok: false, text: e.message || "ذخیره ناموفق بود" }); return; }
+      setOn(enabled);
+      setMsg({ ok: true, text: enabled ? "روز شیفت ثبت شد و این روز و روز بعد دوباره محاسبه شدند" : "روز شیفت برداشته شد" });
+      onChanged?.();
+    } finally { setSaving(false); }
+  }
+  return (
+    <div className={`mb-3 rounded-xl border p-3 ${on ? "border-indigo-500/40 bg-indigo-500/10" : "border-theme bg-theme-secondary"}`}>
+      <label className="flex items-start gap-2 text-sm text-theme-primary cursor-pointer">
+        <input type="checkbox" className="mt-1" checked={on} disabled={saving} onChange={e => toggle(e.target.checked)} />
+        <span className="flex-1">
+          <span className="font-medium">روز شیفت</span> — کار این روز تا روز بعد ادامه داشته
+          <span className="block text-[11px] text-theme-muted mt-0.5">این روز تا ساعت ۲۴ حساب می‌شود و اولین پانچ روز بعد، خروجِ همین شیفت است. در روز بعد، از ۰۰:۰۰ تا شروع ساعت کاری کامل اضافه‌کار حساب می‌شود.</span>
+        </span>
+        {saving && <Loader2 className="w-4 h-4 animate-spin text-theme-muted" />}
+      </label>
+      {msg && <p className={`mt-1.5 text-[11px] ${msg.ok ? "text-green-600" : "text-red-500"}`}>{msg.text}</p>}
+    </div>
+  );
+}
 
 type Props = {
   open: boolean;
@@ -65,9 +103,11 @@ type Props = {
   // Self-service (employee) path: open the parent's request modal pre-set to
   // this kind instead of editing directly. Ignored when allowOverride is set.
   onRequestKind?: (kind: "LEAVE" | "MISSION") => void;
+  // Called after the "روز شیفت" toggle saved (the parent should reload its rows).
+  onShiftChanged?: () => void;
 };
 
-export default function DayDetailModal({ open, onClose, detail, allowOverride, ov, setOv, onSaveOverride, ovSaving, ovUploading, onPickOvAttachment, onRequestKind }: Props) {
+export default function DayDetailModal({ open, onClose, detail, allowOverride, ov, setOv, onSaveOverride, ovSaving, ovUploading, onPickOvAttachment, onRequestKind, onShiftChanged }: Props) {
   const [tab, setTab] = React.useState<"summary" | "punches" | "edit">("summary");
   React.useEffect(() => { if (open) setTab("summary"); }, [open, detail?.row?.id]);
 
@@ -201,6 +241,9 @@ export default function DayDetailModal({ open, onClose, detail, allowOverride, o
 
           {tab === "edit" && allowOverride && ov && setOv && (
             <div>
+              {row?.userId && row?.gregDate && (
+                <ShiftDayToggle userId={row.userId} date={String(row.gregDate).slice(0, 10)} initial={!!detail.shiftDay} onChanged={onShiftChanged} />
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block mb-1 text-theme-secondary text-xs">ورود</label>

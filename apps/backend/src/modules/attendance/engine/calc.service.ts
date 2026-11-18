@@ -628,16 +628,30 @@ export class CalcService {
     for (const o of overrides) if (!ov.has(o.gregDate.getTime())) ov.set(o.gregDate.getTime(), o); // latest wins
     const marked = new Set(marks.map((m) => m.gregDate.getTime()));
     const t = (i: number) => days[i].getTime();
+    // An override check-out typed as midnight — 23:55..23:59, or 00:00..00:05 of the same date
+    // (people enter "00:00" meaning the end of the day) — closes the day at 24:00, i.e. the
+    // work carried on into tomorrow.
+    const midnightOut = (o?: (typeof overrides)[number]) => {
+      if (!o?.newCheckOut) return false;
+      const m = minutesOfDay(o.newCheckOut);
+      return m >= 23 * 60 + 55 || m <= 5;
+    };
     const cond = (i: number) => {
       const o = ov.get(t(i));
-      if ((count.get(t(i)) ?? 0) !== 1 || o?.newCheckOut || o?.clearCheckOut) return false;
       const next = count.get(t(i + 1)) ?? 0;
+      const nextOv = ov.get(t(i + 1));
+      // Admin closed the day at midnight on a shift day / auto group, and the next day's only punch
+      // is the exit (or its check-in was entered as 00:00) → the next day continues this shift.
+      // A next day with its own entry + exit is a fresh day, not a continuation.
+      const nextStartsAtMidnight = !!nextOv?.newCheckIn && minutesOfDay(nextOv.newCheckIn) <= 5;
+      if (midnightOut(o) && (next === 1 || nextStartsAtMidnight) && (marked.has(t(i)) || sched.autoOvernightShift)) return true;
+      if ((count.get(t(i)) ?? 0) !== 1 || o?.newCheckOut || o?.clearCheckOut) return false;
       return next >= 1 && (marked.has(t(i)) || (sched.autoOvernightShift && next === 1));
     };
     const manualCont = (i: number) => {
       const o = ov.get(t(i)), p = ov.get(t(i - 1));
       return !!o?.newCheckIn && minutesOfDay(o.newCheckIn) <= 5
-        && !!p?.newCheckOut && minutesOfDay(p.newCheckOut) >= 23 * 60 + 55
+        && midnightOut(p)
         && (marked.has(t(i - 1)) || sched.autoOvernightShift);
     };
     const carry0 = cond(0);                                             // D-2 (its own past ignored)

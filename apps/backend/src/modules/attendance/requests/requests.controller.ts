@@ -51,9 +51,10 @@ export class RequestsController {
     return this.requests.adminOverride(req.user.userId, body);
   }
 
-  // Mark/unmark a day as an overnight shift (روز شیفت) — from the manual entry page.
+  // Mark/unmark a day as an overnight shift (روز شیفت) — from the manual entry page ("ثبت")
+  // or the records day-detail edit tab ("ویرایش").
   @Put('shift-days')
-  @PageAccess({ pages: ['/dashboard/attendance/records'], action: 'create' })
+  @PageAccess({ pages: ['/dashboard/attendance/records'], action: ['create', 'write'] })
   @UseGuards(PageAccessGuard)
   shiftDay(@Req() req: any, @Body() body: any) {
     return this.requests.setShiftDay(req.user.userId, { userId: body?.userId, date: body?.date, enabled: !!body?.enabled, note: body?.note });

@@ -212,6 +212,13 @@ export default function AttendanceRecordsPage() {
     setOv({ inTime: toHHmm(row.firstCheckIn), outTime: toHHmm(row.lastCheckOut), status: "", reason: "", leaveHours: "", clearCheckIn: false, clearCheckOut: false, isSickLeave: false, attachment: "" });
     setDetail({ row, ...d });
   }
+  // After marking/unmarking a shift day the server recomputed it — show the new numbers.
+  async function refreshDetail() {
+    load();
+    const row = detail?.row; if (!row) return;
+    const d = await fetch(`${API}/attendance/records/day?userId=${row.userId}&date=${row.gregDate.slice(0, 10)}`, { headers: h }).then(r => r.ok ? r.json() : null);
+    if (d) setDetail((s: any) => s && { ...s, ...d, row: d.day ? { ...s.row, ...d.day } : s.row });
+  }
 
   async function saveOverride() {
     if (!detail) return;
@@ -539,6 +546,7 @@ export default function AttendanceRecordsPage() {
         ovSaving={ovSaving}
         ovUploading={ovUploading}
         onPickOvAttachment={onPickOvAttachment}
+        onShiftChanged={refreshDetail}
       />
 
       <BreakdownModal metricKey={breakdown} rows={rows} onClose={() => setBreakdown(null)} />
