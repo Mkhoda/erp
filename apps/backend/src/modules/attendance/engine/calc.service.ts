@@ -567,7 +567,28 @@ export class CalcService {
       } else if (deficitMinutes > 0 && sched.deficitToLeaveEnabled) {
         const remaining = await this.remainingLeaveMinutesBefore(userId, jYear, gregDate, sched);
         const hourlyConvert = Math.min(deficitMinutes, remaining);
-        if (hourlyConvert > 0) {
+        const dayLeave = leaveMinutes + sickLeaveMinutes + hourlyConvert;
+        if (sched.maxDailyLeaveEnabled && dayLeave > sched.maxDailyLeaveMinutes && bothPunches
+          && remaining + leaveMinutes >= sched.dailyMinutes) {
+          // The group's daily leave cap applies to automatic leave too: more than the cap
+          // (granted + auto-converted) in one day ⇒ the whole day is LEAVE and every present
+          // minute becomes overtime — same outcome as granted leave above the cap.
+          status = AttendanceStatus.LEAVE;
+          leaveMinutes = sched.dailyMinutes;
+          sickLeaveMinutes = 0;
+          deficitMinutes = 0;
+          delayMinutes = 0;
+          earlyLeaveMinutes = 0;
+          overtimeMinutes = sched.otAllowed ? workedMinutes : 0;
+          if (overtimeMinutes > 0 && sched.otMaxMonthly > 0) {
+            const prior = await this.prisma.attendanceDay.aggregate({
+              where: { userId, jYear, jMonth, gregDate: { lt: gregDate } },
+              _sum: { overtimeMinutes: true },
+            });
+            overtimeMinutes = Math.max(0, Math.min(overtimeMinutes, sched.otMaxMonthly - (prior._sum.overtimeMinutes ?? 0)));
+          }
+          autoConvertedLeave = true;
+        } else if (hourlyConvert > 0) {
           leaveMinutes += hourlyConvert;
           deficitMinutes -= hourlyConvert;
           autoConvertedLeave = true;
