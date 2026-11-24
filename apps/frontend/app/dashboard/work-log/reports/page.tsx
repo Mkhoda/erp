@@ -548,7 +548,7 @@ function CatalogTab({ h, personOptions, isAdmin }: { h: any; personOptions: any[
   const { confirm, Dialog: ConfirmDlg } = useConfirm();
   // "" = global (عمومی) scope; otherwise items assigned to that user.
   const [scopeUser, setScopeUser] = React.useState("");
-  const [includePersonal, setIncludePersonal] = React.useState(false);
+  const [includePersonal, setIncludePersonal] = React.useState(true);
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [catForm, setCatForm] = React.useState<{ id?: string; name: string; color: string }>({ name: "", color: "#3b82f6" });
@@ -618,7 +618,7 @@ function CatalogTab({ h, personOptions, isAdmin }: { h: any; personOptions: any[
         <div className="w-72"><SearchSelect options={personOptions} value={scopeUser} onChange={setScopeUser} searchKey="search" placeholder="یا انتخاب یک کاربر" /></div>
         {scopeUser && (
           <label className="flex items-center gap-1.5 text-xs text-theme-muted cursor-pointer">
-            <input type="checkbox" checked={includePersonal} onChange={e => setIncludePersonal(e.target.checked)} /> نمایش موارد شخصی کاربر (فقط مشاهده)
+            <input type="checkbox" checked={includePersonal} onChange={e => setIncludePersonal(e.target.checked)} /> نمایش موارد شخصی کاربر
           </label>
         )}
       </div>
@@ -683,10 +683,9 @@ function CatalogTab({ h, personOptions, isAdmin }: { h: any; personOptions: any[
                           : `${faNum(t.doneCount)} نفر`}
                       </td>
                       <td className="text-center whitespace-nowrap">
-                        {t.isAdminDefined ? <>
-                          <button onClick={() => setTaskModal({ ...t, categoryId: t.categoryId || "", deadline: t.deadline ? t.deadline.slice(0, 10) : "", estimateH: t.estimatedMinutes ? String(+(t.estimatedMinutes / 60).toFixed(2)) : "" })} className="p-1 text-theme-muted hover:text-blue-600"><Pencil className="w-3.5 h-3.5" /></button>
-                          <button onClick={async () => { if (await confirm("حذف وظیفه", `وظیفه‌ی «${t.title}» حذف شود؟ زمان‌های ثبت‌شده در گزارش‌ها باقی می‌مانند.`)) call(`/work-log/admin/tasks/${t.id}`, "DELETE", undefined, "حذف شد"); }} className="p-1 text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
-                        </> : <span className="text-[11px] text-theme-muted">شخصی</span>}
+                          <button title="ویرایش" onClick={() => setTaskModal({ ...t, categoryId: t.categoryId || "", deadline: t.deadline ? t.deadline.slice(0, 10) : "", estimateH: t.estimatedMinutes ? String(+(t.estimatedMinutes / 60).toFixed(2)) : "" })} className="p-1 text-theme-muted hover:text-blue-600"><Pencil className="w-3.5 h-3.5" /></button>
+                          <button onClick={async () => { if (await confirm("حذف وظیفه", `وظیفه‌ی «${t.title}» حذف شود؟ زمان‌های ثبت‌شده در گزارش‌ها باقی می‌مانند.`)) call(`/work-log/admin/tasks/${t.id}`, "DELETE", undefined, "حذف شد"); }} title="حذف" className="p-1 text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                          {!t.isAdminDefined && <span className="text-[11px] text-theme-muted mr-1">شخصی</span>}
                       </td>
                     </tr>
                   ))}

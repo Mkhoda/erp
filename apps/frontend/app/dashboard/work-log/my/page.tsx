@@ -298,9 +298,9 @@ export default function MyWorkLogPage() {
                             {t.done && (
                               <button onClick={() => call(`/work-log/me/tasks/${t.id}/done`, "POST", { done: false })} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg text-theme-muted hover:bg-theme-hover"><RotateCcw className="w-3.5 h-3.5" /> برگرداندن</button>
                             )}
-                            {editMode && t.editable && <>
+                            {t.editable && !t.archived && <>
                               <button onClick={() => setTaskModal({ ...t, categoryId: t.categoryId || "", estimateH: t.estimatedMinutes ? String(+(t.estimatedMinutes / 60).toFixed(2)) : "" })} title="ویرایش" className="p-1 rounded text-theme-muted hover:text-blue-600"><Pencil className="w-3.5 h-3.5" /></button>
-                              <button onClick={() => removeTask(t)} title="حذف کامل" className="p-1 rounded text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => removeTask(t)} title="حذف وظیفه" className="p-1 rounded text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                             </>}
                           </div>
                         </div>
