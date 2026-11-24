@@ -65,6 +65,10 @@ export class TicketsController {
     return this.tickets.findAll({ ...q, requesterId: user.id }, { ...user, role: 'ADMIN' as any });
   }
 
+  // Home-page card: tickets waiting for the current user + the open ones they submitted.
+  @Get('inbox')
+  inbox(@Request() req: any) { return this.tickets.inbox(req.user); }
+
   @Get('notifications')
   getNotifications(@Request() req: any) {
     return this.tickets.getMyNotifications(req.user.id);

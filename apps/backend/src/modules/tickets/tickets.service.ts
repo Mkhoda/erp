@@ -15,6 +15,8 @@ const TICKET_INCLUDE = {
   slaMetric: true,
 } as const;
 
+const OPEN_STATUSES: TicketStatus[] = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_USER', 'USER_REPLIED', 'REOPENED'];
+
 const STATUS_FA: Record<TicketStatus, string> = {
   OPEN: 'باز',
   ASSIGNED: 'تخصیص داده شده',
@@ -84,6 +86,35 @@ export class TicketsService {
       }),
     ]);
     return { total, page, limit, rows };
+  }
+
+  // کارتابل: assigned to me, my own waiting for my reply, and — for those who handle a queue
+  // (managers: their departments, admins: all) — tickets nobody has picked up yet.
+  async inbox(user: { id: string; role: Role }) {
+    const open = { status: { in: OPEN_STATUSES } };
+    const queue: any = user.role === Role.ADMIN ? { assigneeId: null }
+      : user.role === Role.MANAGER ? { assigneeId: null, departmentId: { in: await this.userDeptIds(user.id) } } : null;
+    const assigned: any = { ...open, assigneeId: user.id };
+    const waiting: any = { requesterId: user.id, status: TicketStatus.WAITING_USER };
+    const mine: any = { ...open, requesterId: user.id };
+    const inboxWhere = { OR: [assigned, waiting, ...(queue ? [{ ...open, ...queue }] : [])] };
+    const select = {
+      id: true, number: true, title: true, status: true, priority: true, isOverSla: true, dueAt: true, updatedAt: true, assigneeId: true, requesterId: true,
+      category: { select: { name: true } }, department: { select: { name: true } }, requester: { select: { firstName: true, lastName: true } },
+    } as const;
+    const orderBy: any = [{ isOverSla: 'desc' }, { updatedAt: 'desc' }];
+    const [assignedCount, waitingCount, queueCount, inboxCount, mineCount, inbox, mineRows] = await Promise.all([
+      this.prisma.ticket.count({ where: assigned }), this.prisma.ticket.count({ where: waiting }),
+      queue ? this.prisma.ticket.count({ where: { ...open, ...queue } }) : Promise.resolve(0),
+      this.prisma.ticket.count({ where: inboxWhere }), this.prisma.ticket.count({ where: mine }),
+      this.prisma.ticket.findMany({ where: inboxWhere, select, orderBy, take: 20 }),
+      this.prisma.ticket.findMany({ where: mine, select, orderBy, take: 20 }),
+    ]);
+    return {
+      counts: { inbox: inboxCount, assigned: assignedCount, waiting: waitingCount, queue: queueCount, mine: mineCount },
+      inbox: inbox.map((t) => ({ ...t, reason: t.assigneeId === user.id ? 'ASSIGNED' : t.requesterId === user.id && t.status === 'WAITING_USER' ? 'WAITING' : 'QUEUE' })),
+      mine: mineRows,
+    };
   }
 
   async findOne(id: string, requestUser: { id: string; role: Role }) {

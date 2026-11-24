@@ -3,6 +3,7 @@ import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { pageTitle } from "../../lib/branding";
+import TicketInboxCard from "../components/tickets/TicketInboxCard";
 import { readError } from "../../lib/http";
 import {
   ArrowLeft, Boxes, Users, Handshake, Building, BarChart3, Plus, Activity, ArrowUpRight,
@@ -319,6 +320,7 @@ export default function WorkspacePage() {
   // management dashboard — an organisation snapshot.
   const [board, setBoard] = React.useState<any>(null);
   const [org, setOrg] = React.useState<any>(null);
+  const [tickets, setTickets] = React.useState<any>(null);
   const todayStr = React.useMemo(() => todayJalaliStr(), []);
 
   React.useEffect(() => { document.title = pageTitle("فضای کاری"); }, []);
@@ -335,15 +337,16 @@ export default function WorkspacePage() {
       fetch(`${API}/departments`,   { headers: h }).then(r => r.ok ? r.json() : []),
       fetch(`${API}/attendance/me/leave-balance?jYear=${currentJYear()}`, { headers: h }).then(r => r.ok ? r.json() : null),
       fetch(`${API}/notifications/unread-count`, { headers: h }).then(r => r.ok ? r.json() : { count: 0 }),
-      fetch(`${API}/tickets/my?status=OPEN&limit=1`, { headers: h }).then(r => r.ok ? r.json() : { total: 0 }),
-    ]).then(([meData, users, depts, lb, notifCount, myTickets]) => {
+      fetch(`${API}/tickets/inbox`, { headers: h }).then(r => r.ok ? r.json() : null),
+    ]).then(([meData, users, depts, lb, notifCount, inbox]) => {
+      setTickets(inbox);
       setMe(meData);
       setLeave(lb);
       setStats({
         totalUsers:           Array.isArray(users) ? users.length : (users?.data?.length ?? 0),
         totalDepartments:     Array.isArray(depts) ? depts.length : (depts?.data?.length ?? 0),
         unreadNotifications:  notifCount?.count ?? 0,
-        myOpenTickets:        myTickets?.total ?? 0,
+        myOpenTickets:        inbox?.counts?.mine ?? 0,
       });
     }).catch(console.error).finally(() => setStatsLoading(false));
     fetch(`${API}/work-log/me/board`, { headers: h }).then(r => r.ok ? r.json() : null).then(setBoard).catch(() => {});
@@ -477,6 +480,13 @@ export default function WorkspacePage() {
                 </ul>
               )}
             </div>
+          </motion.div>
+        )}
+
+        {/* ── Tickets: my inbox + the ones I submitted ── */}
+        {tickets && (
+          <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.25, delay:0.09 }}>
+            <TicketInboxCard data={tickets} role={role} />
           </motion.div>
         )}
 
