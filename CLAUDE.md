@@ -36,7 +36,7 @@ docker-compose.prod.yml     ← production stack
 - **todos/** — Per-user todo list (dashboard widget)
 - **performance/** — امتیاز عملکرد: monthly 0-100 score per person from work reports, punctuality, attendance, department ticket SLA (team-wide penalty for everyone with queue access) and logged-time coverage; weights in `PerformanceSettings`
 - **analytics/** — read-only org-wide aggregates for `/dashboard/analytics`, gated by `@PageAccess` on that page
-- **work-log/** — ثبت عملکرد: categories/tasks (global, admin-assigned per user with deadline, or personal), per-user completion, daily time entries capped by attendance worked time, daily report with late flag; only the current Jalali month is writable. `WorkLogSettings` singleton (late grace, cap toggle)
+- **work-log/** — ثبت عملکرد: categories/tasks (global, admin-assigned per user with deadline, or personal), per-user completion, daily time entries capped by attendance worked time, daily report with late flag; only the current Jalali month is writable and days off / leave without a punch are blocked; ADMIN can log/edit time for users on any past day (never late) and waive lateness per user-day (`WorkLogLateWaiver`). `WorkLogSettings` singleton (late grace, cap toggle)
 - **ai-settings/** / **chat-history/** / **quota/** — AI chat integration
 - **request-logs/** / **system-logs** — Audit/log infrastructure
 

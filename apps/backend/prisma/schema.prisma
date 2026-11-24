@@ -81,6 +81,7 @@ model User {
   workTaskAdoptions        WorkTaskAdoption[]       @relation("WorkTaskAdoptionUser")
   workTaskEntries          WorkTaskEntry[]          @relation("WorkTaskEntryUser")
   dailyWorkReports         DailyWorkReport[]        @relation("DailyWorkReportUser")
+  workLogLateWaivers       WorkLogLateWaiver[]      @relation("WorkLogLateWaiverUser")
   pagePermissions          UserPagePermission[]     @relation("UserPagePermissionUser")
   pagePermissionsGranted   UserPagePermission[]     @relation("UserPagePermissionGrantor")
   shiftDays                AttendanceShiftDay[]     @relation("ShiftDayUser")
@@ -1637,11 +1638,26 @@ model WorkTaskEntry {
   note      String?
   isLate    Boolean  @default(false) // first saved after the day's deadline (see WorkLogSettings.lateGraceMinutes)
   lateDays  Int      @default(0)
+  enteredById String? // admin who logged this on the user's behalf (never late); null = the user
+  editedById  String? // admin who last edited it
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, gregDate])
   @@index([taskId])
+}
+
+// Lateness waived by an admin for one user's day: the day's report and entries (existing and
+// future) don't count as late. Removing it restores lateness from the original save times.
+model WorkLogLateWaiver {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("WorkLogLateWaiverUser", fields: [userId], references: [id], onDelete: Cascade)
+  gregDate    DateTime
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, gregDate])
 }
 
 model DailyWorkReport {

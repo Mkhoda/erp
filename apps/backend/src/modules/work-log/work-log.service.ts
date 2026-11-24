@@ -11,8 +11,10 @@ const MAX_PERSONAL_CATEGORIES = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_RANGE_DAYS = 62;
 const USER_BRIEF = { id: true, firstName: true, lastName: true, attendanceCardNo: true, department: { select: { id: true, name: true } } } as const;
-// Statuses that mean "not a working day" — no report is required unless the person actually worked.
-const NON_WORKING = new Set(['WEEKEND', 'HOLIDAY', 'COMPANY_HOLIDAY', 'OFF_DUTY']);
+const MAX_WAIVER_ITEMS = 5000;
+// Days off (non-working or on leave): no report is required unless the person actually worked,
+// and without any punch nothing can be logged at all (see isBlockedDay).
+const OFF_STATUSES = new Set(['WEEKEND', 'HOLIDAY', 'COMPANY_HOLIDAY', 'OFF_DUTY', 'LEAVE', 'SICK_LEAVE']);
 
 export type ReportState = 'SUBMITTED' | 'LATE' | 'MISSING' | 'PENDING' | 'NOT_REQUIRED';
 type Actor = { userId?: string; id?: string; role?: string };
@@ -24,6 +26,8 @@ const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 //   • only days of the CURRENT Jalali month, up to today, can be written to;
 //   • an entry/report first saved after the day's midnight (+ WorkLogSettings.lateGraceMinutes)
 //     is flagged late, with how many days late — later edits never clear that flag;
+//   • a holiday / day off / leave day without any punch can't be written to;
+//   • an admin may log/edit time for a user on any past day (never late) and waive lateness per day;
 //   • total logged time for a day can't exceed what attendance shows for it (capByAttendance);
 //   • users manage only their own personal categories/tasks; admin/global ones are read-only to them.
 @Injectable()
@@ -80,6 +84,33 @@ export class WorkLogService {
     return { isLate: true, lateDays: Math.max(1, days) };
   }
 
+  // lateInfo() unless an admin waived lateness for this user's day.
+  private async lateFor(userId: string, date: Date, graceMinutes: number) {
+    const waived = await this.prisma.workLogLateWaiver.findUnique({ where: { userId_gregDate: { userId, gregDate: date } } });
+    return waived ? { isLate: false, lateDays: 0 } : this.lateInfo(date, graceMinutes);
+  }
+
+  // Holiday / weekend / rest / leave with no presence of any kind that day.
+  private async isBlockedDay(userId: string, date: Date): Promise<boolean> {
+    const att = await this.prisma.attendanceDay.findUnique({ where: { userId_gregDate: { userId, gregDate: date } } });
+    if (att && (att.firstCheckIn || att.lastCheckOut || att.workedMinutes > 0)) return false;
+    let status: string | undefined = att?.status;
+    if (!att) {
+      // No computed row yet. Without a card there is no attendance data to judge by.
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { attendanceCardNo: true } });
+      if (!user?.attendanceCardNo) return false;
+      status = (await this.calc.previewDay(userId, date)).computed?.status;
+    }
+    if (!status || !OFF_STATUSES.has(status)) return false;
+    const start = tehranMidnightInstant(date);
+    const punch = await this.prisma.rawAttendanceRecord.findFirst({ where: { userId, punchAt: { gte: start, lt: new Date(start.getTime() + DAY_MS) } }, select: { id: true } });
+    return !punch;
+  }
+
+  private async assertNotBlocked(userId: string, date: Date) {
+    if (await this.isBlockedDay(userId, date)) throw new BadRequestException('این روز تعطیل یا مرخصی است و حضوری برای آن ثبت نشده؛ ثبت عملکرد برای آن امکان‌پذیر نیست');
+  }
+
   // ── Attendance-based cap ────────────────────────────────────────────────
 
   // How many minutes may be logged for (user, date). null = no limit (cap disabled,
@@ -130,8 +161,8 @@ export class WorkLogService {
   // ── Report-required rule ────────────────────────────────────────────────
 
   private isRequired(att: { status: string; workedMinutes: number } | null | undefined, date: Date, workDays: number[], requireOnNonWorkingDays: boolean) {
-    if (requireOnNonWorkingDays) return true;
-    if (att) return !(NON_WORKING.has(att.status) && !(att.workedMinutes > 0));
+    if (att && OFF_STATUSES.has(att.status) && !(att.workedMinutes > 0)) return false;
+    if (att || requireOnNonWorkingDays) return true;
     return workDays.includes(dayOfWeek(date));
   }
 
@@ -170,7 +201,7 @@ export class WorkLogService {
     const j = toJalaliParts(date);
     const { start: monthStart, endExcl: monthEnd } = jalaliMonthRange(j.jYear, j.jMonth);
 
-    const [attendance, categories, tasks, totals, onDate, entries, report, completions, monthAtt, monthReports, monthLogged, cap, used, catalog] = await Promise.all([
+    const [attendance, categories, tasks, totals, onDate, entries, report, completions, monthAtt, monthReports, monthLogged, cap, used, catalog, blocked, waiver] = await Promise.all([
       this.prisma.attendanceDay.findUnique({ where: { userId_gregDate: { userId, gregDate: date } } }),
       this.prisma.workLogCategory.findMany({
         where: { archived: false, ...this.visibleTo(userId) },
@@ -210,6 +241,8 @@ export class WorkLogService {
         include: { category: { select: { id: true, name: true, color: true } }, adoptions: { where: { userId }, select: { id: true } } },
         orderBy: [{ category: { sortOrder: 'asc' } }, { title: 'asc' }],
       }),
+      this.isBlockedDay(userId, date),
+      this.prisma.workLogLateWaiver.findUnique({ where: { userId_gregDate: { userId, gregDate: date } } }),
     ]);
 
     const totalMap = new Map(totals.map((t) => [t.taskId, t._sum.minutes ?? 0]));
@@ -249,13 +282,16 @@ export class WorkLogService {
       });
     }
 
-    const required = this.isRequired(attendance, date, sched.workDays, settings.requireOnNonWorkingDays);
+    const required = !blocked && this.isRequired(attendance, date, sched.workDays, settings.requireOnNonWorkingDays);
     return {
       date: isoDate(date), ...j,
       today: isoDate(today),
-      editable: this.isEditable(date),
+      editable: this.isEditable(date) && !blocked,
+      // Entries logged before the day became a blocked one can still be removed.
+      canDelete: this.isEditable(date),
+      blocked,
       deadline: this.deadlineOf(date, settings.lateGraceMinutes),
-      isLateNow: this.lateInfo(date, settings.lateGraceMinutes).isLate,
+      isLateNow: !waiver && this.lateInfo(date, settings.lateGraceMinutes).isLate,
       required,
       state: this.stateOf(report, required, date, settings.lateGraceMinutes),
       capacity: { allowed: cap.allowed, used, source: cap.source },
@@ -390,13 +426,14 @@ export class WorkLogService {
   async createEntry(userId: string, dto: any) {
     const date = this.parseDate(dto.date);
     this.assertEditable(date);
+    await this.assertNotBlocked(userId, date);
     const task = await this.visibleTask(userId, dto.taskId);
     if (task.archived) throw new BadRequestException('این وظیفه حذف شده است');
     const minutes = this.parseMinutes(dto.minutes);
     await this.assertWithinCap(userId, date, minutes);
     const s = await this.getSettings();
     return this.prisma.workTaskEntry.create({
-      data: { taskId: task.id, userId, gregDate: date, ...toJalaliParts(date), minutes, note: dto.note?.trim() || null, ...this.lateInfo(date, s.lateGraceMinutes) },
+      data: { taskId: task.id, userId, gregDate: date, ...toJalaliParts(date), minutes, note: dto.note?.trim() || null, ...(await this.lateFor(userId, date, s.lateGraceMinutes)) },
     });
   }
 
@@ -404,6 +441,7 @@ export class WorkLogService {
     const e = await this.prisma.workTaskEntry.findUnique({ where: { id } });
     if (!e || e.userId !== userId) throw new NotFoundException('رکورد یافت نشد');
     this.assertEditable(e.gregDate);
+    await this.assertNotBlocked(userId, e.gregDate);
     const data: any = {};
     if (dto.minutes != null) {
       data.minutes = this.parseMinutes(dto.minutes);
@@ -425,6 +463,7 @@ export class WorkLogService {
   async saveReport(userId: string, dto: any) {
     const date = this.parseDate(dto.date);
     this.assertEditable(date);
+    await this.assertNotBlocked(userId, date);
     const content = String(dto.content || '').trim();
     if (!content) throw new BadRequestException('متن گزارش را وارد کنید');
     if (content.length > 10000) throw new BadRequestException('متن گزارش بیش از حد طولانی است');
@@ -434,7 +473,7 @@ export class WorkLogService {
     }
     const s = await this.getSettings();
     return this.prisma.dailyWorkReport.create({
-      data: { userId, gregDate: date, ...toJalaliParts(date), content, ...this.lateInfo(date, s.lateGraceMinutes) },
+      data: { userId, gregDate: date, ...toJalaliParts(date), content, ...(await this.lateFor(userId, date, s.lateGraceMinutes)) },
     });
   }
 
@@ -465,6 +504,92 @@ export class WorkLogService {
     if (!u) throw new ForbiddenException('دسترسی به این کاربر ندارید');
   }
 
+  // ── Time logged by an admin on a user's behalf ──
+  // Any day up to today (not limited to the current month), never late; the attendance cap holds.
+
+  async adminCreateEntry(actor: Actor, dto: any) {
+    if (!dto?.userId) throw new BadRequestException('کاربر را انتخاب کنید');
+    await this.assertUserInScope(actor, dto.userId);
+    if (!dto.date) throw new BadRequestException('تاریخ را انتخاب کنید');
+    const date = this.parseDate(dto.date);
+    if (date.getTime() > workDateOf(new Date()).getTime()) throw new BadRequestException('ثبت برای روزهای آینده امکان‌پذیر نیست');
+    const task = await this.visibleTask(dto.userId, dto.taskId);
+    if (task.archived) throw new BadRequestException('این وظیفه حذف شده است');
+    const minutes = this.parseMinutes(dto.minutes);
+    await this.assertWithinCap(dto.userId, date, minutes);
+    return this.prisma.workTaskEntry.create({
+      data: { taskId: task.id, userId: dto.userId, gregDate: date, ...toJalaliParts(date), minutes, note: dto.note?.trim() || null, enteredById: uidOf(actor) },
+    });
+  }
+
+  async adminUpdateEntry(actor: Actor, id: string, dto: any) {
+    const e = await this.prisma.workTaskEntry.findUnique({ where: { id } });
+    if (!e) throw new NotFoundException('رکورد یافت نشد');
+    const data: any = { editedById: uidOf(actor) };
+    if (dto.taskId && dto.taskId !== e.taskId) {
+      const task = await this.visibleTask(e.userId, dto.taskId);
+      if (task.archived) throw new BadRequestException('این وظیفه حذف شده است');
+      data.taskId = task.id;
+    }
+    if (dto.minutes != null) {
+      data.minutes = this.parseMinutes(dto.minutes);
+      // Reducing time is always fine, even if the day is already over the cap.
+      if (data.minutes > e.minutes) await this.assertWithinCap(e.userId, e.gregDate, data.minutes, e.id);
+    }
+    if ('note' in dto) data.note = dto.note?.trim() || null;
+    return this.prisma.workTaskEntry.update({ where: { id }, data });
+  }
+
+  async adminRemoveEntry(id: string) {
+    const { count } = await this.prisma.workTaskEntry.deleteMany({ where: { id } });
+    if (!count) throw new NotFoundException('رکورد یافت نشد');
+    return { ok: true };
+  }
+
+  /** Waive (or restore) lateness for selected user-days: { users: [{ userId, dates }], waived }. */
+  async setLateWaivers(actor: Actor, dto: any) {
+    const items: Array<{ userId: any; date: any }> = (Array.isArray(dto?.users) ? dto.users : [])
+      .flatMap((u: any) => (Array.isArray(u?.dates) ? u.dates : []).map((date: any) => ({ userId: u.userId, date })));
+    if (!items.length) throw new BadRequestException('روزی انتخاب نشده است');
+    if (items.length > MAX_WAIVER_ITEMS) throw new BadRequestException(`حداکثر ${MAX_WAIVER_ITEMS} روز در هر بار قابل انتخاب است`);
+    if (typeof dto.waived !== 'boolean') throw new BadRequestException('نوع عملیات نامعتبر است');
+    const byUser = new Map<string, Map<number, Date>>();
+    for (const it of items) {
+      if (!it?.userId || !it?.date) throw new BadRequestException('روز انتخاب‌شده نامعتبر است');
+      const d = this.parseDate(it.date);
+      if (!byUser.has(it.userId)) byUser.set(it.userId, new Map());
+      byUser.get(it.userId)!.set(d.getTime(), d);
+    }
+    const found = await this.prisma.user.count({ where: { id: { in: [...byUser.keys()] } } });
+    if (found !== byUser.size) throw new BadRequestException('کاربر انتخاب‌شده یافت نشد');
+    const { lateGraceMinutes: grace } = await this.getSettings();
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const [userId, dateMap] of byUser) {
+        const dates = [...dateMap.values()];
+        const where = { userId, gregDate: { in: dates } };
+        if (dto.waived) {
+          await tx.workLogLateWaiver.createMany({ data: dates.map((gregDate) => ({ userId, gregDate, createdById: uidOf(actor) })), skipDuplicates: true });
+          await tx.dailyWorkReport.updateMany({ where: { ...where, isLate: true }, data: { isLate: false, lateDays: 0 } });
+          await tx.workTaskEntry.updateMany({ where: { ...where, isLate: true }, data: { isLate: false, lateDays: 0 } });
+          continue;
+        }
+        // Only days that were really waived — others keep the flag they were saved with.
+        const waived = (await tx.workLogLateWaiver.findMany({ where, select: { gregDate: true } })).map((w) => w.gregDate);
+        if (!waived.length) continue;
+        const w = { userId, gregDate: { in: waived } };
+        await tx.workLogLateWaiver.deleteMany({ where: w });
+        for (const r of await tx.dailyWorkReport.findMany({ where: w, select: { id: true, gregDate: true, submittedAt: true } })) {
+          await tx.dailyWorkReport.update({ where: { id: r.id }, data: this.lateInfo(r.gregDate, grace, r.submittedAt) });
+        }
+        for (const e of await tx.workTaskEntry.findMany({ where: { ...w, enteredById: null }, select: { id: true, gregDate: true, createdAt: true } })) {
+          await tx.workTaskEntry.update({ where: { id: e.id }, data: this.lateInfo(e.gregDate, grace, e.createdAt) });
+        }
+      }
+    }, { timeout: 60_000 });
+    return { ok: true, count: [...byUser.values()].reduce((n, m) => n + m.size, 0) };
+  }
+
   // Rows = one per (user, day) in range that needs a report or has any logged data.
   async adminDays(actor: Actor, q: any) {
     const today = workDateOf(new Date());
@@ -493,12 +618,20 @@ export class WorkLogService {
       where: { userId: { in: ids }, gregDate: range }, distinct: ['userId', 'gregDate', 'taskId'], select: { userId: true, gregDate: true },
     }) : [];
 
+    const [lateEntries, waivers] = await Promise.all([
+      this.prisma.workTaskEntry.findMany({ where: { userId: { in: ids }, gregDate: range, isLate: true }, distinct: ['userId', 'gregDate'], select: { userId: true, gregDate: true } }),
+      this.prisma.workLogLateWaiver.findMany({ where: { userId: { in: ids }, gregDate: range }, select: { userId: true, gregDate: true } }),
+    ]);
+
     const k = (u: string, d: Date) => `${u}_${d.getTime()}`;
     const attMap = new Map<string, any>(atts.map((a: any) => [k(a.userId, a.gregDate), a]));
     const repMap = new Map<string, any>(reports.map((r: any) => [k(r.userId, r.gregDate), r]));
     const logMap = new Map<string, any>(logged.map((l: any) => [k(l.userId, l.gregDate), l]));
     const tcMap = new Map<string, number>();
     for (const t of taskCounts) tcMap.set(k(t.userId, t.gregDate), (tcMap.get(k(t.userId, t.gregDate)) ?? 0) + 1);
+
+    const lateEntrySet = new Set(lateEntries.map((e) => k(e.userId, e.gregDate)));
+    const waivedSet = new Set(waivers.map((w) => k(w.userId, w.gregDate)));
 
     const workDaysCache = new Map<string, number[]>();
     const rows: any[] = [];
@@ -527,6 +660,7 @@ export class WorkLogService {
           taskCount: tcMap.get(key) ?? 0,
           report: rep ? { isLate: rep.isLate, lateDays: rep.lateDays, submittedAt: rep.submittedAt, editedAt: rep.editedAt, preview: rep.content.slice(0, 140) } : null,
           required, state,
+          hasLateEntry: lateEntrySet.has(key), lateWaived: waivedSet.has(key),
         });
       }
     }
@@ -554,10 +688,18 @@ export class WorkLogService {
       }),
       this.capacity(userId, date, settings.capByAttendance),
     ]);
+    // Admins can log time for this user from here, so they also need the tasks to pick from.
+    const tasks = actor.role !== 'ADMIN' ? [] : await this.prisma.workTask.findMany({
+      where: { archived: false, ...this.visibleTo(userId) },
+      select: { id: true, title: true, category: { select: { name: true } } },
+      orderBy: [{ category: { sortOrder: 'asc' } }, { title: 'asc' }],
+    });
+    const waiver = await this.prisma.workLogLateWaiver.findUnique({ where: { userId_gregDate: { userId, gregDate: date } } });
     const sched = await this.calc.getEffectiveSchedule(userId);
     const required = this.isRequired(attendance, date, sched.workDays, settings.requireOnNonWorkingDays);
     return {
       user, date: isoDate(date), ...toJalaliParts(date),
+      canEditTime: actor.role === 'ADMIN', tasks, lateWaived: !!waiver,
       attendance, punches, entries, report, completedTasks: completions.map((c) => ({ ...c.task, doneAt: c.doneAt })),
       loggedMinutes: entries.reduce((s, e) => s + e.minutes, 0),
       capacity: cap.allowed,

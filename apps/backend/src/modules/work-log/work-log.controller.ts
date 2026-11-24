@@ -63,6 +63,20 @@ export class AdminWorkLogController {
   @Get('day')
   day(@Req() req: any, @Query('userId') userId: string, @Query('date') date: string) { return this.service.adminDay(req.user, userId, date); }
 
+  // Time logged by an admin on a user's behalf (any past day, never late) and lateness waivers.
+  @Post('entries')
+  @Roles('ADMIN')
+  createEntry(@Req() req: any, @Body() body: any) { return this.service.adminCreateEntry(req.user, body); }
+  @Patch('entries/:id')
+  @Roles('ADMIN')
+  updateEntry(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.adminUpdateEntry(req.user, id, body); }
+  @Delete('entries/:id')
+  @Roles('ADMIN')
+  removeEntry(@Param('id') id: string) { return this.service.adminRemoveEntry(id); }
+  @Post('late-waivers')
+  @Roles('ADMIN')
+  lateWaivers(@Req() req: any, @Body() body: any) { return this.service.setLateWaivers(req.user, body); }
+
   // One person's report for a month / quarter / half-year / year (dashboard + printable PDF).
   @Get('user-report')
   userReport(@Req() req: any, @Query() q: any) { return this.service.userReport(req.user, q); }

@@ -216,7 +216,7 @@ export default function MyWorkLogPage() {
               {cap.allowed != null && <> از <span dir="ltr">{fmtMin(cap.allowed)}</span></>}
             </span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${STATE_META[b.state].cls}`}>گزارش: {STATE_META[b.state].label}</span>
-            {!editable && <span className="flex items-center gap-1 text-xs text-theme-muted"><Lock className="w-3.5 h-3.5" /> فقط مشاهده (ماه‌های گذشته قابل ویرایش نیستند)</span>}
+            {!editable && <span className="flex items-center gap-1 text-xs text-theme-muted"><Lock className="w-3.5 h-3.5" /> {b.blocked ? "این روز تعطیل یا مرخصی است و حضوری ندارید؛ ثبت عملکرد ممکن نیست" : "فقط مشاهده (ماه‌های گذشته قابل ویرایش نیستند)"}</span>}
             {editable && b.isLateNow && <span className="flex items-center gap-1 text-xs text-amber-600"><AlertTriangle className="w-3.5 h-3.5" /> ثبت برای این روز «با تأخیر» محسوب می‌شود</span>}
           </div>
 
@@ -349,13 +349,14 @@ export default function MyWorkLogPage() {
                             <div className="flex-1 min-w-0">
                               <div className="text-theme-primary">{e.task?.title}</div>
                               {e.note && <div className="text-xs text-theme-muted">{e.note}</div>}
+                              {e.enteredById && <span className="text-[11px] text-violet-600">ثبت توسط مدیر </span>}
                               {e.isLate && <span className="text-[11px] text-amber-600">ثبت با تأخیر ({faNum(e.lateDays)} روز)</span>}
                             </div>
                             <span className="font-medium text-theme-primary" dir="ltr">{fmtMin(e.minutes)}</span>
-                            {editable && <>
+                            {editable && (
                               <button onClick={() => setEditEntry({ id: e.id, h: String(Math.floor(e.minutes / 60)), m: String(e.minutes % 60), note: e.note || "" })} className="p-1 rounded text-theme-muted hover:text-blue-600"><Pencil className="w-3.5 h-3.5" /></button>
-                              <button onClick={() => removeEntry(e.id)} className="p-1 rounded text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
-                            </>}
+                            )}
+                            {b.canDelete && <button onClick={() => removeEntry(e.id)} className="p-1 rounded text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>}
                           </div>
                         )}
                       </li>

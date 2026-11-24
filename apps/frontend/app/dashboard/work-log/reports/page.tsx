@@ -2,7 +2,7 @@
 import React from "react";
 import {
   NotebookPen, Loader2, Eye, Plus, Pencil, Trash2, Save, Settings2, FolderTree, ClipboardList,
-  CheckCircle2, Circle, Repeat, CalendarClock, X, UserRound, Printer,
+  CheckCircle2, Circle, Repeat, CalendarClock, X, UserRound, Printer, Clock, TimerOff, RotateCcw,
 } from "lucide-react";
 import PersonReport, { PERIOD_LABEL, periodCount, periodTitle, type PeriodKind } from "../../../components/work-log/PersonReport";
 import { pageTitle } from "../../../../lib/branding";
@@ -65,7 +65,7 @@ export default function WorkLogReportsPage() {
         </div>
       </div>
 
-      {tab === "reports" && <ReportsTab h={h} personOptions={personOptions} departments={departments} />}
+      {tab === "reports" && <ReportsTab h={h} personOptions={personOptions} departments={departments} isAdmin={role === "ADMIN"} />}
       {tab === "person" && <PersonTab h={h} personOptions={personOptions} />}
       {tab === "catalog" && <CatalogTab h={h} personOptions={personOptions} isAdmin={role === "ADMIN"} />}
       {tab === "settings" && role === "ADMIN" && <SettingsTab h={h} />}
@@ -77,8 +77,13 @@ export default function WorkLogReportsPage() {
 
 type SortKey = "name" | "dept" | "date" | "attendance" | "worked" | "logged" | "tasks" | "state" | "submittedAt";
 
-function ReportsTab({ h, personOptions, departments }: { h: any; personOptions: any[]; departments: any[] }) {
+function ReportsTab({ h, personOptions, departments, isAdmin }: { h: any; personOptions: any[]; departments: any[]; isAdmin: boolean }) {
   const toast = useToast();
+  const { confirm, Dialog: ConfirmDlg } = useConfirm();
+  // Admin: selected rows (waive lateness) and the "log time for a user" picker.
+  const [sel, setSel] = React.useState<Set<string>>(new Set());
+  const [waiving, setWaiving] = React.useState(false);
+  const [picker, setPicker] = React.useState<{ userId: string; date: string } | null>(null);
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
   const [userId, setUserId] = React.useState("");
@@ -113,7 +118,9 @@ function ReportsTab({ h, personOptions, departments }: { h: any; personOptions: 
     // eslint-disable-next-line
   }, [from, to, userId, deptId, h]);
   React.useEffect(() => { load(); }, [load]);
-  React.useEffect(() => { setPage(1); }, [data, stateF, attF, sortK, sortDir]);
+  React.useEffect(() => { setPage(1); }, [stateF, attF, sortK, sortDir, from, to, userId, deptId]);
+  // A selection only ever covers what the current filters show.
+  React.useEffect(() => { setSel(new Set()); }, [stateF, attF, from, to, userId, deptId]);
 
   function thSort(k: SortKey) {
     if (sortK === k) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -144,6 +151,45 @@ function ReportsTab({ h, personOptions, departments }: { h: any; personOptions: 
     });
   }, [data, stateF, attF, sortK, sortDir]);
 
+  const allSelected = rows.length > 0 && rows.every(r => sel.has(r.id));
+  const toggleRow = (id: string) => setSel(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  async function setWaived(waived: boolean) {
+    const picked = rows.filter(r => sel.has(r.id));
+    if (!picked.length) return;
+    const people = new Set(picked.map(r => r.userId)).size;
+    const ok = await confirm(
+      waived ? "حذف تأخیر" : "برگرداندن تأخیر",
+      waived
+        ? `تأخیر ${faNum(picked.length)} روز از ${faNum(people)} نفر حذف شود؟ ثبت‌های بعدی این روزها هم تأخیر نمی‌خورند.`
+        : `تأخیر ${faNum(picked.length)} روز از ${faNum(people)} نفر برگردد؟ فقط روزهایی که قبلاً بخشیده شده‌اند تغییر می‌کنند.`,
+      "warning");
+    if (!ok) return;
+    const byUser = new Map<string, string[]>();
+    for (const r of picked) byUser.set(r.userId, [...(byUser.get(r.userId) || []), r.date]);
+    setWaiving(true);
+    try {
+      const res = await fetch(`${API}/work-log/admin/late-waivers`, { method: "POST", headers: h, body: JSON.stringify({ waived, users: [...byUser].map(([uid, dates]) => ({ userId: uid, dates })) }) });
+      if (!res.ok) { toast.error(await readError(res, "عملیات ناموفق بود")); return; }
+      toast.success(waived ? "تأخیر روزهای انتخاب‌شده حذف شد" : "تأخیر برگردانده شد");
+      setSel(new Set());
+      await load();
+    } finally { setWaiving(false); }
+  }
+
+  // Any user/day, even one that has no row in the list.
+  function openPicked() {
+    if (!picker?.userId || !picker.date) { toast.warning("شخص و تاریخ را انتخاب کنید"); return; }
+    const p = picker; setPicker(null);
+    openDetail({ userId: p.userId, date: p.date, dow: new Date(p.date + "T00:00:00Z").getUTCDay(), user: { firstName: personOptions.find(o => o.id === p.userId)?.name || "", lastName: "" } });
+  }
+
+  async function refreshDetail(r: any) {
+    load();
+    const res = await fetch(`${API}/work-log/admin/day?userId=${r.userId}&date=${r.date}`, { headers: h });
+    if (res.ok) { const d = await res.json(); setDetail((s: any) => s && { row: r, ...d }); }
+  }
+
   async function openDetail(r: any) {
     setDetail({ loading: true, row: r });
     setDetailLoading(true);
@@ -163,6 +209,12 @@ function ReportsTab({ h, personOptions, departments }: { h: any; personOptions: 
 
   return (
     <>
+      {ConfirmDlg}
+      {isAdmin && (
+        <div className="flex justify-end">
+          <button onClick={() => setPicker({ userId, date: localTodayIso() })} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><Clock className="w-4 h-4" /> ثبت زمان برای کاربر</button>
+        </div>
+      )}
       <div className="bg-theme-card border border-theme rounded-xl p-3 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2">
         <div className="lg:col-span-2 flex items-center gap-1 text-xs text-theme-muted"><span className="shrink-0">از</span><JalaliDatePicker value={from} onChange={v => v && setFrom(v)} /></div>
         <div className="lg:col-span-2 flex items-center gap-1 text-xs text-theme-muted"><span className="shrink-0">تا</span><JalaliDatePicker value={to} onChange={v => v && setTo(v)} /></div>
@@ -201,22 +253,33 @@ function ReportsTab({ h, personOptions, departments }: { h: any; personOptions: 
         </div>
       )}
 
+      {isAdmin && sel.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-xl px-3 py-2 text-sm">
+          <span className="text-theme-primary font-medium">{faNum(rows.filter(r => sel.has(r.id)).length)} روز انتخاب شده</span>
+          <button disabled={waiving} onClick={() => setWaived(true)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white disabled:opacity-50">{waiving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <TimerOff className="w-3.5 h-3.5" />} حذف تأخیر</button>
+          <button disabled={waiving} onClick={() => setWaived(false)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-theme-card border border-theme text-theme-primary disabled:opacity-50"><RotateCcw className="w-3.5 h-3.5" /> برگرداندن تأخیر</button>
+          <button onClick={() => setSel(new Set())} className="mr-auto flex items-center gap-1 text-xs text-theme-muted"><X className="w-3.5 h-3.5" /> لغو انتخاب</button>
+        </div>
+      )}
+
       <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
-        {loading ? (
+        {loading && !data ? (
           <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-center">
               <thead><tr className="text-theme-muted border-b border-theme bg-theme-secondary/30">
+                {isAdmin && <th className="px-2"><input type="checkbox" title="انتخاب همه‌ی نتایج فیلتر" checked={allSelected} onChange={() => setSel(allSelected ? new Set() : new Set(rows.map(r => r.id)))} /></th>}
                 <th className="py-2 px-2 font-medium">#</th>
                 {cols.map(c => <th key={c.k} onClick={() => thSort(c.k)} className="font-medium px-2 cursor-pointer select-none whitespace-nowrap hover:text-theme-primary">{c.label}{arrow(c.k)}</th>)}
                 <th className="font-medium px-2">جزئیات</th>
               </tr></thead>
               <tbody>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={11} className="py-10 text-theme-muted">رکوردی یافت نشد</td></tr>
+                  <tr><td colSpan={12} className="py-10 text-theme-muted">رکوردی یافت نشد</td></tr>
                 ) : rows.slice((page - 1) * pageSize, page * pageSize).map((r, i) => (
                   <tr key={r.id} className="border-b border-theme/40 hover:bg-theme-hover cursor-pointer" onClick={() => openDetail(r)}>
+                    {isAdmin && <td className="px-2" onClick={e => e.stopPropagation()}><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggleRow(r.id)} /></td>}
                     <td className="py-1.5 px-2 text-theme-muted">{faNum((page - 1) * pageSize + i + 1)}</td>
                     <td className="px-2 text-theme-primary whitespace-nowrap">{r.user.firstName} {r.user.lastName}</td>
                     <td className="px-2 text-theme-muted whitespace-nowrap">{r.user.department?.name || "—"}</td>
@@ -225,7 +288,10 @@ function ReportsTab({ h, personOptions, departments }: { h: any; personOptions: 
                     <td className="px-2 text-theme-primary" dir="ltr">{r.attendance ? fmtMin(r.attendance.workedMinutes) : "—"}</td>
                     <td className="px-2 text-violet-600 font-medium" dir="ltr">{r.loggedMinutes ? fmtMin(r.loggedMinutes) : "—"}</td>
                     <td className="px-2 text-theme-muted">{r.taskCount ? faNum(r.taskCount) : "—"}</td>
-                    <td className="px-2"><span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATE_META[r.state].cls}`}>{STATE_META[r.state].label}{r.report?.isLate ? ` (${faNum(r.report.lateDays)} روز)` : ""}</span></td>
+                    <td className="px-2"><span className={`inline-block text-xs px-2 py-0.5 rounded-full ${STATE_META[r.state].cls}`}>{STATE_META[r.state].label}{r.report?.isLate ? ` (${faNum(r.report.lateDays)} روز)` : ""}</span>
+                      {r.lateWaived && <div className="text-[10px] text-green-600 mt-0.5">تأخیر بخشیده شده</div>}
+                      {r.hasLateEntry && <div className="text-[10px] text-amber-600 mt-0.5">زمان با تأخیر</div>}
+                    </td>
                     <td className="px-2 text-xs text-theme-muted whitespace-nowrap">{r.report ? faDateTime(r.report.submittedAt) : "—"}</td>
                     <td className="px-2"><button onClick={e => { e.stopPropagation(); openDetail(r); }} className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-blue-500 hover:bg-blue-500/10"><Eye className="w-4 h-4" /></button></td>
                   </tr>
@@ -252,16 +318,63 @@ function ReportsTab({ h, personOptions, departments }: { h: any; personOptions: 
         footer={<button onClick={() => setDetail(null)} className="btn-theme-secondary text-sm">بستن</button>}>
         {detailLoading || detail?.loading ? (
           <div className="flex items-center justify-center h-40"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
-        ) : detail && <DayDetail d={detail} />}
+        ) : detail && <DayDetail d={detail} h={h} onChanged={() => refreshDetail(detail.row)} />}
+      </Modal>
+
+      <Modal open={!!picker} onClose={() => setPicker(null)} size="sm" title="ثبت زمان برای کاربر"
+        footer={<><button onClick={() => setPicker(null)} className="btn-theme-secondary text-sm">انصراف</button><button onClick={openPicked} className="btn-theme-primary text-sm">ادامه</button></>}>
+        {picker && (
+          <div className="space-y-3">
+            <div><label className="block mb-1 text-xs text-theme-secondary">شخص</label>
+              <SearchSelect options={personOptions} value={picker.userId} onChange={v => setPicker(s => s && { ...s, userId: v })} searchKey="search" placeholder="انتخاب شخص" /></div>
+            <div><label className="block mb-1 text-xs text-theme-secondary">تاریخ</label>
+              <JalaliDatePicker clearable={false} max={localTodayIso()} value={picker.date} onChange={v => setPicker(s => s && { ...s, date: v })} /></div>
+          </div>
+        )}
       </Modal>
     </>
   );
 }
 
-function DayDetail({ d }: { d: any }) {
+function DayDetail({ d, h, onChanged }: { d: any; h: any; onChanged: () => Promise<void> | void }) {
+  const toast = useToast();
+  const { confirm, Dialog: ConfirmDlg } = useConfirm();
   const att = d.attendance;
+  // Admin time entry: form.id set = editing that entry, otherwise adding a new one.
+  const [form, setForm] = React.useState<{ id?: string; taskId: string; h: string; m: string; note: string } | null>(null);
+  const [saving, setSaving] = React.useState(false);
+  const taskOptions = ((d.tasks || []) as any[]).map(t => ({ id: t.id, name: t.category?.name ? `${t.title} — ${t.category.name}` : t.title }));
+  // The edited entry's own task may be archived and missing from the list.
+  const editedTask = form?.id ? d.entries.find((e: any) => e.id === form.id)?.task : null;
+  const options = editedTask && !taskOptions.some(o => o.id === editedTask.id) ? [{ id: editedTask.id, name: editedTask.title }, ...taskOptions] : taskOptions;
+
+  async function saveEntry() {
+    if (!form) return;
+    const minutes = (+form.h || 0) * 60 + (+form.m || 0);
+    if (!form.taskId) { toast.warning("وظیفه را انتخاب کنید"); return; }
+    if (minutes <= 0) { toast.warning("مدت زمان را وارد کنید"); return; }
+    setSaving(true);
+    try {
+      const res = form.id
+        ? await fetch(`${API}/work-log/admin/entries/${form.id}`, { method: "PATCH", headers: h, body: JSON.stringify({ taskId: form.taskId, minutes, note: form.note }) })
+        : await fetch(`${API}/work-log/admin/entries`, { method: "POST", headers: h, body: JSON.stringify({ userId: d.row.userId, date: d.date, taskId: form.taskId, minutes, note: form.note }) });
+      if (!res.ok) { toast.error(await readError(res, "ذخیره ناموفق بود")); return; }
+      toast.success(form.id ? "ویرایش شد" : "زمان ثبت شد");
+      setForm(null);
+      await onChanged();
+    } finally { setSaving(false); }
+  }
+  async function removeEntry(e: any) {
+    if (!(await confirm("حذف زمان ثبت‌شده", `زمان «${e.task.title}» حذف شود؟`))) return;
+    const res = await fetch(`${API}/work-log/admin/entries/${e.id}`, { method: "DELETE", headers: h });
+    if (!res.ok) { toast.error(await readError(res, "حذف ناموفق بود")); return; }
+    toast.success("حذف شد");
+    if (form?.id === e.id) setForm(null);
+    await onChanged();
+  }
   return (
     <div className="space-y-4 text-sm">
+      {ConfirmDlg}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 bg-theme-secondary/30 rounded-lg px-3 py-2">
         <span className="text-theme-muted">حضور: <span className="text-theme-primary font-medium">{att ? (STATUS_FA[att.status] || att.status) : "ثبت نشده"}</span></span>
         {att && <>
@@ -271,16 +384,36 @@ function DayDetail({ d }: { d: any }) {
         </>}
         <span className="text-theme-muted">ثبت‌شده: <span className="text-violet-600 font-medium" dir="ltr">{fmtMin(d.loggedMinutes)}</span>{d.capacity != null && <> از <span dir="ltr">{fmtMin(d.capacity)}</span></>}</span>
         <span className={`text-xs px-2 py-0.5 rounded-full ${STATE_META[d.state].cls}`}>{STATE_META[d.state].label}</span>
+        {d.lateWaived && <span className="text-xs text-green-600">تأخیر بخشیده شده</span>}
       </div>
       {d.punches?.length > 0 && (
         <div className="text-xs text-theme-muted">پانچ‌ها: {d.punches.map((p: any) => <span key={p.id} className="inline-block mx-0.5 px-1.5 py-0.5 rounded bg-theme-secondary/50 text-theme-primary" dir="ltr">{faTime(p.punchAt)}</span>)}</div>
       )}
 
       <div>
-        <div className="font-semibold text-theme-primary mb-1.5">کارهای انجام‌شده</div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="font-semibold text-theme-primary">کارهای انجام‌شده</span>
+          {d.canEditTime && !form && <button onClick={() => setForm({ taskId: "", h: "", m: "", note: "" })} className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><Plus className="w-3.5 h-3.5" /> ثبت زمان</button>}
+        </div>
+        {form && (
+          <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-theme-secondary/40 rounded-lg p-2">
+            <SearchSelect options={options} value={form.taskId} onChange={v => setForm(s => s && { ...s, taskId: v })} placeholder="انتخاب وظیفه" />
+            <div className="flex items-center gap-1" dir="ltr">
+              <input type="number" min={0} max={23} placeholder="ساعت" value={form.h} onChange={e => setForm(s => s && { ...s, h: e.target.value })} className="input-theme text-sm" />
+              <span className="text-theme-muted">:</span>
+              <input type="number" min={0} max={59} placeholder="دقیقه" value={form.m} onChange={e => setForm(s => s && { ...s, m: e.target.value })} className="input-theme text-sm" />
+            </div>
+            <input placeholder="شرح کار (اختیاری)" value={form.note} onChange={e => setForm(s => s && { ...s, note: e.target.value })} className="input-theme text-sm sm:col-span-2" />
+            <div className="sm:col-span-2 flex items-center justify-end gap-2">
+              <span className="ml-auto text-[11px] text-theme-muted">{form.id ? "وضعیت تأخیر این رکورد با ویرایش تغییر نمی‌کند" : "ثبت مدیر بدون تأخیر است"}</span>
+              <button onClick={() => setForm(null)} className="btn-theme-secondary text-xs py-1.5">انصراف</button>
+              <button onClick={saveEntry} disabled={saving} className="btn-theme-primary text-xs py-1.5 disabled:opacity-50">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : form.id ? "ذخیره" : "ثبت"}</button>
+            </div>
+          </div>
+        )}
         {d.entries.length === 0 ? <div className="text-theme-muted text-xs">زمانی ثبت نشده</div> : (
           <table className="w-full text-xs">
-            <thead><tr className="text-theme-muted border-b border-theme"><th className="text-right py-1">وظیفه</th><th className="text-right">دسته</th><th>زمان</th><th className="text-right">شرح</th><th>ثبت</th></tr></thead>
+            <thead><tr className="text-theme-muted border-b border-theme"><th className="text-right py-1">وظیفه</th><th className="text-right">دسته</th><th>زمان</th><th className="text-right">شرح</th><th>ثبت</th>{d.canEditTime && <th />}</tr></thead>
             <tbody>
               {d.entries.map((e: any) => (
                 <tr key={e.id} className="border-b border-theme/40">
@@ -288,7 +421,13 @@ function DayDetail({ d }: { d: any }) {
                   <td className="text-theme-muted"><span className="inline-block w-2 h-2 rounded-full ml-1" style={{ background: e.task.category?.color || "#94a3b8" }} />{e.task.category?.name || "—"}</td>
                   <td className="text-center font-medium text-theme-primary" dir="ltr">{fmtMin(e.minutes)}</td>
                   <td className="text-theme-secondary">{e.note || "—"}</td>
-                  <td className="text-center whitespace-nowrap">{e.isLate ? <span className="text-amber-600">با تأخیر ({faNum(e.lateDays)} روز)</span> : <span className="text-theme-muted">{faDateTime(e.createdAt)}</span>}</td>
+                  <td className="text-center whitespace-nowrap">{e.isLate ? <span className="text-amber-600">با تأخیر ({faNum(e.lateDays)} روز)</span> : <span className="text-theme-muted">{faDateTime(e.createdAt)}</span>}{e.enteredById && <div className="text-violet-600">ثبت توسط مدیر</div>}</td>
+                  {d.canEditTime && (
+                    <td className="whitespace-nowrap text-left">
+                      <button title="ویرایش" onClick={() => setForm({ id: e.id, taskId: e.task.id, h: String(Math.floor(e.minutes / 60)), m: String(e.minutes % 60), note: e.note || "" })} className="p-1 rounded text-theme-muted hover:text-blue-600"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button title="حذف" onClick={() => removeEntry(e)} className="p-1 rounded text-theme-muted hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -632,7 +771,7 @@ function SettingsTab({ h }: { h: any }) {
       </label>
       <label className="flex items-start gap-2 text-sm text-theme-primary cursor-pointer">
         <input type="checkbox" className="mt-1" checked={!!s.requireOnNonWorkingDays} onChange={e => setS((x: any) => ({ ...x, requireOnNonWorkingDays: e.target.checked }))} />
-        <span>گزارش روزانه در روزهای تعطیل و آخر هفته هم الزامی باشد<span className="block text-xs text-theme-muted">در حالت عادی فقط در روزهای کاری (یا روزهای تعطیلی که فرد کار کرده) الزامی است.</span></span>
+        <span>گزارش روزانه در روزهای غیرکاریِ بدون رکورد حضور هم الزامی باشد<span className="block text-xs text-theme-muted">برای کاربران بدون کارت حضور. در روزهای تعطیل و مرخصیِ ثبت‌شده در حضور، گزارش فقط وقتی الزامی است که فرد کار کرده باشد.</span></span>
       </label>
       <div className="flex justify-end">
         <button onClick={save} disabled={saving} className="btn-theme-primary text-sm flex items-center gap-1 disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} ذخیره</button>
