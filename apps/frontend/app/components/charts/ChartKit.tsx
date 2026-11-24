@@ -120,16 +120,16 @@ export function HBars({ data, valueLabel, fmt, limit = 10 }: { data: { name: str
 }
 
 // Stacked daily bars: fixed slot order per series, legend always present (>= 2 series).
-export function DailyStack({ data, series: defs, height = 240 }: { data: any[]; series: { key: string; label: string }[]; height?: number }) {
+export function DailyStack({ data, series: defs, height = 240, xFormat = faDay }: { data: any[]; series: { key: string; label: string }[]; height?: number; xFormat?: (v: string) => string }) {
   const { series, ink } = useChartTheme();
   return (
     <div dir="ltr" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barCategoryGap={2}>
           <CartesianGrid vertical={false} stroke={ink.grid} />
-          <XAxis dataKey="date" reversed tickFormatter={faDay} tick={{ fill: ink.muted, fontSize: 10 }} axisLine={{ stroke: ink.axis }} tickLine={false} interval="preserveStartEnd" />
+          <XAxis dataKey="date" reversed tickFormatter={xFormat} tick={{ fill: ink.muted, fontSize: 10 }} axisLine={{ stroke: ink.axis }} tickLine={false} interval="preserveStartEnd" />
           <YAxis orientation="right" width={36} allowDecimals={false} tick={{ fill: ink.muted, fontSize: 10 }} tickFormatter={v => faNum(v)} axisLine={false} tickLine={false} />
-          <Tooltip cursor={{ fill: ink.grid, opacity: 0.4 }} content={<TooltipBox labelFmt={(l: string) => `روز ${faDay(l)}`} />} />
+          <Tooltip cursor={{ fill: ink.grid, opacity: 0.4 }} content={<TooltipBox labelFmt={(l: string) => (xFormat === faDay ? `روز ${faDay(l)}` : xFormat(l))} />} />
           <Legend wrapperStyle={{ fontSize: 11, direction: "rtl" }} />
           {defs.map((s, i) => (
             <Bar key={s.key} dataKey={s.key} name={s.label} stackId="a" fill={series[i]} stroke={ink.surface} strokeWidth={1}

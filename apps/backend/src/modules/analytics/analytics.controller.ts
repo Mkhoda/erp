@@ -11,6 +11,10 @@ import { AnalyticsService } from './analytics.service';
 export class AnalyticsController {
   constructor(private readonly service: AnalyticsService) {}
 
+  // Choices for the dashboard's filter bars (viewers may not have the assets/tickets pages).
+  @Get('filters')
+  filters() { return this.service.filters(); }
+
   @Get('overview')
   overview(@Query() q: any) { return this.service.overview(q); }
 
@@ -18,14 +22,14 @@ export class AnalyticsController {
   attendance(@Query() q: any) { return this.service.attendance(q); }
 
   @Get('assets')
-  assets() { return this.service.assets(); }
+  assets(@Query() q: any) { return this.service.assets(q); }
 
   @Get('work-log')
   workLog(@Query() q: any) { return this.service.workLog(q); }
 
   @Get('tickets')
-  tickets() { return this.service.tickets(); }
+  tickets(@Query() q: any) { return this.service.tickets(q); }
 
   @Get('system')
-  system() { return this.service.system(); }
+  system(@Query() q: any) { return this.service.system(q); }
 }

@@ -4,13 +4,13 @@ import { Trophy, Loader2, Settings2, Save, Info, X } from "lucide-react";
 import { pageTitle } from "../../../lib/branding";
 import { readError } from "../../../lib/http";
 import Modal from "../../components/ui/Modal";
-import JalaliMonthNav from "../../components/ui/JalaliMonthNav";
-import { localTodayIso } from "../../components/ui/jalali-calendar";
+import DateRangeFilter, { presetRange } from "../../components/ui/DateRangeFilter";
+import SearchSelect from "../../components/ui/SearchSelect";
+import { faDate } from "../../components/work-log/meta";
 import { useToast } from "../../components/ui/Toast";
 import { faNum, fmtH } from "../../components/charts/ChartKit";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
-const J_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
 
 type CKey = "report" | "punctuality" | "attendance" | "tickets" | "coverage";
 const COMP: Record<CKey, { label: string; hint: string }> = {
@@ -29,10 +29,6 @@ const GRADE: Record<string, { label: string; cls: string; bar: string }> = {
 };
 const gradeOf = (v: number | null) => v == null ? null : v >= 90 ? "EXCELLENT" : v >= 75 ? "GOOD" : v >= 60 ? "FAIR" : "POOR";
 
-function currentJalali() {
-  const p = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", timeZone: "Asia/Tehran" }).formatToParts(new Date());
-  return { jYear: +(p.find(x => x.type === "year")?.value || 0), jMonth: +(p.find(x => x.type === "month")?.value || 0) };
-}
 
 function Bar({ v }: { v: number | null }) {
   if (v == null) return <span className="text-theme-muted text-xs">—</span>;
@@ -50,8 +46,9 @@ export default function PerformancePage() {
   const toast = useToast();
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const h = React.useMemo(() => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }), [token]);
-  const now = React.useMemo(currentJalali, []);
-  const [period, setPeriod] = React.useState(now);
+  const [range, setRange] = React.useState(() => presetRange("month"));
+  const [userId, setUserId] = React.useState("");
+  const [people, setPeople] = React.useState<any[]>([]);
   const [deptId, setDeptId] = React.useState("");
   const [scheduleId, setScheduleId] = React.useState("");
   const [departments, setDepartments] = React.useState<any[]>([]);
@@ -67,6 +64,7 @@ export default function PerformancePage() {
 
   React.useEffect(() => {
     fetch(`${API}/auth/me`, { headers: h }).then(r => r.ok ? r.json() : null).then(d => setRole(d?.role ?? null)).catch(() => {});
+    fetch(`${API}/users/brief`, { headers: h }).then(r => r.ok ? r.json() : []).then(u => setPeople((Array.isArray(u) ? u : []).map((x: any) => ({ id: x.id, name: `${x.firstName} ${x.lastName}` })))).catch(() => {});
     fetch(`${API}/departments`, { headers: h }).then(r => r.ok ? r.json() : []).then(setDepartments).catch(() => {});
     fetch(`${API}/attendance/schedules-lite`, { headers: h }).then(r => r.ok ? r.json() : []).then(d => setSchedules(Array.isArray(d) ? d : [])).catch(() => {});
   }, [h]);
@@ -74,7 +72,8 @@ export default function PerformancePage() {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const p = new URLSearchParams({ jYear: String(period.jYear), jMonth: String(period.jMonth) });
+      const p = new URLSearchParams({ from: range.from, to: range.to });
+      if (userId) p.set("userId", userId);
       if (deptId) p.set("departmentId", deptId);
       if (scheduleId) p.set("scheduleId", scheduleId);
       const res = await fetch(`${API}/performance/scores?${p}`, { headers: h });
@@ -83,7 +82,7 @@ export default function PerformancePage() {
       setData(d); setWeights(d.weights);
     } finally { setLoading(false); }
     // eslint-disable-next-line
-  }, [period, deptId, scheduleId, h]);
+  }, [range, userId, deptId, scheduleId, h]);
   React.useEffect(() => { load(); }, [load]);
 
   async function saveWeights() {
@@ -119,17 +118,17 @@ export default function PerformancePage() {
           <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center"><Trophy className="w-5 h-5 text-white" /></div>
           <div>
             <h1 className="text-xl font-bold text-theme-primary">امتیاز عملکرد</h1>
-            <p className="text-sm text-theme-muted">امتیاز ماهانه بر اساس گزارش کار، وقت‌شناسی، حضور، پاسخگویی تیکت و پوشش زمان کار</p>
+            <p className="text-sm text-theme-muted">امتیاز بازه‌ی انتخابی بر اساس گزارش کار، وقت‌شناسی، حضور، پاسخگویی تیکت و پوشش زمان کار</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <JalaliMonthNav jYear={period.jYear} jMonth={period.jMonth} max={localTodayIso()}
-            onChange={(jYear, jMonth) => setPeriod(p => ({ ...p, jYear, jMonth }))} />
-          <select className="input-theme text-sm w-auto" value={deptId} onChange={e => setDeptId(e.target.value)}>
+          <DateRangeFilter value={range} onChange={setRange} />
+          <div className="w-48"><SearchSelect options={people} value={userId} onChange={setUserId} emptyLabel="همه افراد" placeholder="جستجوی شخص" /></div>
+          <select className="input-theme text-sm !w-44" value={deptId} onChange={e => setDeptId(e.target.value)}>
             <option value="">همه دپارتمان‌ها</option>
             {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-          <select className="input-theme text-sm w-auto" value={scheduleId} onChange={e => setScheduleId(e.target.value)}>
+          <select className="input-theme text-sm !w-44" value={scheduleId} onChange={e => setScheduleId(e.target.value)}>
             <option value="">همه گروه‌های کاری</option>
             {schedules.map((s: any) => <option key={s.id} value={s.id}>{s.isDefault ? "پیش‌فرض سازمان" : s.name}</option>)}
           </select>
@@ -179,7 +178,7 @@ export default function PerformancePage() {
       <p className="flex items-start gap-1.5 text-[11px] text-theme-muted"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5" /> شاخصی که برای فردی داده ندارد (مثلاً وقت‌شناسی برای کارکنان ساعتی یا تیکت برای دپارتمانی بدون تیکت) در امتیاز او حساب نمی‌شود و وزن بقیه‌ی شاخص‌ها به همان نسبت بیشتر می‌شود.</p>
 
       {/* Breakdown */}
-      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.name || ""} subtitle={detail ? `${detail.department || ""} — ${J_MONTHS[period.jMonth - 1]} ${period.jYear.toLocaleString("fa-IR", { useGrouping: false })}` : undefined} size="md"
+      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.name || ""} subtitle={detail ? `${detail.department || ""} — ${faDate(range.from)} تا ${faDate(range.to)}` : undefined} size="md"
         footer={<button onClick={() => setDetail(null)} className="btn-theme-secondary text-sm">بستن</button>}>
         {detail && (
           <div className="space-y-3 text-sm">

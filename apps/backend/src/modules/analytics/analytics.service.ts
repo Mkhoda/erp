@@ -1,28 +1,50 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AssetAvailability, AssetCondition, TicketPriority, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WorkLogService } from '../work-log/work-log.service';
-import { jalaliMonthRange, toJalaliParts, workDateOf } from '../attendance/engine/jalali.util';
+import { tehranMidnightInstant, toJalaliParts, workDateOf } from '../attendance/engine/jalali.util';
+import { MAX_REPORT_DAYS, resolveReportRange } from '../attendance/engine/range.util';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 const ADMIN_ACTOR = { role: 'ADMIN' };
 // Ticket statuses that still need work.
-const OPEN_TICKET = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_USER', 'USER_REPLIED'] as const;
+const OPEN_TICKET = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_USER', 'USER_REPLIED', 'REOPENED'] as const;
+// A query value only if it is one of the enum's members (anything else = not filtered).
+const enumOf = <T extends string>(v: any, e: Record<string, T>): T | undefined => Object.values(e).find((x) => x === v);
 
 // Read-only, organisation-wide metrics for /dashboard/analytics. Every method is a pure
-// aggregate over existing tables — nothing here writes. Periods are Jalali months
-// (defaulting to the current one); "today" is the Tehran calendar day.
+// aggregate over existing tables — nothing here writes. Periods are a from/to range or
+// a Jalali month (default: the current one); "today" is the Tehran calendar day.
 @Injectable()
 export class AnalyticsService {
   constructor(private prisma: PrismaService, private workLogs: WorkLogService) {}
 
   private period(q: any) {
-    const t = toJalaliParts(workDateOf(new Date()));
-    const jYear = +q.jYear || t.jYear;
-    const jMonth = +q.jMonth || t.jMonth;
-    if (jMonth < 1 || jMonth > 12) throw new BadRequestException('ماه نامعتبر است');
-    const { start, endExcl } = jalaliMonthRange(jYear, jMonth);
-    return { jYear, jMonth, start, endExcl };
+    const { start, endExcl } = resolveReportRange(q);
+    return {
+      start, endExcl,
+      from: isoDate(start), to: isoDate(new Date(endExcl.getTime() - DAY_MS)),
+      // The same period for real timestamps (createdAt, …): Tehran midnights.
+      instants: { gte: tehranMidnightInstant(start), lt: tehranMidnightInstant(endExcl) },
+    };
+  }
+
+  /** Every day of the period up to today, for per-day series. */
+  private eachDay(p: { start: Date; endExcl: Date }): Date[] {
+    const days: Date[] = [];
+    const last = Math.min(p.endExcl.getTime() - DAY_MS, workDateOf(new Date()).getTime());
+    for (let t = p.start.getTime(); t <= last; t += DAY_MS) days.push(new Date(t));
+    return days;
+  }
+
+  async filters() {
+    const name = { select: { id: true, name: true }, orderBy: { name: 'asc' as const } };
+    const [types, categories, owners, assignees] = await Promise.all([
+      this.prisma.assetType.findMany(name), this.prisma.assetCategory.findMany(name), this.prisma.assetOwner.findMany(name),
+      this.prisma.user.findMany({ where: { disabled: false, ticketsAssigned: { some: {} } }, select: { id: true, firstName: true, lastName: true }, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }] }),
+    ]);
+    return { assetTypes: types, assetCategories: categories, assetOwners: owners, ticketAssignees: assignees.map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}` })) };
   }
 
   private async deptNames(ids: (string | null)[]) {
@@ -40,13 +62,14 @@ export class AnalyticsService {
 
   /**
    * People filter for the attendance / work-log / overview tabs: work-rule groups (scheduleIds,
-   * comma separated; the default group also matches people with no group) and a department.
+   * comma separated; the default group also matches people with no group), a department, one person.
    * Returns null when nothing is filtered.
    */
   private async filteredUserIds(q: any): Promise<Set<string> | null> {
     const scheduleIds = String(q?.scheduleIds || '').split(',').filter(Boolean);
     const departmentId = q?.departmentId || null;
-    if (!scheduleIds.length && !departmentId) return null;
+    const userId = q?.userId || null;
+    if (!scheduleIds.length && !departmentId && !userId) return null;
     const and: any[] = [];
     if (scheduleIds.length) {
       const defaults = await this.prisma.workSchedule.findMany({ where: { id: { in: scheduleIds }, isDefault: true }, select: { id: true } });
@@ -55,6 +78,7 @@ export class AnalyticsService {
       and.push({ OR: or });
     }
     if (departmentId) and.push({ OR: [{ departmentId }, { userDepartments: { some: { departmentId } } }] });
+    if (userId) and.push({ id: String(userId) });
     const users = await this.prisma.user.findMany({ where: { AND: and }, select: { id: true } });
     return new Set(users.map((u) => u.id));
   }
@@ -70,6 +94,15 @@ export class AnalyticsService {
     const userIn = only ? { userId: { in: [...only] } } : {};
     const today = workDateOf(new Date());
     const now = Date.now();
+    const p = this.period(q);
+    const periodDays = { gregDate: { gte: p.start, lt: p.endExcl }, ...userIn };
+    const [periodAtt, periodStatus, ticketsCreated, ticketsResolved, periodRequests] = await Promise.all([
+      this.prisma.attendanceDay.aggregate({ where: periodDays, _sum: { workedMinutes: true, overtimeMinutes: true, delayMinutes: true, deficitMinutes: true } }),
+      this.prisma.attendanceDay.groupBy({ by: ['status'], where: periodDays, _count: true }),
+      this.prisma.ticket.count({ where: { createdAt: p.instants } }),
+      this.prisma.ticket.count({ where: { resolvedAt: p.instants } }),
+      this.prisma.attendanceRequest.count({ where: { createdAt: p.instants, ...userIn } }),
+    ]);
     const [usersActive, usersDisabled, todayStatus, assetsCount, assetsValue, openTickets, overdueTickets, pendingRequests, activeSessions, unread] = await Promise.all([
       this.prisma.user.count({ where: { disabled: false } }),
       this.prisma.user.count({ where: { disabled: true } }),
@@ -96,6 +129,11 @@ export class AnalyticsService {
       attendanceRequestsPending: pendingRequests,
       workLogToday: wl.summary,
       unreadNotifications: unread,
+      period: {
+        from: p.from, to: p.to, ticketsCreated, ticketsResolved, requests: periodRequests,
+        totals: Object.fromEntries(Object.entries(periodAtt._sum).map(([k, v]) => [k, v ?? 0])),
+        statuses: Object.fromEntries(periodStatus.map((r) => [r.status, r._count])),
+      },
     };
   }
 
@@ -117,7 +155,7 @@ export class AnalyticsService {
         by: ['userId'], where,
         _sum: { workedMinutes: true, overtimeMinutes: true, delayMinutes: true, deficitMinutes: true, remoteMinutes: true },
       }),
-      this.prisma.attendanceRequest.groupBy({ by: ['type', 'status'], where: { createdAt: { gte: p.start, lt: p.endExcl }, ...(only ? { userId: { in: [...only] } } : {}) }, _count: true }),
+      this.prisma.attendanceRequest.groupBy({ by: ['type', 'status'], where: { createdAt: p.instants, ...(only ? { userId: { in: [...only] } } : {}) }, _count: true }),
     ]);
     const [todayRows, activeUsers, incompleteOpen, hourly] = await Promise.all([
       this.prisma.attendanceDay.findMany({ where: { gregDate: today, ...(only ? { userId: { in: [...only] } } : {}) }, select: { status: true, firstCheckIn: true, lastCheckOut: true } }),
@@ -143,8 +181,8 @@ export class AnalyticsService {
     for (const r of byStatus) statusCounts[r.status] = r._count;
 
     const days = new Map<number, { date: string; jDay: number; present: number; late: number; absent: number; leave: number; remote: number }>();
-    for (let t = p.start.getTime(); t < p.endExcl.getTime() && t <= workDateOf(new Date()).getTime(); t += DAY_MS) {
-      days.set(t, { date: isoDate(new Date(t)), jDay: toJalaliParts(new Date(t)).jDay, present: 0, late: 0, absent: 0, leave: 0, remote: 0 });
+    for (const d of this.eachDay(p)) {
+      days.set(d.getTime(), { date: isoDate(d), jDay: toJalaliParts(d).jDay, present: 0, late: 0, absent: 0, leave: 0, remote: 0 });
     }
     for (const r of byDay) {
       const d = days.get(r.gregDate.getTime());
@@ -179,7 +217,7 @@ export class AnalyticsService {
     }
 
     return {
-      ...p, start: isoDate(p.start),
+      from: p.from, to: p.to,
       records: totals._count,
       totals: Object.fromEntries(Object.entries(totals._sum).map(([k, v]) => [k, v ?? 0])),
       statusCounts,
@@ -206,26 +244,36 @@ export class AnalyticsService {
   }
 
   // ── اموال ────────────────────────────────────────────────────────────────
-  async assets() {
+  // `from`/`to` (optional here) is when the asset was registered; assignments follow the same assets.
+  async assets(q: any = {}) {
+    const ranged = !!(q.from || q.to);
+    const p = ranged ? this.period(q) : null;
+    const where: any = {
+      ...(q.typeId ? { typeId: String(q.typeId) } : {}), ...(q.categoryId ? { categoryId: String(q.categoryId) } : {}), ...(q.ownerId ? { ownerId: String(q.ownerId) } : {}),
+      availability: enumOf(q.availability, AssetAvailability), condition: enumOf(q.condition, AssetCondition),
+      ...(q.departmentId ? { assignments: { some: { returnedAt: null, departmentId: String(q.departmentId) } } } : {}),
+      ...(p ? { createdAt: p.instants } : {}),
+    };
+    const ofAsset = { asset: where };
     const [total, value, byAvail, byCond, byCat, byType, activeAssign, byMonth, assignByDept] = await Promise.all([
-      this.prisma.asset.count(),
-      this.prisma.asset.aggregate({ _sum: { cost: true } }),
-      this.prisma.asset.groupBy({ by: ['availability'], _count: true, _sum: { cost: true } }),
-      this.prisma.asset.groupBy({ by: ['condition'], _count: true }),
-      this.prisma.asset.groupBy({ by: ['categoryId'], _count: true, _sum: { cost: true } }),
-      this.prisma.asset.groupBy({ by: ['typeId'], _count: true }),
-      this.prisma.assetAssignment.count({ where: { returnedAt: null } }),
-      this.prisma.asset.findMany({ where: { createdAt: { gte: new Date(Date.now() - 400 * DAY_MS) } }, select: { createdAt: true } }),
-      this.prisma.assetAssignment.groupBy({ by: ['departmentId'], where: { returnedAt: null }, _count: true }),
+      this.prisma.asset.count({ where }),
+      this.prisma.asset.aggregate({ where, _sum: { cost: true } }),
+      this.prisma.asset.groupBy({ by: ['availability'], where, _count: true, _sum: { cost: true } }),
+      this.prisma.asset.groupBy({ by: ['condition'], where, _count: true }),
+      this.prisma.asset.groupBy({ by: ['categoryId'], where, _count: true, _sum: { cost: true } }),
+      this.prisma.asset.groupBy({ by: ['typeId'], where, _count: true }),
+      this.prisma.assetAssignment.count({ where: { returnedAt: null, ...ofAsset } }),
+      this.prisma.asset.findMany({ where: { AND: [where, { createdAt: { gte: new Date(Date.now() - 400 * DAY_MS) } }] }, select: { createdAt: true } }),
+      this.prisma.assetAssignment.groupBy({ by: ['departmentId'], where: { returnedAt: null, ...ofAsset }, _count: true }),
     ]);
     const since = new Date(Date.now() - 400 * DAY_MS);
     const [cats, types, assignTotal, assignReturned, assignRecent, returnedRecent] = await Promise.all([
       this.prisma.assetCategory.findMany({ select: { id: true, name: true } }),
       this.prisma.assetType.findMany({ select: { id: true, name: true } }),
-      this.prisma.assetAssignment.count(),
-      this.prisma.assetAssignment.count({ where: { returnedAt: { not: null } } }),
-      this.prisma.assetAssignment.findMany({ where: { assignedAt: { gte: since } }, select: { assignedAt: true } }),
-      this.prisma.assetAssignment.findMany({ where: { returnedAt: { gte: since } }, select: { returnedAt: true } }),
+      this.prisma.assetAssignment.count({ where: ofAsset }),
+      this.prisma.assetAssignment.count({ where: { returnedAt: { not: null }, ...ofAsset } }),
+      this.prisma.assetAssignment.findMany({ where: { assignedAt: { gte: since }, ...ofAsset }, select: { assignedAt: true } }),
+      this.prisma.assetAssignment.findMany({ where: { returnedAt: { gte: since }, ...ofAsset }, select: { returnedAt: true } }),
     ]);
     const catName = new Map(cats.map((c) => [c.id, c.name]));
     const typeName = new Map(types.map((c) => [c.id, c.name]));
@@ -265,9 +313,9 @@ export class AnalyticsService {
     const p = this.period(q);
     const today = workDateOf(new Date());
     const to = new Date(Math.min(p.endExcl.getTime() - DAY_MS, today.getTime()));
-    if (to.getTime() < p.start.getTime()) return { ...p, start: isoDate(p.start), summary: null, daily: [], byDepartment: [], topUsers: [], byCategory: [] };
+    if (to.getTime() < p.start.getTime()) return { from: p.from, to: p.to, summary: null, daily: [], byDepartment: [], topUsers: [], byCategory: [] };
     const only = await this.filteredUserIds(q);
-    const all = await this.workLogs.adminDays(ADMIN_ACTOR, { from: isoDate(p.start), to: isoDate(to) });
+    const all = await this.workLogs.adminDays(ADMIN_ACTOR, { from: isoDate(p.start), to: isoDate(to), ...(q.userId ? { userId: q.userId } : {}) }, MAX_REPORT_DAYS);
     const days = only ? { rows: all.rows.filter((r: any) => only.has(r.userId)), summary: this.summarize(all.rows.filter((r: any) => only.has(r.userId))) } : all;
 
     const daily = new Map<string, { date: string; jDay: number; submitted: number; late: number; missing: number }>();
@@ -305,7 +353,7 @@ export class AnalyticsService {
     }
 
     return {
-      ...p, start: isoDate(p.start),
+      from: p.from, to: p.to,
       summary: days.summary,
       daily: [...daily.values()].sort((a, b) => a.date.localeCompare(b.date)),
       byDepartment: [...dept.values()].sort((a, b) => b.required - a.required),
@@ -315,63 +363,67 @@ export class AnalyticsService {
   }
 
   // ── تیکت‌ها ──────────────────────────────────────────────────────────────
-  async tickets() {
-    const since = new Date(Date.now() - 30 * DAY_MS);
+  // The period covers created/resolved figures; backlog (open, overdue) is always "right now".
+  async tickets(q: any = {}) {
+    const p = this.period(q);
+    const f: any = {
+      ...(q.departmentId ? { departmentId: String(q.departmentId) } : {}), ...(q.assigneeId ? { assigneeId: String(q.assigneeId) } : {}),
+      priority: enumOf(q.priority, TicketPriority), status: enumOf(q.status, TicketStatus),
+    };
+    const open = { AND: [f, { status: { in: [...OPEN_TICKET] as any } }] };
     const [byStatus, byPriority, byDept, recent, resolved, overdue] = await Promise.all([
-      this.prisma.ticket.groupBy({ by: ['status'], _count: true }),
-      this.prisma.ticket.groupBy({ by: ['priority'], where: { status: { in: [...OPEN_TICKET] as any } }, _count: true }),
-      this.prisma.ticket.groupBy({ by: ['departmentId'], where: { status: { in: [...OPEN_TICKET] as any } }, _count: true }),
-      this.prisma.ticket.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true, resolvedAt: true } }),
-      this.prisma.ticket.findMany({ where: { resolvedAt: { gte: since } }, select: { createdAt: true, resolvedAt: true } }),
-      this.prisma.ticket.count({ where: { status: { in: [...OPEN_TICKET] as any }, dueAt: { lt: new Date() } } }),
+      this.prisma.ticket.groupBy({ by: ['status'], where: { ...f, createdAt: p.instants }, _count: true }),
+      this.prisma.ticket.groupBy({ by: ['priority'], where: open, _count: true }),
+      this.prisma.ticket.groupBy({ by: ['departmentId'], where: open, _count: true }),
+      this.prisma.ticket.findMany({ where: { ...f, createdAt: p.instants }, select: { createdAt: true } }),
+      this.prisma.ticket.findMany({ where: { ...f, resolvedAt: p.instants }, select: { createdAt: true, resolvedAt: true } }),
+      this.prisma.ticket.count({ where: { AND: [open, { dueAt: { lt: new Date() } }] } }),
     ]);
     const depts = await this.deptNames(byDept.map((d) => d.departmentId));
     const perDay = new Map<string, { date: string; created: number; resolved: number }>();
-    for (let t = workDateOf(since).getTime(); t <= workDateOf(new Date()).getTime(); t += DAY_MS) {
-      const k = isoDate(new Date(t));
-      perDay.set(k, { date: k, created: 0, resolved: 0 });
-    }
+    for (const d of this.eachDay(p)) perDay.set(isoDate(d), { date: isoDate(d), created: 0, resolved: 0 });
     for (const r of recent) { const d = perDay.get(isoDate(workDateOf(r.createdAt))); if (d) d.created++; }
     for (const r of resolved) { const d = perDay.get(isoDate(workDateOf(r.resolvedAt!))); if (d) d.resolved++; }
     const hours = resolved.map((r) => (r.resolvedAt!.getTime() - r.createdAt.getTime()) / 3_600_000);
     return {
+      from: p.from, to: p.to,
       byStatus: byStatus.map((r) => ({ key: r.status, count: r._count })),
       openByPriority: byPriority.map((r) => ({ key: r.priority, count: r._count })),
       openByDepartment: byDept.map((r) => ({ name: depts.get(r.departmentId) ?? '—', count: r._count })).sort((a, b) => b.count - a.count),
       daily: [...perDay.values()],
       avgResolutionHours: hours.length ? Math.round((hours.reduce((s, h) => s + h, 0) / hours.length) * 10) / 10 : null,
-      resolvedLast30: resolved.length,
-      createdLast30: recent.length,
+      resolvedCount: resolved.length,
+      createdCount: recent.length,
+      openNow: byDept.reduce((s, r) => s + r._count, 0),
       overdue,
     };
   }
 
   // ── کاربران و سامانه ────────────────────────────────────────────────────
-  async system() {
-    const since = new Date(Date.now() - 30 * DAY_MS);
+  async system(q: any = {}) {
+    const p = this.period(q);
+    const inDept = q.departmentId ? { OR: [{ departmentId: String(q.departmentId) }, { userDepartments: { some: { departmentId: String(q.departmentId) } } }] } : {};
     const [byRole, byDept, disabled, noCard, sessions24h, onlineNow, messages, notifByCat] = await Promise.all([
-      this.prisma.user.groupBy({ by: ['role'], where: { disabled: false }, _count: true }),
-      this.prisma.user.groupBy({ by: ['departmentId'], where: { disabled: false }, _count: true }),
-      this.prisma.user.count({ where: { disabled: true } }),
-      this.prisma.user.count({ where: { disabled: false, attendanceCardNo: null } }),
+      this.prisma.user.groupBy({ by: ['role'], where: { disabled: false, ...inDept }, _count: true }),
+      this.prisma.user.groupBy({ by: ['departmentId'], where: { disabled: false, ...inDept }, _count: true }),
+      this.prisma.user.count({ where: { disabled: true, ...inDept } }),
+      this.prisma.user.count({ where: { disabled: false, attendanceCardNo: null, ...inDept } }),
       this.prisma.session.count({ where: { isRevoked: false, lastSeenAt: { gte: new Date(Date.now() - DAY_MS) } } }),
       this.prisma.session.count({ where: { isRevoked: false, lastSeenAt: { gte: new Date(Date.now() - 15 * 60_000) } } }),
-      this.prisma.chatMessage.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true } }),
-      this.prisma.notification.groupBy({ by: ['category'], where: { createdAt: { gte: since } }, _count: true }),
+      this.prisma.chatMessage.findMany({ where: { createdAt: p.instants }, select: { createdAt: true } }),
+      this.prisma.notification.groupBy({ by: ['category'], where: { createdAt: p.instants }, _count: true }),
     ]);
     const depts = await this.deptNames(byDept.map((d) => d.departmentId));
     const perDay = new Map<string, { date: string; messages: number }>();
-    for (let t = workDateOf(since).getTime(); t <= workDateOf(new Date()).getTime(); t += DAY_MS) {
-      const k = isoDate(new Date(t));
-      perDay.set(k, { date: k, messages: 0 });
-    }
+    for (const d of this.eachDay(p)) perDay.set(isoDate(d), { date: isoDate(d), messages: 0 });
     for (const m of messages) { const d = perDay.get(isoDate(workDateOf(m.createdAt))); if (d) d.messages++; }
     return {
+      from: p.from, to: p.to,
       usersByRole: byRole.map((r) => ({ key: r.role, count: r._count })),
       usersByDepartment: byDept.map((r) => ({ name: r.departmentId ? depts.get(r.departmentId) ?? '—' : 'بدون دپارتمان', count: r._count })).sort((a, b) => b.count - a.count),
       disabledUsers: disabled, usersWithoutCard: noCard,
       activeSessions24h: sessions24h, onlineNow,
-      messagesDaily: [...perDay.values()], messagesLast30: messages.length,
+      messagesDaily: [...perDay.values()], messagesCount: messages.length,
       notificationsByCategory: notifByCat.map((r) => ({ key: r.category, count: r._count })).sort((a, b) => b.count - a.count),
     };
   }

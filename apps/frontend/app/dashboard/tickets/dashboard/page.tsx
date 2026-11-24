@@ -7,6 +7,9 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { useToast } from "../../../components/ui/Toast";
+import DateRangeFilter from "../../../components/ui/DateRangeFilter";
+import SearchSelect from "../../../components/ui/SearchSelect";
+import { faDate } from "../../../components/work-log/meta";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -55,27 +58,42 @@ export default function TicketDashboardPage() {
   const [workload, setWorkload] = React.useState<any[]>([]);
   const [slaReport, setSlaReport] = React.useState<any>(null);
 
+  // Filters (all sent to the three endpoints). No range = all tickets, with a 30-day trend.
+  const EMPTY = { from: "", to: "", departmentId: "", assigneeId: "", priority: "", status: "" };
+  const [f, setF] = React.useState(EMPTY);
+  const [departments, setDepartments] = React.useState<any[]>([]);
+  const [people, setPeople] = React.useState<any[]>([]);
   React.useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      fetch(`${API}/tickets/analytics/dashboard`, { headers: h as any }).then(r => r.ok ? r.json() : null),
-      fetch(`${API}/tickets/analytics/workload`, { headers: h as any }).then(r => r.ok ? r.json() : []),
-      fetch(`${API}/tickets/analytics/sla`, { headers: h as any }).then(r => r.ok ? r.json() : null),
-    ]).then(([s, w, sla]) => {
-      setStats(s);
-      setWorkload(Array.isArray(w) ? w : []);
-      setSlaReport(sla);
-    }).catch(() => toast.error("خطا در بارگذاری آمار")).finally(() => setLoading(false));
+    fetch(`${API}/departments`, { headers: h as any }).then(r => r.ok ? r.json() : []).then(d => setDepartments(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`${API}/users/brief`, { headers: h as any }).then(r => r.ok ? r.json() : []).then(u => setPeople((Array.isArray(u) ? u : []).map((x: any) => ({ id: x.id, name: `${x.firstName} ${x.lastName}` })))).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
+  React.useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    const p = new URLSearchParams(Object.entries(f).filter(([, v]) => v));
+    Promise.all([
+      fetch(`${API}/tickets/analytics/dashboard?${p}`, { headers: h as any }).then(r => r.ok ? r.json() : null),
+      fetch(`${API}/tickets/analytics/workload?${p}`, { headers: h as any }).then(r => r.ok ? r.json() : []),
+      fetch(`${API}/tickets/analytics/sla?${p}`, { headers: h as any }).then(r => r.ok ? r.json() : null),
+    ]).then(([s, w, sla]) => {
+      if (!alive) return;
+      setStats(s);
+      setWorkload(Array.isArray(w) ? w : []);
+      setSlaReport(sla);
+    }).catch(() => toast.error("خطا در بارگذاری آمار")).finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f]);
+
+  if (loading && !stats) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
   if (!stats) return <div className="text-center py-20 text-theme-muted">داده‌ای یافت نشد</div>;
 
   const statusPieData = Object.entries(stats.byStatus ?? {}).map(([k, v]: [string, any]) => ({ name: STATUS_FA[k] ?? k, value: v }));
   const priorityPieData = Object.entries(stats.byPriority ?? {}).map(([k, v]: [string, any]) => ({ name: PRIORITY_FA[k] ?? k, value: v }));
   const deptBarData = (stats.byDepartment ?? []).map((d: any) => ({ name: d.name, تیکت: d.total, باز: d.open }));
-  const trendData = (stats.dailyTrend ?? []).map((d: any) => ({ date: d.date, جدید: d.count }));
+  const trendData = (stats.dailyTrend ?? []).map((d: any) => ({ date: faDate(d.date), جدید: d.count }));
 
   const fmtMin = (m: number) => {
     if (!m) return "—";
@@ -96,12 +114,22 @@ export default function TicketDashboardPage() {
         </div>
       </div>
 
+      <div className="bg-theme-card border border-theme rounded-xl px-3 py-2.5 flex flex-wrap items-center gap-2">
+        <DateRangeFilter allowAll value={{ from: f.from, to: f.to }} onChange={r => setF(s => ({ ...s, ...r }))} />
+        <select className="input-theme text-sm !w-44" value={f.departmentId} onChange={e => setF(s => ({ ...s, departmentId: e.target.value }))}><option value="">همه دپارتمان‌ها</option>{departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+        <div className="w-48"><SearchSelect options={people} value={f.assigneeId} onChange={v => setF(s => ({ ...s, assigneeId: v }))} emptyLabel="همه مسئولین" placeholder="مسئول" /></div>
+        <select className="input-theme text-sm !w-44" value={f.priority} onChange={e => setF(s => ({ ...s, priority: e.target.value }))}><option value="">همه اولویت‌ها</option>{Object.entries(PRIORITY_FA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+        <select className="input-theme text-sm !w-44" value={f.status} onChange={e => setF(s => ({ ...s, status: e.target.value }))}><option value="">همه وضعیت‌ها</option>{Object.entries(STATUS_FA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+        {Object.values(f).some(Boolean) && <button onClick={() => setF(EMPTY)} className="text-xs text-red-600 hover:underline">حذف فیلترها</button>}
+        {loading && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+      </div>
+
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="کل تیکت‌ها" value={stats.total ?? 0} />
         <KpiCard label="باز" value={stats.open ?? 0} cls="text-blue-600" />
         <KpiCard label="تأخیر SLA" value={stats.overSla ?? 0} cls="text-red-600"
-          sub={slaReport ? `نرخ تأخیر: ${((slaReport.breachRate ?? 0) * 100).toFixed(1)}٪` : undefined} />
+          sub={slaReport ? `نرخ تأخیر: ${faNum(slaReport.breachRate ?? 0)}٪` : undefined} />
         <KpiCard label="میانگین پاسخ اول"
           value={slaReport?.avgFirstResponse ? fmtMin(Math.round(slaReport.avgFirstResponse)) : "—"}
           sub="ساعت:دقیقه" />
@@ -144,7 +172,7 @@ export default function TicketDashboardPage() {
 
       {/* Trend */}
       <div className="bg-theme-card border border-theme rounded-xl p-4">
-        <div className="text-sm font-medium text-theme-primary mb-3">روند ثبت تیکت (۳۰ روز اخیر)</div>
+        <div className="text-sm font-medium text-theme-primary mb-3">روند ثبت تیکت {f.from ? "(بازه‌ی انتخابی)" : "(۳۰ روز اخیر)"}</div>
         {trendData.length > 0 ? (
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={trendData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -219,8 +247,8 @@ export default function TicketDashboardPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <div className="text-xs text-theme-muted">نرخ تأخیر</div>
-              <div className={`text-lg font-bold ${(slaReport.breachRate ?? 0) > 0.2 ? "text-red-600" : "text-green-600"}`}>
-                {((slaReport.breachRate ?? 0) * 100).toFixed(1)}٪
+              <div className={`text-lg font-bold ${(slaReport.breachRate ?? 0) > 20 ? "text-red-600" : "text-green-600"}`}>
+                {faNum(slaReport.breachRate ?? 0)}٪
               </div>
             </div>
             <div>
@@ -233,7 +261,7 @@ export default function TicketDashboardPage() {
             </div>
             <div>
               <div className="text-xs text-theme-muted">طولانی‌ترین باز</div>
-              <div className="text-lg font-bold text-amber-600">{slaReport.longestOpenDays ?? 0} روز</div>
+              <div className="text-lg font-bold text-amber-600">{faNum(slaReport.longestOpenDays ?? 0)} روز</div>
             </div>
           </div>
         </div>

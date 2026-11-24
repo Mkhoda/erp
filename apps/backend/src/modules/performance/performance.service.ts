@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WorkLogService } from '../work-log/work-log.service';
-import { jalaliMonthRange, toJalaliParts, workDateOf } from '../attendance/engine/jalali.util';
+import { workDateOf } from '../attendance/engine/jalali.util';
+import { MAX_REPORT_DAYS, resolveReportRange } from '../attendance/engine/range.util';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
@@ -63,20 +64,19 @@ export class PerformanceService {
   }
 
   async scores(actor: Actor, q: any) {
-    const t = toJalaliParts(workDateOf(new Date()));
-    const jYear = +q.jYear || t.jYear;
-    const jMonth = +q.jMonth || t.jMonth;
-    const { start, endExcl } = jalaliMonthRange(jYear, jMonth);
+    const { start, endExcl } = resolveReportRange(q);
     const today = workDateOf(new Date());
     const to = new Date(Math.min(endExcl.getTime() - DAY_MS, today.getTime()));
     const { weights } = await this.getSettings();
-    if (to < start) return { jYear, jMonth, weights, rows: [] };
+    const period = { from: isoDate(start), to: isoDate(to) };
+    if (to < start) return { ...period, weights, rows: [] };
 
     // ── who ──
     const scope = await this.scopeOf(actor);
     const deptWhere = (ids: string[]) => ({ OR: [{ departmentId: { in: ids } }, { userDepartments: { some: { departmentId: { in: ids } } } }] });
     const and: any[] = [{ disabled: false }];
     if (scope) and.push(deptWhere(scope));
+    if (q.userId) and.push({ id: String(q.userId) });
     if (q.departmentId) and.push(deptWhere([q.departmentId]));
     if (q.scheduleId) {
       // Work-rule group: users pinned to it, or (for the default group) users with no group.
@@ -94,13 +94,13 @@ export class PerformanceService {
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
-    if (!users.length) return { jYear, jMonth, weights, rows: [] };
+    if (!users.length) return { ...period, weights, rows: [] };
     const ids = users.map((u) => u.id);
     const range = { gte: start, lte: to };
 
     // ── data ──
     const [wl, days, logged, tickets, managers, assignees] = await Promise.all([
-      this.workLog.adminDays({ role: 'ADMIN' }, { from: isoDate(start), to: isoDate(to) }),
+      this.workLog.adminDays({ role: 'ADMIN' }, { from: isoDate(start), to: isoDate(to) }, MAX_REPORT_DAYS),
       this.prisma.attendanceDay.findMany({ where: { userId: { in: ids }, gregDate: range }, select: { userId: true, status: true, delayMinutes: true, earlyLeaveMinutes: true, workedMinutes: true } }),
       this.prisma.workTaskEntry.groupBy({ by: ['userId'], where: { userId: { in: ids }, gregDate: range }, _sum: { minutes: true } }),
       this.prisma.ticket.findMany({
@@ -195,6 +195,6 @@ export class PerformanceService {
     // Rank by score (people without any score at the end).
     rows.sort((x, y) => (y.score ?? -1) - (x.score ?? -1) || x.name.localeCompare(y.name, 'fa'));
     let rank = 0;
-    return { jYear, jMonth, weights, rows: rows.map((r) => ({ ...r, rank: r.score == null ? null : ++rank })) };
+    return { ...period, weights, rows: rows.map((r) => ({ ...r, rank: r.score == null ? null : ++rank })) };
   }
 }
