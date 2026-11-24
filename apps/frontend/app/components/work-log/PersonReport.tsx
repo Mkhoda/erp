@@ -1,6 +1,6 @@
 "use client";
-// One person's work-log report for a Jalali period — shared by the admin "داشبورد فرد" tab
-// and the printable PDF page (printMode: no search box, every row and report printed).
+// One person's work-log report for a Jalali period — the admin "داشبورد فرد" tab
+// (the printable PDF has its own layout: PrintReport).
 import React from "react";
 import { Search } from "lucide-react";
 import { Tile, ChartCard, HBars, DailyLines, faNum, hrs, fmtH, pct, faDay } from "../charts/ChartKit";
@@ -19,7 +19,7 @@ export const periodCount = (p: PeriodKind) => ({ month: 12, quarter: 4, half: 2,
 
 type SortK = "date" | "task" | "category" | "minutes";
 
-export default function PersonReport({ data, printMode = false }: { data: any; printMode?: boolean }) {
+export default function PersonReport({ data }: { data: any }) {
   const [q, setQ] = React.useState("");
   const [sortK, setSortK] = React.useState<SortK>("date");
   const [dir, setDir] = React.useState<"asc" | "desc">("asc");
@@ -41,9 +41,9 @@ export default function PersonReport({ data, printMode = false }: { data: any; p
     });
   }, [data, q, sortK, dir]);
   const th = (k: SortK, label: string) => (
-    <th onClick={() => { if (printMode) return; if (sortK === k) setDir(d => d === "asc" ? "desc" : "asc"); else { setSortK(k); setDir("asc"); } }}
-      className={`text-right py-1.5 px-2 font-medium ${printMode ? "" : "cursor-pointer select-none hover:text-theme-primary"}`}>
-      {label}{!printMode && sortK === k ? (dir === "asc" ? " ↑" : " ↓") : ""}
+    <th onClick={() => { if (sortK === k) setDir(d => d === "asc" ? "desc" : "asc"); else { setSortK(k); setDir("asc"); } }}
+      className="text-right py-1.5 px-2 font-medium cursor-pointer select-none hover:text-theme-primary">
+      {label}{sortK === k ? (dir === "asc" ? " ↑" : " ↓") : ""}
     </th>
   );
 
@@ -61,10 +61,10 @@ export default function PersonReport({ data, printMode = false }: { data: any; p
 
       <ChartCard title="زمان ثبت‌شده در برابر کارکرد حضور" subtitle="ساعت در روز"
         table={{ head: ["روز", "ثبت‌شده (ساعت)", "کارکرد (ساعت)", "وضعیت گزارش"], rows: (data.daily as any[]).map(d => [faDate(d.date), hrs(d.loggedMinutes), hrs(d.workedMinutes), STATE_META[d.state]?.label || d.state]) }}>
-        <DailyLines data={daily} series={[{ key: "logged", label: "زمان ثبت‌شده" }, { key: "worked", label: "کارکرد حضور" }]} height={printMode ? 200 : 240} />
+        <DailyLines data={daily} series={[{ key: "logged", label: "زمان ثبت‌شده" }, { key: "worked", label: "کارکرد حضور" }]} height={240} />
       </ChartCard>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 print:grid-cols-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="زمان به تفکیک دسته" subtitle="ساعت" table={{ head: ["دسته", "ساعت", "رکورد"], rows: (data.byCategory as any[]).map(c => [c.name, hrs(c.minutes), c.entries]) }}>
           <HBars data={(data.byCategory as any[]).map(c => ({ name: c.name, value: hrs(c.minutes) }))} valueLabel="ساعت" fmt={v => `${faNum(v)} ساعت`} />
         </ChartCard>
@@ -74,17 +74,15 @@ export default function PersonReport({ data, printMode = false }: { data: any; p
       </div>
 
       {/* Entries grid */}
-      <div className="bg-theme-card border border-theme rounded-xl overflow-hidden break-inside-avoid-page">
+      <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 border-b border-theme">
           <span className="text-sm font-semibold text-theme-primary">جزئیات کارها ({faNum(rows.length)})</span>
-          {!printMode && (
             <div className="relative w-64 max-w-full">
               <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-theme-muted" />
               <input value={q} onChange={e => setQ(e.target.value)} placeholder="جستجو در وظیفه، دسته یا شرح…" className="input-theme text-xs py-1.5 pr-8" />
             </div>
-          )}
         </div>
-        <div className={printMode ? "" : "max-h-[28rem] overflow-auto"}>
+        <div className="max-h-[28rem] overflow-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-theme-card"><tr className="text-theme-muted border-b border-theme">
               {th("date", "تاریخ")}{th("task", "وظیفه")}{th("category", "دسته")}{th("minutes", "زمان")}
@@ -110,7 +108,7 @@ export default function PersonReport({ data, printMode = false }: { data: any; p
       {/* Daily reports */}
       <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
         <div className="px-3 py-2.5 border-b border-theme text-sm font-semibold text-theme-primary">گزارش‌های کار روزانه ({faNum((data.reports as any[]).length)})</div>
-        <div className={printMode ? "divide-y divide-theme" : "divide-y divide-theme max-h-[32rem] overflow-auto"}>
+        <div className="divide-y divide-theme max-h-[32rem] overflow-auto">
           {(data.reports as any[]).length === 0 && <div className="py-6 text-center text-xs text-theme-muted">گزارشی ثبت نشده</div>}
           {(data.reports as any[]).map(r => {
             const day = (data.daily as any[]).find(d => d.date === r.date);
@@ -128,7 +126,7 @@ export default function PersonReport({ data, printMode = false }: { data: any; p
           })}
         </div>
       </div>
-      {!printMode && <p className="text-[11px] text-theme-muted">روز {faDay(data.from)} تا {faDay(data.to)} — فقط روزهایی که گزارش الزامی بوده یا داده‌ای دارند در آمار آمده‌اند.</p>}
+      <p className="text-[11px] text-theme-muted">روز {faDay(data.from)} تا {faDay(data.to)} — فقط روزهایی که گزارش الزامی بوده یا داده‌ای دارند در آمار آمده‌اند.</p>
     </div>
   );
 }

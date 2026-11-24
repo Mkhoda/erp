@@ -218,7 +218,7 @@ export class WorkLogService {
             { entries: { some: { userId, gregDate: date } } },
           ],
         },
-        include: { category: { select: { id: true, name: true, color: true } }, createdBy: { select: { firstName: true, lastName: true } } },
+        include: { category: { select: { id: true, name: true, color: true } }, createdBy: { select: { firstName: true, lastName: true } }, adoptions: { where: { userId }, select: { id: true } } },
         orderBy: [{ deadline: 'asc' }, { createdAt: 'desc' }],
       }),
       this.prisma.workTaskEntry.groupBy({ by: ['taskId'], where: { userId }, _sum: { minutes: true } }),
@@ -248,8 +248,10 @@ export class WorkLogService {
     const totalMap = new Map(totals.map((t) => [t.taskId, t._sum.minutes ?? 0]));
     const dateMap = new Map(onDate.map((t) => [t.taskId, t._sum.minutes ?? 0]));
     const doneMap = new Map(completions.map((c) => [c.taskId, c.doneAt]));
-    const taskRows = tasks.map((t) => ({
+    const taskRows = tasks.map(({ adoptions, ...t }) => ({
         ...t,
+        // A global task the user added themselves, so they can take it off their list again.
+        removable: t.userId == null && t.deadline == null && adoptions.length > 0,
         scope: t.userId == null ? 'GLOBAL' : t.isAdminDefined ? 'ASSIGNED' : 'PERSONAL',
         editable: t.userId === userId && !t.isAdminDefined,
         totalMinutes: totalMap.get(t.id) ?? 0,
@@ -258,11 +260,10 @@ export class WorkLogService {
         doneAt: doneMap.get(t.id) ?? null,
         overdue: !!t.deadline && !doneMap.has(t.id) && !t.recurring && t.deadline.getTime() < today.getTime(),
       }));
-    const inList = new Set(taskRows.filter((t) => !t.done).map((t) => t.id));
     const globalCatalog = catalog.map((t) => ({
       id: t.id, title: t.title, description: t.description, recurring: t.recurring, category: t.category,
       // in-list: already on the board · finished: adopted then ended (re-adding reopens it) · available
-      state: inList.has(t.id) ? 'IN_LIST' : t.adoptions.length && doneMap.has(t.id) ? 'FINISHED' : 'AVAILABLE',
+      state: !t.adoptions.length ? 'AVAILABLE' : doneMap.has(t.id) ? 'FINISHED' : 'IN_LIST',
     }));
 
     const attMap = new Map(monthAtt.map((a) => [a.gregDate.getTime(), a]));
@@ -411,6 +412,18 @@ export class WorkLogService {
     if (!t) throw new NotFoundException('وظیفه‌ی عمومی یافت نشد');
     await this.prisma.$transaction([
       this.prisma.workTaskAdoption.upsert({ where: { taskId_userId: { taskId, userId } }, create: { taskId, userId }, update: {} }),
+      this.prisma.workTaskCompletion.deleteMany({ where: { taskId, userId } }),
+    ]);
+    return { ok: true };
+  }
+
+  // Undo adoptTask (added by mistake): off the list entirely, not "finished". Logged time stays.
+  async unadoptTask(userId: string, taskId: string) {
+    const t = await this.prisma.workTask.findFirst({ where: { id: taskId, userId: null, adoptions: { some: { userId } } } });
+    if (!t) throw new NotFoundException('این وظیفه در فهرست شما نیست');
+    if (t.deadline) throw new BadRequestException('این وظیفه برای همه مهلت دارد و از فهرست برداشته نمی‌شود');
+    await this.prisma.$transaction([
+      this.prisma.workTaskAdoption.deleteMany({ where: { taskId, userId } }),
       this.prisma.workTaskCompletion.deleteMany({ where: { taskId, userId } }),
     ]);
     return { ok: true };
@@ -591,14 +604,14 @@ export class WorkLogService {
   }
 
   // Rows = one per (user, day) in range that needs a report or has any logged data.
-  async adminDays(actor: Actor, q: any) {
+  async adminDays(actor: Actor, q: any, maxDays = MAX_RANGE_DAYS) {
     const today = workDateOf(new Date());
     const tj = toJalaliParts(today);
     let from = q.from ? this.parseDate(q.from) : jalaliMonthRange(tj.jYear, tj.jMonth).start;
     let to = q.to ? this.parseDate(q.to) : today;
     if (to.getTime() > today.getTime()) to = today;
     if (from.getTime() > to.getTime()) [from, to] = [to, from];
-    if ((to.getTime() - from.getTime()) / DAY_MS + 1 > MAX_RANGE_DAYS) throw new BadRequestException(`بازه‌ی تاریخ حداکثر ${MAX_RANGE_DAYS} روز است`);
+    if ((to.getTime() - from.getTime()) / DAY_MS + 1 > maxDays) throw new BadRequestException(`بازه‌ی تاریخ حداکثر ${maxDays} روز است`);
 
     const scope = await this.scopeOf(actor);
     const and: any[] = [{ disabled: false }];
@@ -863,7 +876,8 @@ export class WorkLogService {
       }),
       to < from ? [] : this.prisma.dailyWorkReport.findMany({ where: { userId: q.userId, gregDate: { gte: from, lte: to } }, orderBy: { gregDate: 'asc' } }),
     ]);
-    const days = to < from ? { rows: [], summary: null } : await this.adminDays(actor, { from: isoDate(from), to: isoDate(to), userId: q.userId });
+    // One person, so up to a whole year is fine.
+    const days = to < from ? { rows: [], summary: null } : await this.adminDays(actor, { from: isoDate(from), to: isoDate(to), userId: q.userId }, 366);
 
     const byCategory = new Map<string, { name: string; color: string | null; minutes: number; entries: number }>();
     const byTask = new Map<string, { title: string; category: string; minutes: number; entries: number; days: Set<string> }>();

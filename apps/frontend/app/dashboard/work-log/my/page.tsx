@@ -2,7 +2,7 @@
 import React from "react";
 import {
   ListTodo, ChevronRight, ChevronLeft, Loader2, Plus, Pencil, Trash2, Clock, CheckCircle2, Circle,
-  AlertTriangle, Lock, Save, FolderCog, Repeat, CalendarClock, X, ListChecks, Flag, RotateCcw, ArrowUp, ArrowDown,
+  AlertTriangle, Lock, Save, FolderCog, Repeat, CalendarClock, X, ListChecks, Flag, RotateCcw, ArrowUp, ArrowDown, ListX,
 } from "lucide-react";
 import { pageTitle } from "../../../../lib/branding";
 import { readError } from "../../../../lib/http";
@@ -111,6 +111,12 @@ export default function MyWorkLogPage() {
   async function finishTask(t: any) {
     if (!(await confirm("تموم شد", `وظیفه‌ی «${t.title}» از فهرست شما خارج شود؟ زمان‌های ثبت‌شده‌ی آن باقی می‌ماند و بعداً می‌توانید آن را برگردانید.`, "warning"))) return;
     await call(`/work-log/me/tasks/${t.id}/done`, "POST", { done: true }, "از فهرست شما خارج شد");
+  }
+
+  // A global task I added by mistake: take it off my list (nothing is marked finished).
+  async function unadoptTask(t: any) {
+    if (!(await confirm("برداشتن از فهرست", `وظیفه‌ی عمومی «${t.title}» از فهرست شما برداشته شود؟ زمان‌هایی که قبلاً برایش ثبت کرده‌اید باقی می‌ماند.`, "warning"))) return;
+    await call(`/work-log/me/tasks/${t.id}/adopt`, "DELETE", undefined, "از فهرست شما برداشته شد");
   }
 
   async function removeTask(t: any) {
@@ -245,17 +251,18 @@ export default function MyWorkLogPage() {
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
                       {(b.globalCatalog as any[]).map(c => (
-                        <button key={c.id} disabled={c.state === "IN_LIST"} onClick={() => call(`/work-log/me/tasks/${c.id}/adopt`, "POST", undefined, "به فهرست شما اضافه شد")}
-                          title={c.description || ""}
-                          className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${c.state === "IN_LIST" ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300 cursor-default" : "border-theme text-theme-primary hover:bg-theme-hover"}`}>
+                        <button key={c.id} onClick={() => c.state === "IN_LIST" ? unadoptTask(c) : call(`/work-log/me/tasks/${c.id}/adopt`, "POST", undefined, "به فهرست شما اضافه شد")}
+                          title={c.state === "IN_LIST" ? "در فهرست شماست — برای برداشتن کلیک کنید" : c.description || ""}
+                          className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${c.state === "IN_LIST" ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300 hover:border-red-500/50" : "border-theme text-theme-primary hover:bg-theme-hover"}`}>
                           <span className="w-2 h-2 rounded-full" style={{ background: c.category?.color || "#94a3b8" }} />
                           {c.state === "IN_LIST" ? <CheckCircle2 className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
                           {c.title}{c.state === "FINISHED" ? " (افزودن دوباره)" : ""}
+                          {c.state === "IN_LIST" && <X className="w-3 h-3 text-red-500" />}
                         </button>
                       ))}
                     </div>
                   )}
-                  <p className="text-[11px] text-theme-muted mt-1.5">وظایف فهرست شما هر روز نمایش داده می‌شوند، چه زمانی برایشان ثبت کنید چه نکنید. برای حذف یک وظیفه از فهرست، «تموم شد» را بزنید؛ زمان‌های قبلی آن باقی می‌ماند.</p>
+                  <p className="text-[11px] text-theme-muted mt-1.5">وظایف فهرست شما هر روز نمایش داده می‌شوند، چه زمانی برایشان ثبت کنید چه نکنید. اگر وظیفه‌ای را اشتباهی اضافه کرده‌اید، روی آن (✕) بزنید تا برداشته شود؛ اگر کارش تمام شده، «تموم شد» را بزنید. در هر دو حالت زمان‌های قبلی باقی می‌ماند.</p>
                 </div>
               )}
               <div className="divide-y divide-theme/50">
@@ -297,6 +304,9 @@ export default function MyWorkLogPage() {
                             )}
                             {t.done && (
                               <button onClick={() => call(`/work-log/me/tasks/${t.id}/done`, "POST", { done: false })} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg text-theme-muted hover:bg-theme-hover"><RotateCcw className="w-3.5 h-3.5" /> برگرداندن</button>
+                            )}
+                            {t.removable && (
+                              <button onClick={() => unadoptTask(t)} title="برداشتن از فهرست من" className="p-1 rounded text-theme-muted hover:text-red-600"><ListX className="w-3.5 h-3.5" /></button>
                             )}
                             {t.editable && !t.archived && <>
                               <button onClick={() => setTaskModal({ ...t, categoryId: t.categoryId || "", estimateH: t.estimatedMinutes ? String(+(t.estimatedMinutes / 60).toFixed(2)) : "" })} title="ویرایش" className="p-1 rounded text-theme-muted hover:text-blue-600"><Pencil className="w-3.5 h-3.5" /></button>
