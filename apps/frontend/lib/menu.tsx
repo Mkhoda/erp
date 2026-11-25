@@ -158,6 +158,7 @@ export const MENU: MenuItem[] = [
     roles: ['ADMIN'],
     children: [
       { id: 'access',           title: 'دسترسی صفحات',     page: '/dashboard/access',            icon: FileText },
+      { id: 'admin.scoring',    title: 'شاخص‌های امتیاز',  page: '/dashboard/performance/settings', icon: Trophy },
       { id: 'admin.settings',   title: 'تنظیمات سامانه',   page: '/dashboard/settings',          icon: SlidersHorizontal },
       { id: 'admin.sessions',   title: 'مدیریت نشست‌ها',   page: '/dashboard/security/sessions', icon: ShieldCheck },
       { id: 'admin.logs',       title: 'لاگ سیستم',        page: '/dashboard/system-logs',       icon: ScrollText },

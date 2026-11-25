@@ -22,6 +22,7 @@ const ADMIN_LOCKED = [
   "/dashboard/attendance/settings",
   "/dashboard/attendance/sync",
   "/dashboard/attendance/work-rules",
+  "/dashboard/performance/settings",
 ];
 
 const UNIVERSAL_PAGES = [

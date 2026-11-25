@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -14,6 +14,11 @@ export class PerformanceController {
 
   @Get('scores')
   scores(@Req() req: any, @Query() q: any) { return this.service.scores(req.user, q); }
+
+  // Scores with an unsaved config (admin panel).
+  @Post('preview')
+  @Roles('ADMIN')
+  preview(@Req() req: any, @Body() body: any) { return this.service.preview(req.user, body); }
 
   @Get('settings')
   settings() { return this.service.getSettings(); }

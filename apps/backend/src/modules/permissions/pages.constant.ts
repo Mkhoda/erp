@@ -11,6 +11,7 @@ export const ADMIN_PAGES: string[] = [
   '/dashboard/attendance/sync',
   '/dashboard/attendance/work-rules',
   '/dashboard/security/sessions',
+  '/dashboard/performance/settings',
 ];
 
 export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[] = [
@@ -57,6 +58,7 @@ export const KNOWN_PAGES: { page: string; label: string; adminOnly?: boolean }[]
   // ── Admin metrics dashboard — ADMIN by default, grantable per department/role or per person ──
   { page: '/dashboard/analytics',            label: 'داشبورد مدیریتی' },
   { page: '/dashboard/performance',          label: 'امتیاز عملکرد' },
+  { page: '/dashboard/performance/settings', label: 'شاخص‌های امتیاز عملکرد', adminOnly: true },
 
   // ── Work log (ثبت عملکرد) ──
   { page: '/dashboard/work-log/my',          label: 'عملکرد من' },
