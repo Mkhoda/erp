@@ -19,14 +19,23 @@ const GRADE: Record<string, { label: string; cls: string; bar: string }> = {
   FAIR: { label: "متوسط", cls: "bg-amber-500/15 text-amber-700 dark:text-amber-300", bar: "bg-amber-500" },
   POOR: { label: "ضعیف", cls: "bg-red-500/15 text-red-700 dark:text-red-300", bar: "bg-red-500" },
 };
-const barCls = (v: number, g: any) => (v >= g.excellent ? GRADE.EXCELLENT.bar : v >= g.good ? GRADE.GOOD.bar : v >= g.fair ? GRADE.FAIR.bar : GRADE.POOR.bar);
 const signed = (n: number, sign: string) => (n ? `${sign}${faNum(n)}` : "—");
 
+const SHORT: Record<string, string> = { report: "گزارش روزانه", coverage: "پوشش زمان", taskDeadline: "وظایف", punctuality: "وقت‌شناسی", attendance: "بدون مرخصی", workHours: "ساعت موظفی", tickets: "تیکت تیمی", ticketResolve: "حل تیکت", ticketFirstResponse: "پاسخ اول" };
+const band = (v: number, g: any) => (v >= g.excellent ? "GREEN" : v >= g.good ? "BLUE" : v >= g.fair ? "AMBER" : "RED");
+const CHIP: Record<string, string> = { GREEN: "bg-green-500/15 text-green-700 dark:text-green-300", BLUE: "bg-blue-500/15 text-blue-700 dark:text-blue-300", AMBER: "bg-amber-500/15 text-amber-700 dark:text-amber-300", RED: "bg-red-500/15 text-red-700 dark:text-red-300" };
+const BAR: Record<string, string> = { GREEN: "bg-green-500", BLUE: "bg-blue-500", AMBER: "bg-amber-500", RED: "bg-red-500" };
+
+// Compact value chip (the detail modal still shows the long bar).
+function Chip({ v, g }: { v: number | null; g: any }) {
+  if (v == null) return <span className="inline-block w-11 text-center text-theme-muted/60 text-xs">—</span>;
+  return <span className={`inline-block w-11 text-center rounded-md py-1 text-xs font-bold ${CHIP[band(v, g)]}`}>{faNum(Math.round(v))}</span>;
+}
 function Bar({ v, g }: { v: number | null; g: any }) {
   if (v == null) return <span className="text-theme-muted text-xs">—</span>;
   return (
     <div className="flex items-center gap-1.5 min-w-[90px]">
-      <div className="flex-1 h-1.5 rounded-full bg-theme-secondary overflow-hidden"><div className={`h-full rounded-full ${barCls(v, g)}`} style={{ width: `${Math.max(2, v)}%` }} /></div>
+      <div className="flex-1 h-1.5 rounded-full bg-theme-secondary overflow-hidden"><div className={`h-full rounded-full ${BAR[band(v, g)]}`} style={{ width: `${Math.max(2, v)}%` }} /></div>
       <span className="text-xs text-theme-primary w-9 text-left" dir="ltr">{faNum(Math.round(v))}</span>
     </div>
   );
@@ -50,6 +59,7 @@ export default function PerformancePage() {
   const [sortK, setSortK] = React.useState<string>("rank");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
   const [detail, setDetail] = React.useState<any>(null);
+  const [show, setShow] = React.useState<"all" | "scored" | "unscored">("all");
 
   React.useEffect(() => {
     fetch(`${API}/auth/me`, { headers: h }).then(r => r.ok ? r.json() : null).then(d => setRole(d?.role ?? null)).catch(() => {});
@@ -83,7 +93,7 @@ export default function PerformancePage() {
   }
   const arrow = (k: string) => sortK === k ? (sortDir === "asc" ? " ↑" : " ↓") : "";
   const rows = React.useMemo(() => {
-    const list = [...(data?.rows || [])];
+    const list = ((data?.rows || []) as any[]).filter(r => show === "all" || (show === "scored") === (r.score != null));
     const num = (x: any) => (x == null ? -1 : x);
     const v = (r: any) => sortK === "rank" ? (r.rank ?? 1e9) : sortK === "name" ? r.name : sortK === "department" ? (r.department || "")
       : sortK === "score" || sortK === "bonus" || sortK === "penalty" ? num(r[sortK]) : num(r.items?.[sortK]?.value);
@@ -92,10 +102,10 @@ export default function PerformancePage() {
       const c = typeof x === "number" ? x - (y as number) : String(x).localeCompare(String(y), "fa");
       return sortDir === "asc" ? c : -c;
     });
-  }, [data, sortK, sortDir]);
+  }, [data, sortK, sortDir, show]);
   const scored = (data?.rows || []).filter((r: any) => r.score != null);
   const avg = scored.length ? scored.reduce((s: number, r: any) => s + r.score, 0) / scored.length : null;
-  const th = (k: string, label: React.ReactNode, hint?: string) => <th key={k} onClick={() => thSort(k)} title={hint} className="px-2 font-medium cursor-pointer whitespace-nowrap">{label}{arrow(k)}</th>;
+  const th = (k: string, label: React.ReactNode, hint?: string, cls = "") => <th key={k} onClick={() => thSort(k)} title={hint} className={`px-1.5 py-2.5 font-medium cursor-pointer select-none align-bottom hover:text-theme-primary ${cls}`}>{label}{arrow(k)}</th>;
 
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-4" dir="rtl">
@@ -124,39 +134,72 @@ export default function PerformancePage() {
 
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2.5">
-          <div className="bg-theme-card border border-theme rounded-2xl px-3 py-2.5"><div className="text-xs text-theme-muted">میانگین امتیاز</div><div className="text-2xl font-extrabold text-theme-primary">{avg == null ? "—" : faNum(Math.round(avg))}</div></div>
-          {(["EXCELLENT", "GOOD", "FAIR", "POOR"] as const).map(k => (
-            <div key={k} className="bg-theme-card border border-theme rounded-2xl px-3 py-2.5"><div className="text-xs text-theme-muted">{GRADE[k].label}</div><div className="text-2xl font-extrabold text-theme-primary">{faNum(scored.filter((r: any) => r.grade === k).length)}</div></div>
-          ))}
-          <div className="bg-theme-card border border-theme rounded-2xl px-3 py-2.5"><div className="text-xs text-theme-muted">بدون امتیاز</div><div className="text-2xl font-extrabold text-theme-primary">{faNum((data.rows?.length || 0) - scored.length)}</div></div>
+          <div className="bg-theme-card border border-theme rounded-2xl px-4 py-3">
+            <div className="text-xs text-theme-muted">میانگین امتیاز</div>
+            <div className="text-3xl font-extrabold text-theme-primary mt-0.5">{avg == null ? "—" : faNum(Math.round(avg))}</div>
+            <div className="text-[11px] text-theme-muted mt-0.5">{faNum(scored.length)} نفر دارای امتیاز</div>
+          </div>
+          {(["EXCELLENT", "GOOD", "FAIR", "POOR"] as const).map(k => {
+            const n = scored.filter((r: any) => r.grade === k).length;
+            return (
+              <div key={k} className="bg-theme-card border border-theme rounded-2xl px-4 py-3 relative overflow-hidden">
+                <span className={`absolute inset-x-0 top-0 h-1 ${GRADE[k].bar}`} />
+                <div className="text-xs text-theme-muted">{GRADE[k].label}</div>
+                <div className="text-3xl font-extrabold text-theme-primary mt-0.5">{faNum(n)}</div>
+                <div className="text-[11px] text-theme-muted mt-0.5">{scored.length ? faNum(Math.round((n / scored.length) * 100)) : 0}٪</div>
+              </div>
+            );
+          })}
+          <div className="bg-theme-card border border-theme rounded-2xl px-4 py-3">
+            <div className="text-xs text-theme-muted">بدون امتیاز</div>
+            <div className="text-3xl font-extrabold text-theme-primary mt-0.5">{faNum((data.rows?.length || 0) - scored.length)}</div>
+            <div className="text-[11px] text-theme-muted mt-0.5">داده‌ی ناکافی</div>
+          </div>
         </div>
       )}
 
-      <div className="bg-theme-card border border-theme rounded-xl overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex bg-theme-secondary border border-theme p-0.5 rounded-lg text-xs">
+          {([["all", "همه"], ["scored", "دارای امتیاز"], ["unscored", "بدون امتیاز"]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setShow(k)} className={`px-3 py-1.5 rounded-md ${show === k ? "bg-theme-card shadow text-theme-primary font-medium" : "text-theme-muted"}`}>{l}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-theme-muted">
+          {(["GREEN", "BLUE", "AMBER", "RED"] as const).map((k, i) => <span key={k} className="flex items-center gap-1"><span className={`w-2.5 h-2.5 rounded ${BAR[k]}`} />{["عالی", "خوب", "متوسط", "ضعیف"][i]}</span>)}
+        </div>
+      </div>
+
+      <div className="bg-theme-card border border-theme rounded-2xl overflow-hidden">
         {loading && !data ? (
           <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="text-theme-muted border-b border-theme bg-theme-secondary/30 text-xs">
-                {th("rank", "رتبه")}
-                <th onClick={() => thSort("name")} className="text-right px-2 font-medium cursor-pointer">نام{arrow("name")}</th>
-                <th onClick={() => thSort("department")} className="text-right px-2 font-medium cursor-pointer">دپارتمان{arrow("department")}</th>
-                {th("score", "امتیاز کل")}
-                {base.map(i => th(i.key, <>{i.label}<span className="block text-[10px] font-normal">{totalW ? faNum(Math.round((i.weight / totalW) * 100)) : 0}٪ وزن</span></>, i.description))}
-                {th("bonus", "پاداش")}{th("penalty", "کسورات")}
-              </tr></thead>
+              <thead className="bg-theme-secondary/40 text-[11px] text-theme-muted border-b border-theme">
+                <tr>
+                  {th("rank", "رتبه", undefined, "w-14 text-center")}
+                  <th onClick={() => thSort("name")} className="px-2 py-2.5 text-right font-medium cursor-pointer select-none align-bottom hover:text-theme-primary min-w-44">نام{arrow("name")}</th>
+                  {th("score", "امتیاز کل", undefined, "w-24 text-center")}
+                  {base.map(i => th(i.key, <><span className="block leading-tight">{SHORT[i.key] || i.label}</span><span className="block text-[10px] font-normal opacity-70">{totalW ? faNum(Math.round((i.weight / totalW) * 100)) : 0}٪</span></>, i.description, "w-16 text-center"))}
+                  {th("bonus", "پاداش", undefined, "w-14 text-center")}{th("penalty", "کسورات", undefined, "w-14 text-center")}
+                </tr>
+              </thead>
               <tbody>
-                {rows.length === 0 && <tr><td colSpan={7 + base.length} className="py-10 text-center text-theme-muted">کسی یافت نشد</td></tr>}
+                {rows.length === 0 && <tr><td colSpan={5 + base.length} className="py-12 text-center text-theme-muted">کسی یافت نشد</td></tr>}
                 {rows.map((r: any) => (
-                  <tr key={r.userId} onClick={() => setDetail(r)} className="border-b border-theme/40 hover:bg-theme-hover cursor-pointer">
-                    <td className="py-2 px-2 text-center text-theme-muted">{r.rank == null ? "—" : faNum(r.rank)}</td>
-                    <td className="px-2 text-theme-primary whitespace-nowrap">{r.name}{r.employeeType === "HOURLY" && <span className="mr-1 text-[10px] text-theme-muted">(ساعتی)</span>}</td>
-                    <td className="px-2 text-theme-muted whitespace-nowrap">{r.department || "—"}</td>
-                    <td className="px-2 text-center">{r.score == null ? <span className="text-theme-muted text-xs" title={r.note || ""}>بدون امتیاز</span> : <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-semibold ${GRADE[r.grade].cls}`}>{faNum(Math.round(r.score))} · {GRADE[r.grade].label}</span>}</td>
-                    {base.map(i => <td key={i.key} className="px-2"><Bar v={r.items?.[i.key]?.value ?? null} g={g} /></td>)}
-                    <td className="px-2 text-center text-green-600 text-xs" dir="ltr">{signed(r.bonus, "+")}</td>
-                    <td className="px-2 text-center text-red-600 text-xs" dir="ltr">{signed(r.penalty, "−")}</td>
+                  <tr key={r.userId} onClick={() => setDetail(r)} className="border-b border-theme/50 last:border-b-0 hover:bg-theme-hover cursor-pointer">
+                    <td className="py-2.5 text-center">
+                      {r.rank == null ? <span className="text-theme-muted">—</span> : <span className={`inline-flex w-7 h-7 items-center justify-center rounded-full text-xs font-bold ${r.rank === 1 ? "bg-amber-400/25 text-amber-600" : r.rank === 2 ? "bg-slate-400/25 text-slate-500" : r.rank === 3 ? "bg-orange-400/25 text-orange-600" : "text-theme-muted"}`}>{faNum(r.rank)}</span>}
+                    </td>
+                    <td className="px-2 py-2.5"><div className="font-medium text-theme-primary leading-tight">{r.name}{r.employeeType === "HOURLY" && <span className="mr-1 text-[10px] font-normal text-theme-muted">(ساعتی)</span>}</div><div className="text-[11px] text-theme-muted leading-tight mt-0.5">{r.department || "بدون دپارتمان"}</div></td>
+                    <td className="px-1.5 py-2.5 text-center">
+                      {r.score == null
+                        ? <span title={r.note || ""} className="inline-block text-[11px] px-2 py-1.5 rounded-lg bg-theme-secondary text-theme-muted whitespace-nowrap">بدون امتیاز</span>
+                        : <span className={`inline-flex flex-col items-center min-w-16 rounded-xl px-2.5 py-1.5 ${GRADE[r.grade].cls}`}><span className="text-lg font-extrabold leading-none">{faNum(Math.round(r.score))}</span><span className="text-[10px] mt-1 whitespace-nowrap">{GRADE[r.grade].label}</span></span>}
+                    </td>
+                    {base.map(i => <td key={i.key} className="px-1.5 py-2.5 text-center"><Chip v={r.items?.[i.key]?.value ?? null} g={g} /></td>)}
+                    <td className="px-1.5 py-2.5 text-center text-green-600 text-xs font-semibold" dir="ltr">{signed(r.bonus, "+")}</td>
+                    <td className="px-1.5 py-2.5 text-center text-red-600 text-xs font-semibold" dir="ltr">{signed(r.penalty, "−")}</td>
                   </tr>
                 ))}
               </tbody>
