@@ -30,7 +30,7 @@ function isRoleAllowed(itemRoles: Role[] | undefined, userRole: Role | null): bo
 /**
  * Should this item be shown?
  * - Groups: visible if role matches OR if any child page is explicitly in allowedPages (API grant overrides hard-coded roles)
- * - Leaf items without roles (universal pages like AI workspace, profile) → always visible
+ * - Leaf items without roles → visible when the page is in allowedPages (base pages always are)
  * - Leaf items with roles → visible only if role matches AND page is in allowedPages
  */
 function shouldShow(item: MenuItem, allowedPages: string[] | null, userRole: Role | null): boolean {
@@ -41,7 +41,8 @@ function shouldShow(item: MenuItem, allowedPages: string[] | null, userRole: Rol
     return item.children.some(c => c.page && allowedPages.includes(c.page));
   }
   const hasRoles = item.roles && item.roles.length > 0;
-  if (!hasRoles) return true; // universal — always show
+  // No role restriction: still needs the page in the user's allowed pages (the page itself is gated the same way)
+  if (!hasRoles) return isAllowed(item.page, allowedPages);
   return isRoleAllowed(item.roles, userRole) && isAllowed(item.page, allowedPages);
 }
 
