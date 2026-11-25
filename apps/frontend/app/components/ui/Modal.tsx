@@ -10,7 +10,7 @@ type Props = {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "full";
   footer?: React.ReactNode;
 };
 
@@ -19,6 +19,7 @@ const sizeMap = {
   md: "max-w-md",
   lg: "max-w-lg",
   xl: "max-w-3xl",
+  full: "max-w-7xl",
 };
 
 export default function Modal({ open, onClose, title, subtitle, children, size = "md", footer }: Props) {

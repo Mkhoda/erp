@@ -9,7 +9,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 const ADMIN_ACTOR = { role: 'ADMIN' };
 // Ticket statuses that still need work.
-const OPEN_TICKET = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_USER', 'USER_REPLIED', 'REOPENED'] as const;
+export const OPEN_TICKET = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_USER', 'USER_REPLIED', 'REOPENED'] as const;
 // A query value only if it is one of the enum's members (anything else = not filtered).
 const enumOf = <T extends string>(v: any, e: Record<string, T>): T | undefined => Object.values(e).find((x) => x === v);
 
@@ -65,7 +65,7 @@ export class AnalyticsService {
    * comma separated; the default group also matches people with no group), a department, one person.
    * Returns null when nothing is filtered.
    */
-  private async filteredUserIds(q: any): Promise<Set<string> | null> {
+  async filteredUserIds(q: any): Promise<Set<string> | null> {
     const scheduleIds = String(q?.scheduleIds || '').split(',').filter(Boolean);
     const departmentId = q?.departmentId || null;
     const userId = q?.userId || null;
@@ -339,8 +339,10 @@ export class AnalyticsService {
       users.set(r.userId, u);
     }
 
-    // Logged time by category over the period.
-    const byTask = await this.prisma.workTaskEntry.groupBy({ by: ['taskId'], where: { gregDate: { gte: p.start, lte: to }, ...(only ? { userId: { in: [...only] } } : {}) }, _sum: { minutes: true } });
+    // Logged time by category over the period (never from before the work log started).
+    const wlStart = await this.workLogs.startDate();
+    const since = wlStart && wlStart > p.start ? wlStart : p.start;
+    const byTask = await this.prisma.workTaskEntry.groupBy({ by: ['taskId'], where: { gregDate: { gte: since, lte: to }, ...(only ? { userId: { in: [...only] } } : {}) }, _sum: { minutes: true } });
     const tasks = byTask.length ? await this.prisma.workTask.findMany({ where: { id: { in: byTask.map((t) => t.taskId) } }, select: { id: true, category: { select: { name: true, color: true } } } }) : [];
     const taskCat = new Map(tasks.map((t) => [t.id, t.category]));
     const cats = new Map<string, { name: string; color: string | null; minutes: number }>();

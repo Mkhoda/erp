@@ -5,11 +5,12 @@ import {
   toFa, faNum, hrs, fmtH, money, pct, faDay, useChartTheme, Tile, ChartCard, TooltipBox, HBars, DailyStack, DailyLines,
 } from "../../components/charts/ChartKit";
 import {
-  PieChart, Loader2, Users, Fingerprint, Boxes, ListTodo, Ticket, Activity, RefreshCw,
+  PieChart, Loader2, Users, TableProperties, Fingerprint, Boxes, ListTodo, Ticket, Activity, RefreshCw,
 } from "lucide-react";
 import { pageTitle } from "../../../lib/branding";
 import DateRangeFilter, { presetRange, type DateRange } from "../../components/ui/DateRangeFilter";
 import SearchSelect from "../../components/ui/SearchSelect";
+import AnalyticsDetails, { type Section } from "../../components/analytics/AnalyticsDetails";
 import { parseIso } from "../../components/ui/jalali-calendar";
 import { readError } from "../../../lib/http";
 
@@ -38,6 +39,8 @@ const TABS: Array<{ k: TabKey; label: string; icon: any; path: string; filters: 
   { k: "tickets", label: "تیکت‌ها", icon: Ticket, path: "tickets", filters: ["departmentId", "assigneeId", "priority", "status"] },
   { k: "system", label: "کاربران و سامانه", icon: Users, path: "system", filters: ["departmentId"] },
 ];
+// The drill-down behind each tab.
+const DETAILS: Record<TabKey, Section> = { overview: "users", attendance: "attendance", assets: "assets", worklog: "worklog", tickets: "tickets", system: "users" };
 const DEFAULT_RANGE: Record<TabKey, string> = { overview: "month", attendance: "month", assets: "all", worklog: "month", tickets: "30d", system: "30d" };
 
 export default function AnalyticsPage() {
@@ -52,6 +55,7 @@ export default function AnalyticsPage() {
   const [error, setError] = React.useState("");
   const cur = TABS.find(t => t.k === tab)!;
   const curRange = tab === "assets" ? assetRange : range ?? presetRange(DEFAULT_RANGE[tab]);
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
   const set = (k: string, v: string) => setFilters(f => ({ ...f, [k]: v }));
   const groupIds = (filters.scheduleIds || "").split(",").filter(Boolean);
 
@@ -128,6 +132,7 @@ export default function AnalyticsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <DateRangeFilter value={curRange} onChange={tab === "assets" ? setAssetRange : setRange} allowAll={cur.allowAll} />
           {tab === "assets" && <span className="text-[11px] text-theme-muted">بر اساس تاریخ ثبت دارایی</span>}
+          <button onClick={() => setDetailsOpen(true)} className="mr-auto flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><TableProperties className="w-4 h-4" /> جزئیات ریز و ردگیری</button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {sel("departmentId", "همه دپارتمان‌ها", named(departments))}
@@ -152,6 +157,9 @@ export default function AnalyticsPage() {
           {active && <button onClick={() => { setFilters({}); if (tab === "assets") setAssetRange({ from: "", to: "" }); else setRange(null); }} className="text-xs text-red-600 hover:underline">حذف فیلترها</button>}
         </div>
       </div>
+
+      <AnalyticsDetails open={detailsOpen} onClose={() => setDetailsOpen(false)} section={DETAILS[tab]}
+        base={{ ...Object.fromEntries(cur.filters.filter(k => filters[k]).map(k => [k, filters[k]])), from: curRange.from, to: curRange.to }} />
 
       {error && <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
       {!d ? (

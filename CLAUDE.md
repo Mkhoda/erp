@@ -34,9 +34,9 @@ docker-compose.prod.yml     ← production stack
 - **messaging/** — Socket.IO gateway + REST: conversations, messages, reactions, presence, file upload, admin settings
 - **attendance/** — Full workforce management: raw punches, computed days, requests/approvals, work schedules, holidays, overrides
 - **todos/** — Per-user todo list (dashboard widget)
-- **performance/** — امتیاز عملکرد: monthly 0-100 score per person from work reports, punctuality, attendance, department ticket SLA (team-wide penalty for everyone with queue access) and logged-time coverage; weights in `PerformanceSettings`
-- **analytics/** — read-only org-wide aggregates for `/dashboard/analytics`, gated by `@PageAccess` on that page
-- **work-log/** — ثبت عملکرد: categories/tasks (global, admin-assigned per user with deadline, or personal), per-user completion, daily time entries capped by attendance worked time, daily report with late flag; only the current Jalali month is writable and days off / leave without a punch are blocked; ADMIN can log/edit time for users on any past day (never late) and waive lateness per user-day (`WorkLogLateWaiver`). `WorkLogSettings` singleton (late grace, cap toggle)
+- **performance/** — امتیاز عملکرد: 0-100 score per person for any from/to range = weighted base of `score` indicators + capped bonuses − capped penalties. The indicator catalog is `indicators.ts` (add an entry + its evaluation in `performance.service.ts`); switches/weights/points/caps/thresholds live in `PerformanceSettings.config` and are edited in `/dashboard/performance/settings` (ADMIN, with live preview)
+- **analytics/** — read-only org-wide aggregates for `/dashboard/analytics` plus row-level drill-down (`details/*`, view only; report/ticket text is ADMIN-only), gated by `@PageAccess` on that page
+- **work-log/** — ثبت عملکرد: categories/tasks (global, admin-assigned per user with deadline, or personal), per-user completion, daily time entries capped by attendance worked time, daily report with late flag; only the current Jalali month is writable and days off / leave without a punch are blocked; ADMIN can log/edit time for users on any past day (never late) and waive lateness per user-day (`WorkLogLateWaiver`). `WorkLogSettings` singleton (late grace, cap toggle, `startDate` = first work date: nothing earlier is required, writable or counted)
 - **ai-settings/** / **chat-history/** / **quota/** — AI chat integration
 - **request-logs/** / **system-logs** — Audit/log infrastructure
 
@@ -75,7 +75,8 @@ docker-compose.prod.yml     ← production stack
 | `/dashboard/attendance/sync` | Sync monitor | Admin |
 | `/dashboard/work-log/my` | My daily tasks, time and work report | All |
 | `/dashboard/work-log/reports` | Users' work reports, catalog (categories/tasks), settings | Restricted |
-| `/dashboard/performance` | Performance score ranking + weights (admin) | ADMIN; grantable |
+| `/dashboard/performance` | Performance score ranking (any date range) | ADMIN; grantable |
+| `/dashboard/performance/settings` | Score indicators panel: on/off, weights, points, caps, thresholds, live preview | Admin |
 | `/dashboard/departments` | Department tree, drag & drop members (move / Ctrl = add), per-department member role, primary department | Admin |
 | `/print/work-log` | Printable per-person work-log report (outside the dashboard layout; browser "Save as PDF") | via work-log reports page |
 | `/dashboard/analytics` | Admin metrics dashboard (tabs: overview, attendance, assets, work log, tickets, system) | ADMIN; grantable per dept/role or per person |
