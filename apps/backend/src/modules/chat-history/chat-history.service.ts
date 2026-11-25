@@ -1,18 +1,26 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiSettingsService } from '../ai-settings/ai-settings.service';
+import { AiStreamService, Caps, ChatMsg, Part } from '../ai-settings/ai-stream.service';
+import { ChatFilesService } from './files/files.service';
 
 const AUTO_EXTRACT_THRESHOLD = 12;  // extract memories when messages reach this
 const RECENT_WINDOW = 30;           // most recent messages sent verbatim with every request
 const HISTORY_CHAR_BUDGET = 24000;  // …but never more than this many characters of them
 const SUMMARY_EVERY = 10;           // refresh the summary of older turns every N new messages
 const ERROR_PREFIX = '⚠️ خطا در دریافت پاسخ'; // failed replies are stored for display but never fed back to the model
+const MEDIA_TURNS = 2;                        // media (images, PDFs, audio, video) of the last N user turns go to the model; older ones become a note
+const MEDIA_BYTES_BUDGET = 40 * 1024 * 1024;  // …and never more than this many bytes of it per request
+const FILE_TEXT_BUDGET = 150_000;             // characters of extracted file text per request
+const catFa: Record<string, string> = { image: 'تصویر', document: 'سند', text: 'فایل متنی', audio: 'صدا', video: 'ویدیو' };
 
 @Injectable()
 export class ChatHistoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiSettingsService,
+    private readonly streamSvc: AiStreamService,
+    private readonly files: ChatFilesService,
   ) {}
 
   // ── Conversations ────────────────────────────────────────────
@@ -33,11 +41,11 @@ export class ChatHistoryService {
   async getConversation(userId: string, id: string) {
     const conv = await this.prisma.conversation.findUnique({
       where: { id },
-      include: { messages: { orderBy: { createdAt: 'asc' } } },
+      include: { messages: { orderBy: { createdAt: 'asc' }, include: { attachments: { orderBy: { createdAt: 'asc' } } } } },
     });
     if (!conv) throw new NotFoundException('Conversation not found');
     if (conv.userId !== userId) throw new ForbiddenException();
-    return conv;
+    return { ...conv, messages: conv.messages.map(({ attachments, ...m }) => ({ ...m, attachments: attachments.map((a) => this.files.view(a)) })) };
   }
 
   async createConversation(userId: string, provider: string, model?: string) {
@@ -53,6 +61,7 @@ export class ChatHistoryService {
     const conv = await this.prisma.conversation.findUnique({ where: { id } });
     if (!conv) throw new NotFoundException();
     if (conv.userId !== userId) throw new ForbiddenException();
+    await this.files.unlinkForConversation(id);
     await this.prisma.conversation.delete({ where: { id } });
     return { ok: true };
   }
@@ -276,10 +285,10 @@ ${text.substring(0, 3000)}`,
   }
 
   /**
-   * [system prompt, …recent turns verbatim, new user message]. Older turns that
-   * don't fit the window are represented by `conv.summary`.
+   * The system prompt (memories, summary of old turns) and the most recent turns verbatim, newest-first
+   * within the window / character budget. Older turns that don't fit are represented by `conv.summary`.
    */
-  private async buildHistory(userId: string, conv: any, newUserMessage: string) {
+  private async historyParts(userId: string, conv: any, messages: any[]) {
     const [memories, user, settings] = await Promise.all([
       this.prisma.userMemory.findMany({
         where: { userId },
@@ -296,7 +305,8 @@ ${text.substring(0, 3000)}`,
     const system: string[] = [
       `تو دستیار هوشمند سامانه ${org ? `«${org}»` : 'سازمان'} هستی و با ${user ? `${user.firstName} ${user.lastName}`.trim() : 'کاربر'} گفتگو می‌کنی.`,
       'این یک گفتگوی پیوسته است: پیام‌های قبلی همین گفتگو را به خاطر داشته باش و در پاسخ‌ها از آن‌ها استفاده کن. اگر کاربر به چیزی که قبلاً گفته اشاره کرد، از تاریخچه گفتگو استفاده کن.',
-      'به زبان خود کاربر پاسخ بده (پیش‌فرض فارسی).',
+      'اگر کاربر تصویر، سند یا فایلی فرستاد، آن را با دقت بررسی کن و بر اساس محتوای واقعی آن پاسخ بده؛ اگر چیزی در فایل نامشخص یا ناخوانا بود، همین را صادقانه بگو.',
+      'به زبان خود کاربر پاسخ بده (پیش‌فرض فارسی). پاسخ‌ها را با Markdown خوانا و مرتب بنویس (عنوان، فهرست، جدول و بلوک کد در صورت نیاز).',
       `تاریخ امروز: ${today}`,
     ];
     if (memories.length > 0) {
@@ -306,21 +316,170 @@ ${text.substring(0, 3000)}`,
       system.push(`خلاصه بخش‌های قدیمی‌تر همین گفتگو (پیام‌هایی که در ادامه نیامده‌اند):\n${conv.summary}`);
     }
 
-    // Most recent turns verbatim, newest first until the window/character budget is used
-    const usable = (conv.messages as Array<{ role: string; content: string }>).filter(m => !this.isErrorReply(m));
-    const recent: Array<{ role: string; content: string }> = [];
+    const usable = messages.filter(m => !this.isErrorReply(m));
+    const recent: any[] = [];
     let budget = HISTORY_CHAR_BUDGET;
     for (let i = usable.length - 1; i >= 0 && recent.length < RECENT_WINDOW; i--) {
       const len = usable[i].content.length;
       if (len > budget && recent.length > 0) break;
-      recent.unshift({ role: usable[i].role, content: usable[i].content.substring(0, Math.max(budget, 2000)) });
+      recent.unshift(usable[i]);
       budget -= len;
     }
+    return { system: system.join('\n\n'), recent, budget };
+  }
 
+  /** [system prompt, …recent turns verbatim, new user message] — plain text (the non-streaming path). */
+  private async buildHistory(userId: string, conv: any, newUserMessage: string) {
+    const h = await this.historyParts(userId, conv, conv.messages);
     return [
-      { role: 'system', content: system.join('\n\n') },
-      ...recent,
+      { role: 'system', content: h.system },
+      ...h.recent.map((m) => ({ role: m.role, content: String(m.content).substring(0, Math.max(h.budget, 2000)) })),
       { role: 'user', content: newUserMessage },
     ];
   }
+
+  // ── Streaming + attachments ───────────────────────────────────
+
+  /** A model-ready user turn: its text, the text of attached documents, and (when allowed) the media itself. */
+  private async userTurn(content: string, atts: any[], caps: Caps, media: boolean, state: { bytes: number; chars: number }): Promise<string | Part[]> {
+    const blocks: string[] = [];
+    const parts: Part[] = [];
+    const notes: string[] = [];
+    for (const a of atts) {
+      if (a.extractedText) {
+        const room = Math.max(0, FILE_TEXT_BUDGET - state.chars);
+        const text = String(a.extractedText).slice(0, room);
+        state.chars += text.length;
+        blocks.push(`[محتوای فایل «${a.name}»${text.length < a.extractedText.length ? ' — بریده‌شده' : ''}]\n${text}\n[پایان فایل]`);
+        continue;
+      }
+      const ok = media && state.bytes + a.sizeBytes <= MEDIA_BYTES_BUDGET
+        && ((a.category === 'image' && caps.image) || (a.category === 'audio' && caps.audio) || (a.category === 'video' && caps.video) || (a.category === 'document' && caps.file));
+      if (!ok) { notes.push(`[پیوست قبلی: ${catFa[a.category] || 'فایل'} «${a.name}»]`); continue; }
+      const b64 = await this.files.base64(a);
+      state.bytes += a.sizeBytes;
+      const ext = a.storageKey.split('.').pop() || '';
+      if (a.category === 'image') parts.push({ type: 'image_url', image_url: { url: `data:${a.mime};base64,${b64}` } });
+      else if (a.category === 'audio') parts.push({ type: 'input_audio', input_audio: { data: b64, format: ext } });
+      else if (a.category === 'video') parts.push({ type: 'video_url', video_url: { url: `data:${a.mime};base64,${b64}` } });
+      else parts.push({ type: 'file', file: { filename: a.name, file_data: `data:${a.mime};base64,${b64}` } });
+    }
+    const text = [content, ...blocks, ...notes].filter(Boolean).join('\n\n') || 'این فایل‌ها را بررسی کن.';
+    return parts.length ? [{ type: 'text', text }, ...parts] : text;
+  }
+
+  private checkAttachments(atts: any[], caps: Caps, providerName: string) {
+    for (const a of atts) {
+      if (a.extractedText) continue; // text-like files are plain text to every model
+      const need = a.category === 'image' ? caps.image : a.category === 'audio' ? caps.audio : a.category === 'video' ? caps.video : caps.file;
+      if (!need) throw new BadRequestException(`مدل «${providerName}» از ${catFa[a.category] || 'این نوع فایل'} پشتیبانی نمی‌کند. مدل دیگری انتخاب کنید یا فایل را بردارید.`);
+    }
+  }
+
+  /**
+   * Validates a streaming request and stores the user's message — everything that can fail with a
+   * normal HTTP error happens here, before the event stream opens.
+   */
+  async beginStream(userId: string, conversationId: string, body: { content?: string; attachmentIds?: string[]; safeMode?: boolean; providerId?: string; regenerate?: boolean; reasoning?: boolean }) {
+    const conv: any = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { messages: { orderBy: { createdAt: 'asc' }, include: { attachments: true } } },
+    });
+    if (!conv) throw new NotFoundException();
+    if (conv.userId !== userId) throw new ForbiddenException();
+
+    if (body.providerId && body.providerId !== conv.provider) {
+      const p = await this.prisma.aiProvider.findUnique({ where: { id: body.providerId }, select: { id: true, model: true } });
+      if (p) { conv.provider = p.id; await this.prisma.conversation.update({ where: { id: conversationId }, data: { provider: p.id, model: p.model } }); }
+    }
+    const provider = await this.streamSvc.prepare(userId, conv.provider);
+    const caps = await this.streamSvc.capabilities(provider);
+    const policy = await this.files.policy();
+
+    let userMsg: any, history: any[];
+    if (body.regenerate) {
+      const msgs = [...conv.messages];
+      if (msgs.length && msgs[msgs.length - 1].role === 'assistant') {
+        await this.prisma.conversationMessage.delete({ where: { id: msgs.pop().id } });
+      }
+      userMsg = msgs[msgs.length - 1];
+      if (!userMsg || userMsg.role !== 'user') throw new BadRequestException('پیامی برای تولید دوباره وجود ندارد');
+      history = msgs.slice(0, -1);
+    } else {
+      const content = (body.content || '').trim();
+      const ids = Array.from(new Set(body.attachmentIds || []));
+      if (ids.length > policy.maxFilesPerMessage) throw new BadRequestException(`حداکثر ${policy.maxFilesPerMessage} فایل در هر پیام مجاز است`);
+      if (!content && !ids.length) throw new BadRequestException('متن پیام خالی است');
+      const atts = ids.length ? await this.prisma.conversationAttachment.findMany({ where: { id: { in: ids }, userId, messageId: null } }) : [];
+      if (atts.length !== ids.length) throw new BadRequestException('یکی از فایل‌ها یافت نشد یا قبلاً استفاده شده است');
+      this.checkAttachments(atts, caps, provider.name);
+      userMsg = await this.prisma.conversationMessage.create({ data: { conversationId, role: 'user', content } });
+      if (atts.length) await this.prisma.conversationAttachment.updateMany({ where: { id: { in: ids } }, data: { messageId: userMsg.id } });
+      userMsg.attachments = atts;
+      history = conv.messages;
+    }
+
+    // Build the model messages: system + recent turns (media only for the last few user turns) + this turn.
+    const h = await this.historyParts(userId, conv, history);
+    const userTurns = h.recent.filter((m: any) => m.role === 'user' && m.attachments?.length).slice(-(MEDIA_TURNS - 1)).map((m: any) => m.id);
+    const state = { bytes: 0, chars: 0 };
+    const current = await this.userTurn(userMsg.content, userMsg.attachments || [], caps, true, state);
+    const recent: ChatMsg[] = [];
+    for (const m of h.recent as any[]) {
+      recent.push({ role: m.role, content: m.role === 'user' && m.attachments?.length ? await this.userTurn(m.content, m.attachments, caps, userTurns.includes(m.id), state) : String(m.content).substring(0, Math.max(h.budget, 2000)) });
+    }
+    const messages: ChatMsg[] = [{ role: 'system', content: h.system }, ...recent, { role: 'user', content: current }];
+
+    return {
+      conv, provider, caps, messages, safeMode: body.safeMode ?? false, reasoning: !!body.reasoning && caps.reasoning,
+      userMsg: body.regenerate ? null : { id: userMsg.id, role: 'user', content: userMsg.content, createdAt: userMsg.createdAt, attachments: (userMsg.attachments || []).map((a: any) => this.files.view(a)) },
+      prompt: userMsg.content || (userMsg.attachments?.[0]?.name ?? ''), isFirst: conv.messages.length === 0, total: conv.messages.length + 2,
+    };
+  }
+
+  /** Runs the model, forwarding text and thinking through `emit`, then stores the reply. Never throws. */
+  async runStream(ctx: Awaited<ReturnType<ChatHistoryService['beginStream']>>, userId: string, emit: (event: string, data: any) => void, signal: AbortSignal) {
+    const { conv, provider, messages } = ctx;
+    const started = Date.now();
+    let content = '', reasoning = '', usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, stopped = false, errorMsg: string | undefined;
+    try {
+      if (ctx.caps.stream) {
+        const r = await this.streamSvc.stream(provider, messages, {
+          safeMode: ctx.safeMode, reasoning: ctx.reasoning, signal,
+          onDelta: (t) => emit('delta', { t }), onReasoning: (t) => emit('reasoning', { t }),
+        });
+        content = r.content; reasoning = r.reasoning; stopped = r.aborted;
+        usage = { promptTokens: r.promptTokens, completionTokens: r.completionTokens, totalTokens: r.totalTokens };
+      } else {
+        // Provider without a streaming dialect (Gemini / Anthropic / Agnes): one round trip, shown as a single chunk.
+        const flat = messages.map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : (m.content.find((p: any) => p.type === 'text') as any)?.text || '' }));
+        const r = await this.ai.chat(userId, provider.id, flat, ctx.safeMode);
+        if (!r.success) throw new Error(r.errorMsg || 'خطای ناشناخته');
+        content = r.content; emit('delta', { t: content });
+      }
+      if (!content.trim() && !stopped) throw new Error('پاسخی از مدل دریافت نشد');
+    } catch (e: any) {
+      errorMsg = e?.message || 'خطای ناشناخته';
+      this.logStreamError(provider, e);
+    }
+    const latencyMs = Date.now() - started;
+    if (ctx.caps.stream) await this.streamSvc.record(userId, provider, ctx.prompt, usage, latencyMs, !errorMsg, errorMsg);
+
+    const failed = !!errorMsg;
+    const reply = failed ? `${ERROR_PREFIX} از ${provider.name}: ${errorMsg}` : content;
+    const saved = await this.prisma.conversationMessage.create({
+      data: { conversationId: conv.id, role: 'assistant', content: reply, latencyMs, reasoning: failed ? null : reasoning || null, promptTokens: usage.promptTokens || null, completionTokens: usage.completionTokens || null, stopped },
+    });
+    const title = ctx.isFirst ? (ctx.prompt || 'گفتگوی جدید').substring(0, 60).trim() : undefined;
+    await this.prisma.conversation.update({ where: { id: conv.id }, data: { title, updatedAt: new Date() } });
+    if (!failed && !stopped && ctx.total >= AUTO_EXTRACT_THRESHOLD && ctx.total % 10 === 0) this.autoExtractMemories(userId, conv.id).catch(() => {});
+    if (!failed && !stopped && ctx.total > RECENT_WINDOW && ctx.total % SUMMARY_EVERY === 0) this.compactConversation(userId, conv.id).catch(() => {});
+    emit(failed ? 'error' : 'done', { messageId: saved.id, latencyMs, stopped, usage, title: title ?? conv.title, message: failed ? errorMsg : undefined, content: reply });
+    return saved;
+  }
+
+  private logStreamError(provider: any, e: any) {
+    console.error(`[AI Stream ERROR] provider=${provider.name} type=${provider.type} model=${provider.model} msg=${e?.message}`);
+  }
+
 }

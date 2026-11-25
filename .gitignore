@@ -278,3 +278,4 @@ docker-compose.override.yml
 
 # Left by update.sh when a deploy's migrations failed (auto-update retries while present)
 .deploy-failed
+private-uploads/

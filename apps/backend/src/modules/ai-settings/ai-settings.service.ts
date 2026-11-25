@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { QuotaService } from '../quota/quota.service';
+import { AiStreamService } from './ai-stream.service';
 
 const DEFAULT_URLS: Record<string, string> = {
   agnes:      'https://apihub.agnes-ai.com/v1',
@@ -38,6 +39,7 @@ export class AiSettingsService {
     private readonly prisma: PrismaService,
     private readonly http: HttpService,
     private readonly quota: QuotaService,
+    private readonly streamSvc: AiStreamService,
   ) {}
 
   async listAll() {
@@ -125,12 +127,14 @@ export class AiSettingsService {
     }
   }
 
+  /** Active providers for the chat page, each with what its model can take (images, PDFs, audio, video, thinking). */
   async getActiveProviders() {
-    return this.prisma.aiProvider.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, type: true, model: true, isActive: true },
+    const rows = await this.prisma.aiProvider.findMany({
+      where: { isActive: true, type: { not: 'whisper' } },
+      select: { id: true, name: true, type: true, model: true, isActive: true, config: true },
       orderBy: { createdAt: 'asc' },
     });
+    return Promise.all(rows.map(async ({ config, ...p }) => ({ ...p, capabilities: await this.streamSvc.capabilities({ type: p.type, model: p.model, config }) })));
   }
 
   /** Send a chat message — providerId selects the exact configured provider. */

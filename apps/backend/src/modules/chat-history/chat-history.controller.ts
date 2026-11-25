@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { ChatHistoryService } from './chat-history.service';
 
@@ -53,6 +53,36 @@ export class ChatHistoryController {
     @Body() body: { content: string; safeMode?: boolean; providerId?: string },
   ) {
     return this.svc.sendMessage(this.uid(req), id, body.content, body.safeMode ?? false, body.providerId);
+  }
+
+  /**
+   * Streaming reply (Server-Sent Events): `start` (the stored user message), then `reasoning` / `delta`
+   * text chunks as the model produces them, then `done` (or `error`). Closing the connection stops the model.
+   */
+  @Post('conversations/:id/stream')
+  async stream(
+    @Req() req: any,
+    @Res() res: any,
+    @Param('id') id: string,
+    @Body() body: { content?: string; attachmentIds?: string[]; safeMode?: boolean; providerId?: string; regenerate?: boolean; reasoning?: boolean },
+  ) {
+    const userId = this.uid(req);
+    const ctx = await this.svc.beginStream(userId, id, body); // validation errors are ordinary HTTP errors
+    const ctl = new AbortController();
+    res.on('close', () => { if (!res.writableFinished) ctl.abort(); });
+    res.status(200).set({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+    res.flushHeaders?.();
+    const emit = (event: string, data: any) => { if (!res.writableEnded && !res.destroyed) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+    const beat = setInterval(() => { if (!res.writableEnded && !res.destroyed) res.write(': ping\n\n'); }, 15000);
+    try {
+      emit('start', { userMessage: ctx.userMsg, model: ctx.provider.model, provider: ctx.provider.name });
+      await this.svc.runStream(ctx, userId, emit, ctl.signal);
+    } catch (e: any) {
+      emit('error', { message: e?.message || 'خطای ناشناخته' });
+    } finally {
+      clearInterval(beat);
+      if (!res.writableEnded) res.end();
+    }
   }
 
   @Post('conversations/:id/compact')

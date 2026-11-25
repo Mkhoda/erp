@@ -1,16 +1,18 @@
 "use client";
 import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Cpu, BarChart3, Shield } from "lucide-react";
+import { Cpu, BarChart3, Shield, Paperclip } from "lucide-react";
 import { pageTitle } from "../../../lib/branding";
 import SettingsTab from "./SettingsTab";
 import UsageTab from "./UsageTab";
 import QuotaTab from "./QuotaTab";
+import FilesTab from "./FilesTab";
 
 const TABS = [
   { id: "settings", label: "تنظیمات AI", icon: Cpu },
   { id: "usage", label: "مصرف AI", icon: BarChart3 },
   { id: "quota", label: "سقف توکن", icon: Shield },
+  { id: "files", label: "فایل‌های گفتگو", icon: Paperclip },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -49,6 +51,7 @@ function AiHubContent() {
       {tab === "settings" && <SettingsTab />}
       {tab === "usage" && <UsageTab />}
       {tab === "quota" && <QuotaTab />}
+      {tab === "files" && <FilesTab />}
     </div>
   );
 }

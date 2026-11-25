@@ -82,6 +82,7 @@ model User {
   workTaskEntries          WorkTaskEntry[]          @relation("WorkTaskEntryUser")
   dailyWorkReports         DailyWorkReport[]        @relation("DailyWorkReportUser")
   workLogLateWaivers       WorkLogLateWaiver[]      @relation("WorkLogLateWaiverUser")
+  chatAttachments          ConversationAttachment[] @relation("ChatAttachmentUser")
   pagePermissions          UserPagePermission[]     @relation("UserPagePermissionUser")
   pagePermissionsGranted   UserPagePermission[]     @relation("UserPagePermissionGrantor")
   shiftDays                AttendanceShiftDay[]     @relation("ShiftDayUser")
@@ -377,15 +378,50 @@ model Conversation {
 }
 
 model ConversationMessage {
-  id             String       @id @default(cuid())
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role           String // "user" | "assistant"
-  content        String
-  latencyMs      Int?
-  createdAt      DateTime     @default(now())
+  id               String                   @id @default(cuid())
+  conversationId   String
+  conversation     Conversation             @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role             String // "user" | "assistant"
+  content          String
+  latencyMs        Int?
+  reasoning        String?                  @db.Text // the model's visible thinking (when it streams one)
+  promptTokens     Int?
+  completionTokens Int?
+  stopped          Boolean                  @default(false) // the user stopped generation; content is what had arrived
+  attachments      ConversationAttachment[]
+  createdAt        DateTime                 @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+// A file sent in the AI chat. Stored outside the public uploads dir (private-uploads/ai-chat) and only
+// served through short-lived signed URLs; every file is validated (content sniffing, size, policy) first.
+model ConversationAttachment {
+  id            String               @id @default(cuid())
+  userId        String
+  user          User                 @relation("ChatAttachmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  messageId     String? // null until the message that carries it is sent
+  message       ConversationMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  name          String
+  mime          String
+  category      String // image | document | text | audio | video
+  sizeBytes     Int
+  sha256        String
+  storageKey    String
+  width         Int?
+  height        Int?
+  extractedText String?              @db.Text // text / docx / xlsx content handed to the model as text
+  createdAt     DateTime             @default(now())
+
+  @@index([userId, createdAt])
+  @@index([messageId])
+}
+
+// Singleton: which files the AI chat accepts (categories, extensions, sizes, daily quota).
+model AiChatSettings {
+  id        String   @id @default("singleton")
+  policy    Json?
+  updatedAt DateTime @updatedAt
 }
 
 // User memory: facts the AI should remember across conversations
@@ -1625,23 +1661,23 @@ model WorkTaskAdoption {
 
 // Time spent on a task on one work day. A task can collect entries over many days.
 model WorkTaskEntry {
-  id        String   @id @default(cuid())
-  taskId    String
-  task      WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation("WorkTaskEntryUser", fields: [userId], references: [id], onDelete: Cascade)
-  gregDate  DateTime
-  jYear     Int
-  jMonth    Int
-  jDay      Int
-  minutes   Int
-  note      String?
-  isLate    Boolean  @default(false) // first saved after the day's deadline (see WorkLogSettings.lateGraceMinutes)
-  lateDays  Int      @default(0)
+  id          String   @id @default(cuid())
+  taskId      String
+  task        WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation("WorkTaskEntryUser", fields: [userId], references: [id], onDelete: Cascade)
+  gregDate    DateTime
+  jYear       Int
+  jMonth      Int
+  jDay        Int
+  minutes     Int
+  note        String?
+  isLate      Boolean  @default(false) // first saved after the day's deadline (see WorkLogSettings.lateGraceMinutes)
+  lateDays    Int      @default(0)
   enteredById String? // admin who logged this on the user's behalf (never late); null = the user
   editedById  String? // admin who last edited it
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([userId, gregDate])
   @@index([taskId])
@@ -1681,12 +1717,12 @@ model DailyWorkReport {
 }
 
 model WorkLogSettings {
-  id                      String   @id @default("singleton")
-  lateGraceMinutes        Int      @default(0) // minutes after the work day's midnight before an entry/report counts as late (0 = midnight)
-  capByAttendance         Boolean  @default(true) // block logging more time than the day's attendance shows
+  id                      String    @id @default("singleton")
+  lateGraceMinutes        Int       @default(0) // minutes after the work day's midnight before an entry/report counts as late (0 = midnight)
+  capByAttendance         Boolean   @default(true) // block logging more time than the day's attendance shows
   startDate               DateTime? // first work date of the work log: earlier days are never required, writable or counted (null = no limit)
-  requireOnNonWorkingDays Boolean  @default(false) // also require a report on weekends/holidays nobody worked
-  updatedAt               DateTime @updatedAt
+  requireOnNonWorkingDays Boolean   @default(false) // also require a report on weekends/holidays nobody worked
+  updatedAt               DateTime  @updatedAt
 }
 
 // Per-person page grant, in addition to department/role PagePermission rows. Grants
