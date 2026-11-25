@@ -756,6 +756,11 @@ function SettingsTab({ h }: { h: any }) {
   return (
     <div className="bg-theme-card border border-theme rounded-xl p-4 space-y-5 max-w-2xl">
       <div>
+        <label className="block mb-1 text-sm font-medium text-theme-primary">تاریخ شروع ثبت عملکرد</label>
+        <div className="w-56"><JalaliDatePicker value={s.startDate ? String(s.startDate).slice(0, 10) : ""} onChange={v => setS((x: any) => ({ ...x, startDate: v || null }))} placeholder="از ابتدا" /></div>
+        <p className="mt-1 text-xs text-theme-muted">روزهای قبل از این تاریخ در هیچ گزارش، آمار و امتیازی نمی‌آیند و قابل ثبت نیستند؛ اطلاعات قبلی پاک نمی‌شود و با خالی‌کردن تاریخ دوباره دیده می‌شود.</p>
+      </div>
+      <div>
         <label className="block mb-1 text-sm font-medium text-theme-primary">مهلت ثبت بدون تأخیر (دقیقه پس از نیمه‌شب)</label>
         <input type="number" min={0} dir="ltr" value={s.lateGraceMinutes} onChange={e => setS((x: any) => ({ ...x, lateGraceMinutes: e.target.value }))} className="input-theme text-sm w-40" />
         <p className="mt-1 text-xs text-theme-muted">

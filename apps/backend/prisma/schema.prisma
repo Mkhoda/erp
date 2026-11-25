@@ -1684,6 +1684,7 @@ model WorkLogSettings {
   id                      String   @id @default("singleton")
   lateGraceMinutes        Int      @default(0) // minutes after the work day's midnight before an entry/report counts as late (0 = midnight)
   capByAttendance         Boolean  @default(true) // block logging more time than the day's attendance shows
+  startDate               DateTime? // first work date of the work log: earlier days are never required, writable or counted (null = no limit)
   requireOnNonWorkingDays Boolean  @default(false) // also require a report on weekends/holidays nobody worked
   updatedAt               DateTime @updatedAt
 }
@@ -1749,6 +1750,7 @@ model IgnoredAttendanceCard {
 // no data for are skipped and the remaining weights rescaled.
 model PerformanceSettings {
   id        String   @id @default("singleton")
+  config    Json? // indicator switches, weights, points, caps, thresholds (see performance/indicators.ts); null = defaults
   weights   Json     @default("{\"report\":25,\"punctuality\":25,\"attendance\":20,\"tickets\":20,\"coverage\":10}")
   updatedAt DateTime @updatedAt
 }
