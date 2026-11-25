@@ -72,7 +72,8 @@ export class PerformanceService {
     const next = this.checked(dto?.config);
     const [cur, res] = await Promise.all([this.evaluate(actor, dto, (await this.getSettings()).config), this.evaluate(actor, dto, next)]);
     const now = new Map(cur.rows.map((r) => [r.userId, r]));
-    return { from: res.from, to: res.to, rows: res.rows.map((r) => ({ userId: r.userId, name: r.name, department: r.department, score: r.score, grade: r.grade, rank: r.rank, currentScore: now.get(r.userId)?.score ?? null, currentRank: now.get(r.userId)?.rank ?? null })) };
+    // The new config's full breakdown (indicators, stats, per-person items) next to each person's current score.
+    return { ...res, rows: res.rows.map((r) => ({ ...r, currentScore: now.get(r.userId)?.score ?? null, currentRank: now.get(r.userId)?.rank ?? null, currentGrade: now.get(r.userId)?.grade ?? null })) };
   }
 
   private async evaluate(actor: Actor, q: any, config: ScoreConfig) {
@@ -84,7 +85,7 @@ export class PerformanceService {
       from: isoDate(start), to: isoDate(to), general: config.general,
       indicators: on.map((d) => ({ key: d.key, kind: d.kind, group: d.group, label: d.label, description: d.description, unit: d.unit ?? null, weight: config.indicators[d.key].weight, points: config.indicators[d.key].points, cap: config.indicators[d.key].cap })),
     };
-    if (to < start) return { ...head, rows: [] };
+    if (to < start) return { ...head, people: 0, stats: {}, rows: [] };
 
     // ── who ──
     const scope = await this.scopeOf(actor);
@@ -109,7 +110,7 @@ export class PerformanceService {
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
-    if (!users.length) return { ...head, rows: [] };
+    if (!users.length) return { ...head, people: 0, stats: {}, rows: [] };
     const ids = users.map((u) => u.id);
     const range = { gte: start, lte: to };
     const instants = { gte: tehranMidnightInstant(start), lt: tehranMidnightInstant(new Date(to.getTime() + DAY_MS)) };
@@ -122,7 +123,7 @@ export class PerformanceService {
       this.workLog.adminDays({ role: 'ADMIN' }, { from: isoDate(start), to: isoDate(to) }, MAX_REPORT_DAYS),
       this.prisma.attendanceDay.findMany({
         where: { userId: { in: ids }, gregDate: range },
-        select: { userId: true, gregDate: true, status: true, delayMinutes: true, earlyLeaveMinutes: true, workedMinutes: true, overtimeMinutes: true, holidayOvertimeMinutes: true, deficitMinutes: true },
+        select: { userId: true, gregDate: true, status: true, delayMinutes: true, earlyLeaveMinutes: true, workedMinutes: true, overtimeMinutes: true, holidayOvertimeMinutes: true, deficitMinutes: true, leaveMinutes: true, sickLeaveMinutes: true },
       }),
       this.prisma.workTaskEntry.groupBy({ by: ['userId'], where: { userId: { in: ids }, gregDate: { gte: wlFrom, lte: to } }, _sum: { minutes: true } }),
       this.prisma.ticket.findMany({
@@ -183,6 +184,12 @@ export class PerformanceService {
       const present = ds.filter((d) => PRESENT.has(d.status));
       const workingDays = ds.filter((d) => !NON_WORKING.has(d.status)).length;
       const absent = ds.filter((d) => d.status === 'ABSENT').length;
+      // Leave taken, in days: whole days by status, partial days by hourly leave (sick leave may count less).
+      const sickShare = (P('attendance').sick ?? 100) / 100, dayMin = P('attendance').dayMinutes || 480;
+      const leaveDays = ds.filter((d) => !NON_WORKING.has(d.status)).reduce((s, d) => {
+        const whole = d.status === 'LEAVE' ? 1 : d.status === 'SICK_LEAVE' ? sickShare : 0;
+        return s + (whole || Math.min(1, (d.leaveMinutes + d.sickLeaveMinutes * sickShare) / dayMin));
+      }, 0);
       const sum = (f: (d: (typeof ds)[number]) => number) => ds.reduce((s, d) => s + f(d), 0);
       const delay = sum((d) => d.delayMinutes), early = sum((d) => d.earlyLeaveMinutes), deficit = sum((d) => d.deficitMinutes);
       const overtime = sum((d) => d.overtimeMinutes), holiday = sum((d) => d.holidayOvertimeMinutes);
@@ -236,7 +243,7 @@ export class PerformanceService {
         coverage: () => { const v = pct(loggedMin, wlWorked); return score(v == null ? null : Math.min(100, (v / target) * 100), `${hm(loggedMin)} ثبت‌شده از ${hm(wlWorked)} کارکرد`); },
         taskDeadline: () => score(pct(onTime + (lateDone * (P('taskDeadline').lateCredit ?? 50)) / 100, due), due ? `${fa(onTime)} به‌موقع، ${fa(lateDone)} با تأخیر و ${fa(openTasks)} انجام‌نشده از ${fa(due)} وظیفه` : 'وظیفه‌ی سررسیدشده ندارد'),
         punctuality: () => (hourly ? score(null, 'کارمند ساعتی: محاسبه نمی‌شود') : score(pct(punctual, present.length), `${fa(punctual)} روز وقت‌شناس از ${fa(present.length)} روز حضور`)),
-        attendance: () => score(u.attendanceCardNo ? pct(workingDays - absent, workingDays) : null, u.attendanceCardNo ? `${fa(absent)} روز غیبت از ${fa(workingDays)} روز کاری` : 'کارت حضور ندارد'),
+        attendance: () => score(u.attendanceCardNo ? pct(Math.max(0, workingDays - leaveDays - absent), workingDays) : null, u.attendanceCardNo ? `${fa(r1(leaveDays))} روز مرخصی${absent ? ` و ${fa(absent)} روز غیبت` : ''} از ${fa(workingDays)} روز کاری` : 'کارت حضور ندارد'),
         workHours: () => (hourly ? score(null, 'کارمند ساعتی: محاسبه نمی‌شود') : score(pct(regular, regular + deficit), `${hm(deficit)} کسری از ${hm(regular + deficit)} ساعت موظفی`)),
         tickets: () => score(pct(tTotal - tLate, tTotal), tTotal ? `${fa(tLate)} تیکت با تأخیر از ${fa(tTotal)} تیکت در ${fa(queues.size)} کارتابل` : 'تیکتی در کارتابل‌های فرد ثبت نشده'),
         ticketResolve: () => score(pct(resolvedOk, resolvedMine.length + overdueMine), resolvedMine.length + overdueMine ? `${fa(resolvedOk)} حل به‌موقع از ${fa(resolvedMine.length + overdueMine)} تیکت` : 'تیکت شخصی ندارد'),
@@ -263,11 +270,11 @@ export class PerformanceService {
       };
 
       const items: Record<string, Item> = {};
-      let wSum = 0, sumW = 0, bonus = 0, penalty = 0;
+      let wSum = 0, sumW = 0, bonus = 0, penalty = 0, withData = 0;
       for (const d of on) {
         const it = calc[d.key]();
         items[d.key] = it;
-        if (d.kind === 'score') { if (it.value != null) { wSum += config.indicators[d.key].weight; sumW += it.value * config.indicators[d.key].weight; } }
+        if (d.kind === 'score') { if (it.value != null) { withData++; wSum += config.indicators[d.key].weight; sumW += it.value * config.indicators[d.key].weight; } }
         else if (d.kind === 'bonus') bonus += it.points;
         else penalty += it.points;
       }
@@ -275,11 +282,14 @@ export class PerformanceService {
       bonus = Math.min(g.maxBonus, r1(bonus)); penalty = Math.min(g.maxPenalty, r1(penalty));
       const base = wSum ? r1(sumW / wSum) : null;
       const tooFew = g.minWorkingDays > 0 && workingDays < g.minWorkingDays;
-      const total = base == null || tooFew ? null : r1(Math.max(0, Math.min(100, base + bonus - penalty)));
+      // A score built on one or two indicators (a guard with no reports or tickets) says little — it is not shown.
+      const thin = base != null && withData < g.minIndicators;
+      const total = base == null || tooFew || thin ? null : r1(Math.max(0, Math.min(100, base + bonus - penalty)));
       return {
         userId: u.id, name: `${u.firstName} ${u.lastName}`, department: u.department?.name ?? null, employeeType: hourly ? 'HOURLY' : 'FULL_TIME',
         score: total, base, bonus, penalty,
-        note: base == null ? 'داده‌ای برای امتیازدهی ندارد' : tooFew ? `کمتر از ${fa(g.minWorkingDays)} روز کاری` : null,
+        indicatorsWithData: withData,
+        note: base == null ? 'داده‌ای برای امتیازدهی ندارد' : thin ? `داده‌ی ناکافی: فقط ${fa(withData)} شاخص اصلی برای این فرد قابل محاسبه است (حداقل ${fa(g.minIndicators)})` : tooFew ? `کمتر از ${fa(g.minWorkingDays)} روز کاری` : null,
         grade: total == null ? null : total >= g.excellent ? 'EXCELLENT' : total >= g.good ? 'GOOD' : total >= g.fair ? 'FAIR' : 'POOR',
         items,
       };
@@ -287,6 +297,21 @@ export class PerformanceService {
     // Rank by score (people without any score at the end).
     rows.sort((x, y) => (y.score ?? -1) - (x.score ?? -1) || x.name.localeCompare(y.name, 'fa'));
     let rank = 0;
-    return { ...head, rows: rows.map((r) => ({ ...r, rank: r.score == null ? null : ++rank })) };
+    // What each indicator actually did across these people: who it applied to and how it was distributed.
+    const stats: Record<string, { withData?: number; avg?: number | null; hist?: number[]; affected?: number; total?: number }> = {};
+    for (const d of on) {
+      const its = rows.map((r) => r.items[d.key]);
+      if (d.kind === 'score') {
+        const v = its.filter((i) => i.value != null).map((i) => i.value as number);
+        const hist = [0, 0, 0, 0, 0];
+        for (const x of v) hist[Math.min(4, Math.floor(x / 20))]++;
+        stats[d.key] = { withData: v.length, avg: v.length ? r1(v.reduce((s, x) => s + x, 0) / v.length) : null, hist };
+      } else {
+        const pts = its.map((i) => i.points).filter((x) => x > 0);
+        const total = pts.reduce((s, x) => s + x, 0);
+        stats[d.key] = { affected: pts.length, avg: pts.length ? r1(total / pts.length) : 0, total: r1(total) };
+      }
+    }
+    return { ...head, people: rows.length, stats, rows: rows.map((r) => ({ ...r, rank: r.score == null ? null : ++rank })) };
   }
 }

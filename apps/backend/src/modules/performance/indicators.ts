@@ -20,7 +20,8 @@ export const INDICATORS: IndicatorDef[] = [
   { key: 'coverage', kind: 'score', group: 'گزارش کار', label: 'پوشش زمان کار', description: 'زمان ثبت‌شده در «عملکرد من» نسبت به کارکرد حضور. رسیدن به درصد هدف یعنی امتیاز کامل.', enabled: true, weight: 10, params: [p('target', 'درصد هدف', '٪', 100, 10, 100)] },
   { key: 'taskDeadline', kind: 'score', group: 'وظایف', label: 'انجام به‌موقع وظایف مهلت‌دار', description: 'وظایفی که تا مهلتشان انجام شده‌اند، نسبت به وظایف سررسیدشده (شخصی، واگذارشده و عمومیِ مهلت‌دار).', enabled: true, weight: 10, params: [p('lateCredit', 'ارزش انجام با تأخیر', '٪', 50, 0, 100)] },
   { key: 'punctuality', kind: 'score', group: 'حضور', label: 'وقت‌شناسی', description: 'روزهای حضور بدون تاخیر و تعجیل، نسبت به کل روزهای حضور. کارکنان ساعتی محاسبه نمی‌شوند.', enabled: true, weight: 25, params: [p('tolerance', 'تاخیر یا تعجیل قابل چشم‌پوشی در روز', 'دقیقه', 0, 0, 120)] },
-  { key: 'attendance', kind: 'score', group: 'حضور', label: 'حضور بدون غیبت', description: 'روزهای کاری بدون غیبت، نسبت به کل روزهای کاری. مرخصی، ماموریت و دورکاری غیبت نیست.', enabled: true, weight: 20 },
+  // Absence is never recorded as such here: a no-show becomes leave until the balance runs out, so leave is the signal.
+  { key: 'attendance', kind: 'score', group: 'حضور', label: 'حضور بدون مرخصی', description: 'روزهای کاری که فرد مرخصی نداشته و غایب هم نبوده، نسبت به کل روزهای کاری. روز غیبتی که از مانده‌ی مرخصی کم شده مرخصی حساب می‌شود؛ ماموریت و دورکاری مرخصی نیست.', enabled: true, weight: 20, params: [p('sick', 'ارزش مرخصی استعلاجی در کسر', '٪', 100, 0, 100), p('dayMinutes', 'مدت یک روز کاری (برای مرخصی ساعتی)', 'دقیقه', 480, 60, 1440, 10)] },
   { key: 'workHours', kind: 'score', group: 'حضور', label: 'تکمیل ساعت موظفی', description: 'سهمی از ساعت موظفی که بدون کسری کارکرد پر شده است. کارکنان ساعتی محاسبه نمی‌شوند.', enabled: true, weight: 10, overlaps: ['deficitHours'] },
   { key: 'tickets', kind: 'score', group: 'تیکت', label: 'پاسخگویی تیمی تیکت', description: 'تیکت‌های کارتابل دپارتمان‌های فرد که در مهلت SLA پاسخ و حل شده‌اند. تأخیر برای همه‌ی کسانی که به آن کارتابل دسترسی دارند حساب می‌شود.', enabled: true, weight: 20 },
   { key: 'ticketResolve', kind: 'score', group: 'تیکت', label: 'حل به‌موقع تیکت‌های شخصی', description: 'تیکت‌های ارجاع‌شده به خود فرد که تا مهلت حل شده‌اند، نسبت به تیکت‌های حل‌شده یا از مهلت گذشته.', enabled: false, weight: 10, overlaps: ['overdueTicket'] },
@@ -40,7 +41,7 @@ export const INDICATORS: IndicatorDef[] = [
   { key: 'shortReport', kind: 'penalty', group: 'گزارش کار', label: 'گزارش بیش از حد کوتاه', description: 'هر گزارش که متن آن از حداقل تعیین‌شده کوتاه‌تر باشد.', unit: 'گزارش', enabled: false, points: 0.5, cap: 5, params: [p('minChars', 'حداقل طول متن', 'کاراکتر', 30, 5, 1000, 5)] },
   { key: 'lowCoverage', kind: 'penalty', group: 'گزارش کار', label: 'روز با ثبت زمان ناکافی', description: 'هر روزی که زمان ثبت‌شده از درصد تعیین‌شده‌ی کارکرد همان روز کمتر باشد (امروز حساب نمی‌شود).', unit: 'روز', enabled: false, points: 0.5, cap: 10, overlaps: ['coverage'], params: [p('threshold', 'حداقل پوشش روز', '٪', 50, 5, 100)] },
   { key: 'overdueTask', kind: 'penalty', group: 'وظایف', label: 'وظیفه‌ی معوق', description: 'هر وظیفه‌ی مهلت‌دار که مهلتش گذشته و هنوز انجام نشده است.', unit: 'وظیفه', enabled: false, points: 2, cap: 10, overlaps: ['taskDeadline'] },
-  { key: 'absence', kind: 'penalty', group: 'حضور', label: 'غیبت', description: 'هر روز غیبت.', unit: 'روز', enabled: false, points: 2, cap: 15, overlaps: ['attendance'] },
+  { key: 'absence', kind: 'penalty', group: 'حضور', label: 'غیبت واقعی', description: 'هر روز غیبتِ ثبت‌شده؛ یعنی روز بدون حضور که مانده‌ی مرخصی هم برایش نبوده. چون پیش از آن به مرخصی تبدیل می‌شود، نشانه‌ی جدی‌تری است.', unit: 'روز', enabled: true, points: 3, cap: 20 },
   { key: 'delayHours', kind: 'penalty', group: 'حضور', label: 'مجموع تاخیر', description: 'هر ساعت تاخیر، پس از کسر سهمیه‌ی مجاز بازه. کارکنان ساعتی محاسبه نمی‌شوند.', unit: 'ساعت', enabled: false, points: 1, cap: 10, overlaps: ['punctuality'], params: [p('free', 'سهمیه‌ی مجاز در بازه', 'دقیقه', 60, 0, 3000, 10)] },
   { key: 'earlyLeaveHours', kind: 'penalty', group: 'حضور', label: 'مجموع تعجیل', description: 'هر ساعت خروج زودهنگام، پس از کسر سهمیه‌ی مجاز بازه. کارکنان ساعتی محاسبه نمی‌شوند.', unit: 'ساعت', enabled: false, points: 1, cap: 10, overlaps: ['punctuality'], params: [p('free', 'سهمیه‌ی مجاز در بازه', 'دقیقه', 60, 0, 3000, 10)] },
   { key: 'deficitHours', kind: 'penalty', group: 'حضور', label: 'کسری کارکرد', description: 'هر ساعت کسری کارکرد که با مرخصی جبران نشده است.', unit: 'ساعت', enabled: false, points: 1, cap: 10, overlaps: ['workHours'] },
@@ -53,10 +54,10 @@ export const INDICATORS: IndicatorDef[] = [
 export type IndicatorConfig = { enabled: boolean; weight: number; points: number; cap: number; params: Record<string, number> };
 export type ScoreConfig = {
   indicators: Record<string, IndicatorConfig>;
-  general: { maxBonus: number; maxPenalty: number; minWorkingDays: number; excellent: number; good: number; fair: number };
+  general: { maxBonus: number; maxPenalty: number; minWorkingDays: number; minIndicators: number; excellent: number; good: number; fair: number };
 };
 
-const DEFAULT_GENERAL: ScoreConfig['general'] = { maxBonus: 10, maxPenalty: 30, minWorkingDays: 0, excellent: 90, good: 75, fair: 60 };
+const DEFAULT_GENERAL: ScoreConfig['general'] = { maxBonus: 10, maxPenalty: 30, minWorkingDays: 0, minIndicators: 3, excellent: 90, good: 75, fair: 60 };
 const num = (v: any, def: number, min: number, max: number) => {
   const n = v === '' || v == null ? NaN : +v;
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n * 100) / 100)) : def;
@@ -85,6 +86,7 @@ export function normalizeConfig(raw: any, legacyWeights?: any): ScoreConfig {
     general: {
       maxBonus: num(g.maxBonus, DEFAULT_GENERAL.maxBonus, 0, 100), maxPenalty: num(g.maxPenalty, DEFAULT_GENERAL.maxPenalty, 0, 100),
       minWorkingDays: Math.round(num(g.minWorkingDays, DEFAULT_GENERAL.minWorkingDays, 0, 366)),
+      minIndicators: Math.round(num(g.minIndicators, DEFAULT_GENERAL.minIndicators, 1, 20)),
       excellent, good, fair: Math.min(good, num(g.fair, DEFAULT_GENERAL.fair, 0, 100)),
     },
   };
