@@ -684,7 +684,10 @@ export class WorkLogService {
         const required = this.isRequired(att, d, workDays, settings.requireOnNonWorkingDays);
         if (!required && !rep && !log) continue;
         const state = this.stateOf(rep, required, d, settings.lateGraceMinutes);
-        if (required) summary.required++;
+        // A day still open for its report (today, or yesterday within the grace) isn't owed yet: it is
+        // listed as PENDING but never counted as required, so no rate or score is held against anyone for it.
+        const countable = required && state !== 'PENDING';
+        if (countable) summary.required++;
         if (state === 'SUBMITTED') summary.submitted++;
         else if (state === 'LATE') summary.late++;
         else if (state === 'MISSING') summary.missing++;
@@ -697,7 +700,7 @@ export class WorkLogService {
           entryCount: log?._count._all ?? 0,
           taskCount: tcMap.get(key) ?? 0,
           report: rep ? { isLate: rep.isLate, lateDays: rep.lateDays, submittedAt: rep.submittedAt, editedAt: rep.editedAt, preview: rep.content.slice(0, 140), length: rep.content.trim().length } : null,
-          required, state,
+          required, countable, state,
           hasLateEntry: lateEntrySet.has(key), lateWaived: waivedSet.has(key),
         });
       }

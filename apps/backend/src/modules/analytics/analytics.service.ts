@@ -95,7 +95,9 @@ export class AnalyticsService {
     const today = workDateOf(new Date());
     const now = Date.now();
     const p = this.period(q);
-    const periodDays = { gregDate: { gte: p.start, lt: p.endExcl }, ...userIn };
+    // Period figures cover finished days only; today is shown live in its own block.
+    const finished = new Date(Math.min(p.endExcl.getTime(), today.getTime()));
+    const periodDays = { gregDate: { gte: p.start, lt: finished }, ...userIn };
     const [periodAtt, periodStatus, ticketsCreated, ticketsResolved, periodRequests] = await Promise.all([
       this.prisma.attendanceDay.aggregate({ where: periodDays, _sum: { workedMinutes: true, overtimeMinutes: true, delayMinutes: true, deficitMinutes: true } }),
       this.prisma.attendanceDay.groupBy({ by: ['status'], where: periodDays, _count: true }),
@@ -141,8 +143,11 @@ export class AnalyticsService {
   async attendance(q: any) {
     const p = this.period(q);
     const only = await this.filteredUserIds(q);
-    const where: any = { gregDate: { gte: p.start, lt: p.endExcl }, ...(only ? { userId: { in: [...only] } } : {}) };
     const today = workDateOf(new Date());
+    // Period totals, rankings and the daily chart use finished days only — a day still in progress
+    // would show everyone as absent or short. Today has its own live block below.
+    const finished = new Date(Math.min(p.endExcl.getTime(), today.getTime()));
+    const where: any = { gregDate: { gte: p.start, lt: finished }, ...(only ? { userId: { in: [...only] } } : {}) };
     const [totals, byStatus, byDay, perUser, requests] = await Promise.all([
       this.prisma.attendanceDay.aggregate({
         where,
@@ -181,7 +186,7 @@ export class AnalyticsService {
     for (const r of byStatus) statusCounts[r.status] = r._count;
 
     const days = new Map<number, { date: string; jDay: number; present: number; late: number; absent: number; leave: number; remote: number }>();
-    for (const d of this.eachDay(p)) {
+    for (const d of this.eachDay(p).filter((x) => x < finished)) {
       days.set(d.getTime(), { date: isoDate(d), jDay: toJalaliParts(d).jDay, present: 0, late: 0, absent: 0, leave: 0, remote: 0 });
     }
     for (const r of byDay) {
@@ -235,7 +240,7 @@ export class AnalyticsService {
   private summarize(rows: any[]) {
     const s = { required: 0, submitted: 0, late: 0, missing: 0, pending: 0, loggedMinutes: 0 };
     for (const r of rows) {
-      if (r.required) s.required++;
+      if (r.countable) s.required++;
       if (r.state === 'SUBMITTED') s.submitted++; else if (r.state === 'LATE') s.late++;
       else if (r.state === 'MISSING') s.missing++; else if (r.state === 'PENDING') s.pending++;
       s.loggedMinutes += r.loggedMinutes || 0;
@@ -327,7 +332,7 @@ export class AnalyticsService {
       daily.set(r.date, d);
       const dk = r.user.department?.name || 'بدون دپارتمان';
       const dd = dept.get(dk) ?? { department: dk, required: 0, submitted: 0, late: 0, missing: 0, loggedMinutes: 0 };
-      if (r.required) dd.required++;
+      if (r.countable) dd.required++;
       if (r.state === 'SUBMITTED') dd.submitted++; else if (r.state === 'LATE') dd.late++; else if (r.state === 'MISSING') dd.missing++;
       dd.loggedMinutes += r.loggedMinutes;
       dept.set(dk, dd);

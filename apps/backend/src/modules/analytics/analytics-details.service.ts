@@ -147,16 +147,16 @@ export class AnalyticsDetailsService {
       .map((r) => ({
         id: r.id, userId: r.userId, name: nameOf(r.user), department: r.user.department?.name ?? null, date: r.date, status: r.attendance?.status ?? null,
         workedMinutes: r.attendance?.workedMinutes ?? 0, loggedMinutes: r.loggedMinutes, coverage: r.attendance?.workedMinutes ? Math.round((r.loggedMinutes / r.attendance.workedMinutes) * 100) : null,
-        taskCount: r.taskCount, required: r.required, state: r.state, lateDays: r.report?.lateDays ?? 0, submittedAt: r.report?.submittedAt ?? null, lateWaived: r.lateWaived, length: r.report?.length ?? 0,
+        taskCount: r.taskCount, required: r.required, countable: r.countable, state: r.state, lateDays: r.report?.lateDays ?? 0, submittedAt: r.report?.submittedAt ?? null, lateWaived: r.lateWaived, length: r.report?.length ?? 0,
         preview: admin ? r.report?.preview ?? null : null,
       }));
     const count = (s: string) => rows.filter((r) => r.state === s).length;
-    const totals = { records: rows.length, required: rows.filter((r) => r.required).length, submitted: count('SUBMITTED'), late: count('LATE'), missing: count('MISSING'), loggedMinutes: rows.reduce((s, r) => s + r.loggedMinutes, 0), workedMinutes: rows.reduce((s, r) => s + r.workedMinutes, 0) };
+    const totals = { records: rows.length, required: rows.filter((r) => r.countable).length, submitted: count('SUBMITTED'), late: count('LATE'), missing: count('MISSING'), loggedMinutes: rows.reduce((s, r) => s + r.loggedMinutes, 0), workedMinutes: rows.reduce((s, r) => s + r.workedMinutes, 0) };
     if (q.view === 'people') {
       const by = new Map<string, any>();
       for (const r of rows) {
         const x = by.get(r.userId) ?? { userId: r.userId, name: r.name, department: r.department, required: 0, submitted: 0, late: 0, missing: 0, loggedMinutes: 0, workedMinutes: 0 };
-        if (r.required) x.required++;
+        if (r.countable) x.required++;
         if (r.state === 'SUBMITTED') x.submitted++; else if (r.state === 'LATE') x.late++; else if (r.state === 'MISSING') x.missing++;
         x.loggedMinutes += r.loggedMinutes; x.workedMinutes += r.workedMinutes;
         by.set(r.userId, x);

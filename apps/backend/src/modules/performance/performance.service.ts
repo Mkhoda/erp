@@ -79,10 +79,11 @@ export class PerformanceService {
   private async evaluate(actor: Actor, q: any, config: ScoreConfig) {
     const { start, endExcl } = resolveReportRange(q);
     const today = workDateOf(new Date());
-    const to = new Date(Math.min(endExcl.getTime() - DAY_MS, today.getTime()));
+    // Only finished days count: today is still being worked, so nobody is scored on it.
+    const to = new Date(Math.min(endExcl.getTime() - DAY_MS, today.getTime() - DAY_MS));
     const on = INDICATORS.filter((d) => config.indicators[d.key].enabled && (d.kind !== 'score' || config.indicators[d.key].weight > 0));
     const head = {
-      from: isoDate(start), to: isoDate(to), general: config.general,
+      from: isoDate(start), to: isoDate(to), general: config.general, todayExcluded: endExcl.getTime() - DAY_MS >= today.getTime(),
       indicators: on.map((d) => ({ key: d.key, kind: d.kind, group: d.group, label: d.label, description: d.description, unit: d.unit ?? null, weight: config.indicators[d.key].weight, points: config.indicators[d.key].points, cap: config.indicators[d.key].cap })),
     };
     if (to < start) return { ...head, people: 0, stats: {}, rows: [] };
@@ -197,7 +198,7 @@ export class PerformanceService {
       const wlWorked = ds.filter((d) => d.gregDate >= wlFrom).reduce((s, d) => s + d.workedMinutes, 0);
       const loggedMin = loggedOf.get(u.id) ?? 0;
       const w = wlOf.get(u.id) ?? [];
-      const req = w.filter((r) => r.required);
+      const req = w.filter((r) => r.countable);
       const submitted = req.filter((r) => r.state === 'SUBMITTED').length, lateRep = req.filter((r) => r.state === 'LATE').length, missing = req.filter((r) => r.state === 'MISSING').length;
 
       let due = 0, onTime = 0, lateDone = 0, openTasks = 0, earlyTasks = 0;

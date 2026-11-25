@@ -132,6 +132,8 @@ export default function PerformancePage() {
         </div>
       </div>
 
+      {data?.todayExcluded && <p className="flex items-start gap-1.5 text-[11px] text-theme-muted bg-theme-secondary/40 rounded-lg px-3 py-2"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5" /> فقط روزهای تمام‌شده حساب می‌شوند؛ روز جاری تا پایان روز در هیچ شاخصی، امتیازی را کم نمی‌کند. بازه‌ی محاسبه‌شده: {faDate(data.from)} تا {faDate(data.to)}.</p>}
+
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2.5">
           <div className="bg-theme-card border border-theme rounded-2xl px-4 py-3">
@@ -185,7 +187,7 @@ export default function PerformancePage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 && <tr><td colSpan={5 + base.length} className="py-12 text-center text-theme-muted">کسی یافت نشد</td></tr>}
+                {rows.length === 0 && <tr><td colSpan={5 + base.length} className="py-12 text-center text-theme-muted">{data?.todayExcluded && data.to < data.from ? "بازه‌ی انتخابی فقط شامل امروز است و روز جاری هنوز تمام نشده؛ از فردا قابل محاسبه است." : "کسی یافت نشد"}</td></tr>}
                 {rows.map((r: any) => (
                   <tr key={r.userId} onClick={() => setDetail(r)} className="border-b border-theme/50 last:border-b-0 hover:bg-theme-hover cursor-pointer">
                     <td className="py-2.5 text-center">
