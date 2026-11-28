@@ -911,6 +911,20 @@ export class WorkLogService {
     ]);
     // One person, so up to a whole year is fine.
     const days = to < from ? { rows: [], summary: null } : await this.adminDays(actor, { from: isoDate(from), to: isoDate(to), userId: q.userId }, 366);
+    // Every calendar day of the period (leave, sick leave, holidays, weekends included) so the monthly record is complete.
+    const attRows = to < from ? [] : await this.prisma.attendanceDay.findMany({
+      where: { userId: q.userId, gregDate: { gte: from, lte: to } }, select: { gregDate: true, status: true, workedMinutes: true },
+    });
+    const attByDate = new Map(attRows.map((a) => [isoDate(a.gregDate), a]));
+    const rowByDate = new Map<string, any>(days.rows.map((r: any) => [r.date, r]));
+    const daily: any[] = [];
+    for (let t = from.getTime(); t <= to.getTime(); t += DAY_MS) {
+      const d = new Date(t), iso = isoDate(d), j = toJalaliParts(d);
+      const row = rowByDate.get(iso), att = attByDate.get(iso);
+      daily.push(row
+        ? { date: iso, dow: row.dow, jDay: row.jDay, jMonth: row.jMonth, loggedMinutes: row.loggedMinutes, workedMinutes: row.attendance?.workedMinutes ?? 0, state: row.state, status: row.attendance?.status ?? null }
+        : { date: iso, dow: dayOfWeek(d), jDay: j.jDay, jMonth: j.jMonth, loggedMinutes: 0, workedMinutes: att?.workedMinutes ?? 0, state: 'NOT_REQUIRED', status: att?.status ?? null });
+    }
 
     const byCategory = new Map<string, { name: string; color: string | null; minutes: number; entries: number }>();
     const byTask = new Map<string, { title: string; category: string; minutes: number; entries: number; days: Set<string> }>();
@@ -928,7 +942,7 @@ export class WorkLogService {
     return {
       user, jYear, period, index, from: isoDate(from), to: isoDate(to),
       summary: days.summary,
-      daily: days.rows.map((r: any) => ({ date: r.date, jDay: r.jDay, jMonth: r.jMonth, loggedMinutes: r.loggedMinutes, workedMinutes: r.attendance?.workedMinutes ?? 0, state: r.state, status: r.attendance?.status ?? null })),
+      daily,
       byCategory: [...byCategory.values()].sort((a, b) => b.minutes - a.minutes),
       byTask: [...byTask.values()].map(({ days: d, ...t }) => ({ ...t, days: d.size })).sort((a, b) => b.minutes - a.minutes),
       entries: entries.map((e) => ({ id: e.id, date: isoDate(e.gregDate), task: e.task.title, category: e.task.category?.name || 'بدون دسته', color: e.task.category?.color ?? null, minutes: e.minutes, note: e.note, isLate: e.isLate, lateDays: e.lateDays })),

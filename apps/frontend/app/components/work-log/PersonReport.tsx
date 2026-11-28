@@ -60,7 +60,7 @@ export default function PersonReport({ data }: { data: any }) {
       </div>
 
       <ChartCard title="زمان ثبت‌شده در برابر کارکرد حضور" subtitle="ساعت در روز"
-        table={{ head: ["روز", "ثبت‌شده (ساعت)", "کارکرد (ساعت)", "وضعیت گزارش"], rows: (data.daily as any[]).map(d => [faDate(d.date), hrs(d.loggedMinutes), hrs(d.workedMinutes), STATE_META[d.state]?.label || d.state]) }}>
+        table={{ head: ["روز", "وضعیت حضور", "ثبت‌شده (ساعت)", "کارکرد (ساعت)", "وضعیت گزارش"], rows: (data.daily as any[]).map(d => [faDate(d.date), d.status ? STATUS_FA[d.status] || d.status : "—", hrs(d.loggedMinutes), hrs(d.workedMinutes), STATE_META[d.state]?.label || d.state]) }}>
         <DailyLines data={daily} series={[{ key: "logged", label: "زمان ثبت‌شده" }, { key: "worked", label: "کارکرد حضور" }]} height={240} />
       </ChartCard>
 
@@ -126,7 +126,7 @@ export default function PersonReport({ data }: { data: any }) {
           })}
         </div>
       </div>
-      <p className="text-[11px] text-theme-muted">روز {faDay(data.from)} تا {faDay(data.to)} — فقط روزهایی که گزارش الزامی بوده یا داده‌ای دارند در آمار آمده‌اند.</p>
+      <p className="text-[11px] text-theme-muted">روز {faDay(data.from)} تا {faDay(data.to)} — همه‌ی روزهای بازه نمایش داده می‌شوند؛ مرخصی، استعلاجی، ماموریت، تعطیل و آخر هفته با وضعیت حضور مشخص‌اند و در «روزهای نیازمند گزارش» شمرده نمی‌شوند.</p>
     </div>
   );
 }
